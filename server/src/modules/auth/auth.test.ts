@@ -1,5 +1,5 @@
 import supertest from 'supertest';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { app } from '../../app';
 import { prisma } from '../../lib/prisma';
 

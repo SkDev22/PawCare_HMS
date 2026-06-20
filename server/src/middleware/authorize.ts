@@ -1,10 +1,10 @@
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { PERMISSIONS, PermissionKey } from '@pawcare/shared';
 import { AuthenticatedRequest } from './authenticate';
 
 export function authorize(...requiredPermissions: PermissionKey[]) {
-  return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
-    const { role } = req.user;
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const { role } = (req as AuthenticatedRequest).user;
 
     const allowed = requiredPermissions.every((perm) =>
       (PERMISSIONS[perm] as readonly string[]).includes(role),

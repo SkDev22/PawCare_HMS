@@ -1,4 +1,4 @@
-import { app } from './app';
+﻿import { app } from './app';
 import { env } from './config/env';
 import { prisma } from './lib/prisma';
 import { redis } from './lib/redis';
@@ -23,7 +23,7 @@ async function start() {
 
     // Graceful shutdown
     const shutdown = async (signal: string) => {
-      logger.info(`${signal} received — shutting down gracefully`);
+      logger.info(`${signal} received â€” shutting down gracefully`);
       server.close(async () => {
         await prisma.$disconnect();
         redis.disconnect();

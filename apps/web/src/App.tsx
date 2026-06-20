@@ -4,6 +4,10 @@ import { useAuthStore } from './stores/auth.store';
 import { LoginPage } from './pages/auth/LoginPage';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
+import { OwnersPage } from './pages/patients/OwnersPage';
+import { OwnerDetailPage } from './pages/patients/OwnerDetailPage';
+import { PetsPage } from './pages/patients/PetsPage';
+import { PetDetailPage } from './pages/patients/PetDetailPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,6 +28,14 @@ function RequireGuest({ children }: { children: React.ReactNode }) {
   return accessToken ? <Navigate to="/dashboard" replace /> : <>{children}</>;
 }
 
+function AuthLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <RequireAuth>
+      <DashboardLayout>{children}</DashboardLayout>
+    </RequireAuth>
+  );
+}
+
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -38,16 +50,13 @@ export function App() {
             }
           />
 
-          <Route
-            path="/dashboard"
-            element={
-              <RequireAuth>
-                <DashboardLayout>
-                  <DashboardPage />
-                </DashboardLayout>
-              </RequireAuth>
-            }
-          />
+          <Route path="/dashboard" element={<AuthLayout><DashboardPage /></AuthLayout>} />
+
+          {/* Patient Management */}
+          <Route path="/owners"     element={<AuthLayout><OwnersPage /></AuthLayout>} />
+          <Route path="/owners/:id" element={<AuthLayout><OwnerDetailPage /></AuthLayout>} />
+          <Route path="/patients"   element={<AuthLayout><PetsPage /></AuthLayout>} />
+          <Route path="/patients/:id" element={<AuthLayout><PetDetailPage /></AuthLayout>} />
 
           {/* Default redirect */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

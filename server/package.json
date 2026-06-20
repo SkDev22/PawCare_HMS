@@ -9,14 +9,14 @@
     "type-check": "tsc --noEmit",
     "test": "jest --testPathPattern='\\.unit\\.test\\.ts$' --passWithNoTests",
     "test:integration": "jest --passWithNoTests",
-    "db:migrate": "prisma migrate dev",
-    "db:generate": "prisma generate",
-    "db:seed": "ts-node -r tsconfig-paths/register src/prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:migrate": "dotenv -e ../.env -- prisma migrate dev",
+    "db:generate": "dotenv -e ../.env -- prisma generate",
+    "db:seed": "dotenv -e ../.env -- ts-node -r tsconfig-paths/register src/prisma/seed.ts",
+    "db:studio": "dotenv -e ../.env -- prisma studio"
   },
   "prisma": {
     "schema": "src/prisma/schema.prisma",
-    "seed": "ts-node -r tsconfig-paths/register src/prisma/seed.ts"
+    "seed": "dotenv -e ../.env -- ts-node -r tsconfig-paths/register src/prisma/seed.ts"
   },
   "dependencies": {
     "@pawcare/shared": "workspace:*",
@@ -24,7 +24,7 @@
     "@aws-sdk/client-s3": "^3.600.0",
     "@aws-sdk/s3-request-presigner": "^3.600.0",
     "@sendgrid/mail": "^8.1.0",
-    "bcrypt": "^5.1.0",
+    "bcryptjs": "^2.4.3",
     "bullmq": "^5.10.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
@@ -34,7 +34,7 @@
     "helmet": "^7.1.0",
     "ioredis": "^5.4.0",
     "jsonwebtoken": "^9.0.0",
-    "multer": "^1.4.5",
+    "multer": "^2.2.0",
     "sharp": "^0.33.0",
     "stripe": "^16.0.0",
     "twilio": "^5.2.0",
@@ -42,7 +42,7 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
-    "@types/bcrypt": "^5.0.0",
+    "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.0",
     "@types/cors": "^2.8.0",
     "@types/express": "^4.17.0",
@@ -57,6 +57,7 @@
     "ts-jest": "^29.2.0",
     "ts-node": "^10.9.0",
     "ts-node-dev": "^2.0.0",
+    "dotenv-cli": "^7.4.0",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.4.0"
   }

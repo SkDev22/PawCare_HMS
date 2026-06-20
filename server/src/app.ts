@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Express } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -7,7 +7,7 @@ import { apiRouter } from './api/routes/index';
 import { errorHandler } from './middleware/error-handler';
 import { logger } from './lib/logger';
 
-export const app = express();
+export const app: Express = express();
 
 // Security headers
 app.use(helmet());

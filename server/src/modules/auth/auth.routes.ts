@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, IRouter, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { validate } from '../../middleware/validate';
 import { authenticate } from '../../middleware/authenticate';
@@ -25,7 +25,7 @@ const loginLimiter = rateLimit({
   },
 });
 
-export const authRouter = Router();
+export const authRouter: IRouter = Router();
 
 authRouter.post(
   '/login',

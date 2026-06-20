@@ -1,13 +1,14 @@
-import { Router } from 'express';
+import { Router, IRouter } from 'express';
 import { authRouter } from '../../modules/auth/auth.routes';
+import { patientsRouter } from '../../modules/patients/patients.routes';
 
-export const apiRouter = Router();
+export const apiRouter: IRouter = Router();
 
 apiRouter.use('/auth', authRouter);
+apiRouter.use('/', patientsRouter);
 
 // Modules will be registered here as they are implemented:
-// apiRouter.use('/owners',           ownersRouter);
-// apiRouter.use('/pets',             petsRouter);
+// apiRouter.use('/appointments',     appointmentsRouter);
 // apiRouter.use('/appointments',     appointmentsRouter);
 // apiRouter.use('/medical-records',  medicalRecordsRouter);
 // apiRouter.use('/inventory',        inventoryRouter);

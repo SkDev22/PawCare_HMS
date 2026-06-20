@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { prisma } from '../../lib/prisma';
 import { signAccessToken } from '../../lib/jwt';
 import { AppError } from '../../lib/errors';
