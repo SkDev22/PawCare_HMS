@@ -1,0 +1,668 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────
+// CLINIC & CONFIGURATION
+// ─────────────────────────────────────────
+
+model Clinic {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
+  address    String?
+  phone      String?
+  email      String?
+  logo_url   String?
+  timezone   String   @default("UTC")
+  currency   String   @default("USD")
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  staff    StaffUser[]
+  services Service[]
+  rooms    Room[]
+
+  @@map("clinics")
+}
+
+// ─────────────────────────────────────────
+// STAFF & AUTHENTICATION
+// ─────────────────────────────────────────
+
+enum StaffRole {
+  ADMIN
+  VETERINARIAN
+  NURSE
+  RECEPTIONIST
+  LAB_TECHNICIAN
+}
+
+model StaffUser {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clinic_id      String    @db.Uuid
+  email          String    @unique
+  password_hash  String
+  first_name     String
+  last_name      String
+  role           StaffRole
+  specialization String?
+  license_number String?
+  phone          String?
+  avatar_url     String?
+  is_active      Boolean   @default(true)
+  last_login_at  DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+  deleted_at     DateTime?
+
+  clinic         Clinic          @relation(fields: [clinic_id], references: [id])
+  refresh_tokens RefreshToken[]
+  appointments   Appointment[]
+  soap_notes     SoapNote[]
+  schedules      StaffSchedule[]
+
+  @@map("staff_users")
+}
+
+model RefreshToken {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  staff_id   String    @db.Uuid
+  token_hash String    @unique
+  expires_at DateTime
+  revoked_at DateTime?
+  created_at DateTime  @default(now())
+
+  staff StaffUser @relation(fields: [staff_id], references: [id])
+
+  @@index([staff_id])
+  @@map("refresh_tokens")
+}
+
+model StaffSchedule {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  staff_id    String   @db.Uuid
+  day_of_week Int
+  start_time  String
+  end_time    String
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  staff StaffUser @relation(fields: [staff_id], references: [id])
+
+  @@map("staff_schedules")
+}
+
+// ─────────────────────────────────────────
+// OWNERS (CLIENTS) & PETS (PATIENTS)
+// ─────────────────────────────────────────
+
+model Owner {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clinic_id         String    @db.Uuid
+  email             String?   @unique
+  password_hash     String?
+  first_name        String
+  last_name         String
+  phone             String
+  address           String?
+  emergency_contact String?
+  preferred_contact String    @default("email")
+  portal_enabled    Boolean   @default(false)
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+  deleted_at        DateTime?
+
+  pets     Pet[]
+  invoices Invoice[]
+
+  @@map("owners")
+}
+
+enum Species {
+  DOG
+  CAT
+  BIRD
+  RABBIT
+  REPTILE
+  SMALL_MAMMAL
+  OTHER
+}
+
+enum PetStatus {
+  ACTIVE
+  DECEASED
+  TRANSFERRED
+  INACTIVE
+}
+
+model Pet {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  owner_id     String    @db.Uuid
+  name         String
+  species      Species
+  breed        String?
+  date_of_birth DateTime?
+  weight_kg    Decimal?  @db.Decimal(6, 2)
+  sex          String?
+  color        String?
+  microchip_id String?   @unique
+  photo_url    String?
+  insurance_id String?
+  status       PetStatus @default(ACTIVE)
+  notes        String?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+  deleted_at   DateTime?
+
+  owner            Owner             @relation(fields: [owner_id], references: [id])
+  appointments     Appointment[]
+  medical_records  MedicalRecord[]
+  vaccinations     Vaccination[]
+  allergies        Allergy[]
+  prescriptions    Prescription[]
+  hospitalizations Hospitalization[]
+
+  @@map("pets")
+}
+
+model Allergy {
+  id       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pet_id   String   @db.Uuid
+  allergen String
+  reaction String?
+  severity String?
+  noted_at DateTime @default(now())
+
+  pet Pet @relation(fields: [pet_id], references: [id])
+
+  @@map("allergies")
+}
+
+// ─────────────────────────────────────────
+// APPOINTMENTS
+// ─────────────────────────────────────────
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  CHECKED_IN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum AppointmentType {
+  WELLNESS_EXAM
+  VACCINATION
+  SICK_VISIT
+  SURGERY
+  DENTAL
+  FOLLOW_UP
+  EMERGENCY
+  GROOMING
+  LAB_ONLY
+}
+
+model Appointment {
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clinic_id     String            @db.Uuid
+  pet_id        String            @db.Uuid
+  vet_id        String            @db.Uuid
+  room_id       String?           @db.Uuid
+  type          AppointmentType
+  status        AppointmentStatus @default(SCHEDULED)
+  start_at      DateTime
+  end_at        DateTime
+  reason        String?
+  notes         String?
+  is_walk_in    Boolean           @default(false)
+  cancelled_at  DateTime?
+  cancel_reason String?
+  created_at    DateTime          @default(now())
+  updated_at    DateTime          @updatedAt
+
+  pet            Pet            @relation(fields: [pet_id], references: [id])
+  vet            StaffUser      @relation(fields: [vet_id], references: [id])
+  room           Room?          @relation(fields: [room_id], references: [id])
+  medical_record MedicalRecord?
+  invoice        Invoice?
+
+  @@index([clinic_id, start_at])
+  @@index([vet_id, start_at])
+  @@map("appointments")
+}
+
+model Room {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clinic_id  String   @db.Uuid
+  name       String
+  type       String
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  clinic        Clinic        @relation(fields: [clinic_id], references: [id])
+  appointments  Appointment[]
+  kennel_units  KennelUnit[]
+
+  @@map("rooms")
+}
+
+// ─────────────────────────────────────────
+// ELECTRONIC MEDICAL RECORDS (EMR)
+// ─────────────────────────────────────────
+
+model MedicalRecord {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pet_id          String    @db.Uuid
+  appointment_id  String?   @unique @db.Uuid
+  vet_id          String    @db.Uuid
+  visit_date      DateTime  @default(now())
+  chief_complaint String?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  pet         Pet          @relation(fields: [pet_id], references: [id])
+  appointment Appointment? @relation(fields: [appointment_id], references: [id])
+  soap_note   SoapNote?
+  vitals      Vitals?
+  lab_results LabResult[]
+  prescriptions Prescription[]
+  attachments Attachment[]
+  diagnoses   Diagnosis[]
+
+  @@index([pet_id, visit_date])
+  @@map("medical_records")
+}
+
+model SoapNote {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  medical_record_id String   @unique @db.Uuid
+  vet_id            String   @db.Uuid
+  subjective        String?
+  objective         String?
+  assessment        String?
+  plan              String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  medical_record MedicalRecord @relation(fields: [medical_record_id], references: [id])
+  vet            StaffUser     @relation(fields: [vet_id], references: [id])
+
+  @@map("soap_notes")
+}
+
+model Vitals {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  medical_record_id    String   @unique @db.Uuid
+  weight_kg            Decimal? @db.Decimal(6, 2)
+  temperature_c        Decimal? @db.Decimal(4, 1)
+  heart_rate_bpm       Int?
+  respiratory_rate     Int?
+  blood_pressure       String?
+  body_condition_score Int?
+  recorded_at          DateTime @default(now())
+
+  medical_record MedicalRecord @relation(fields: [medical_record_id], references: [id])
+
+  @@map("vitals")
+}
+
+model Diagnosis {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  medical_record_id String   @db.Uuid
+  code              String?
+  name              String
+  is_primary        Boolean  @default(false)
+  notes             String?
+  created_at        DateTime @default(now())
+
+  medical_record MedicalRecord @relation(fields: [medical_record_id], references: [id])
+
+  @@map("diagnoses")
+}
+
+model Attachment {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  medical_record_id String   @db.Uuid
+  file_name         String
+  file_type         String
+  mime_type         String
+  s3_key            String
+  size_bytes        Int
+  deleted_at        DateTime?
+  uploaded_at       DateTime @default(now())
+
+  medical_record MedicalRecord @relation(fields: [medical_record_id], references: [id])
+
+  @@map("attachments")
+}
+
+// ─────────────────────────────────────────
+// VACCINATIONS
+// ─────────────────────────────────────────
+
+model Vaccination {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pet_id          String    @db.Uuid
+  vaccine_name    String
+  manufacturer    String?
+  lot_number      String?
+  administered_at DateTime
+  next_due_at     DateTime?
+  administered_by String    @db.Uuid
+  notes           String?
+  created_at      DateTime  @default(now())
+
+  pet Pet @relation(fields: [pet_id], references: [id])
+
+  @@map("vaccinations")
+}
+
+// ─────────────────────────────────────────
+// PRESCRIPTIONS & MEDICATIONS
+// ─────────────────────────────────────────
+
+model Prescription {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pet_id            String    @db.Uuid
+  medical_record_id String?   @db.Uuid
+  prescribed_by     String    @db.Uuid
+  drug_name         String
+  dosage            String
+  frequency         String
+  duration_days     Int?
+  quantity          Int?
+  refills_remaining Int       @default(0)
+  instructions      String?
+  dispensed_at      DateTime?
+  expires_at        DateTime?
+  is_active         Boolean   @default(true)
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  pet            Pet            @relation(fields: [pet_id], references: [id])
+  medical_record MedicalRecord? @relation(fields: [medical_record_id], references: [id])
+
+  @@map("prescriptions")
+}
+
+// ─────────────────────────────────────────
+// LABORATORY
+// ─────────────────────────────────────────
+
+enum LabStatus {
+  PENDING
+  SAMPLE_COLLECTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model LabOrder {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pet_id            String    @db.Uuid
+  ordered_by        String    @db.Uuid
+  panel_name        String
+  status            LabStatus @default(PENDING)
+  is_external       Boolean   @default(false)
+  external_lab_name String?
+  ordered_at        DateTime  @default(now())
+  completed_at      DateTime?
+  notes             String?
+
+  results LabResult[]
+
+  @@map("lab_orders")
+}
+
+model LabResult {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lab_order_id      String    @db.Uuid
+  medical_record_id String?   @db.Uuid
+  test_name         String
+  value             String
+  unit              String?
+  reference_min     String?
+  reference_max     String?
+  is_abnormal       Boolean   @default(false)
+  recorded_at       DateTime  @default(now())
+
+  lab_order      LabOrder       @relation(fields: [lab_order_id], references: [id])
+  medical_record MedicalRecord? @relation(fields: [medical_record_id], references: [id])
+
+  @@map("lab_results")
+}
+
+// ─────────────────────────────────────────
+// WARD & HOSPITALIZATION
+// ─────────────────────────────────────────
+
+model KennelUnit {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  room_id     String  @db.Uuid
+  label       String
+  size        String
+  is_occupied Boolean @default(false)
+  notes       String?
+
+  room             Room              @relation(fields: [room_id], references: [id])
+  hospitalizations Hospitalization[]
+
+  @@map("kennel_units")
+}
+
+model Hospitalization {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pet_id              String    @db.Uuid
+  kennel_id           String    @db.Uuid
+  admitted_by         String    @db.Uuid
+  reason              String
+  admitted_at         DateTime  @default(now())
+  discharged_at       DateTime?
+  discharge_notes     String?
+  estimated_stay_days Int?
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  pet      Pet        @relation(fields: [pet_id], references: [id])
+  kennel   KennelUnit @relation(fields: [kennel_id], references: [id])
+  care_logs CareLog[]
+
+  @@map("hospitalizations")
+}
+
+model CareLog {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hospitalization_id String   @db.Uuid
+  performed_by       String   @db.Uuid
+  type               String
+  notes              String
+  logged_at          DateTime @default(now())
+
+  hospitalization Hospitalization @relation(fields: [hospitalization_id], references: [id])
+
+  @@map("care_logs")
+}
+
+// ─────────────────────────────────────────
+// INVENTORY & PHARMACY
+// ─────────────────────────────────────────
+
+enum ItemCategory {
+  MEDICATION
+  VACCINE
+  SURGICAL_SUPPLY
+  DIAGNOSTIC_SUPPLY
+  FOOD
+  EQUIPMENT
+  OTHER
+}
+
+model InventoryItem {
+  id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clinic_id          String       @db.Uuid
+  name               String
+  sku                String?      @unique
+  category           ItemCategory
+  unit               String
+  quantity_on_hand   Int          @default(0)
+  reorder_threshold  Int          @default(10)
+  unit_cost          Decimal      @db.Decimal(10, 2)
+  selling_price      Decimal?     @db.Decimal(10, 2)
+  supplier_name      String?
+  supplier_sku       String?
+  expiry_date        DateTime?
+  location           String?
+  is_controlled      Boolean      @default(false)
+  is_active          Boolean      @default(true)
+  created_at         DateTime     @default(now())
+  updated_at         DateTime     @updatedAt
+
+  transactions       InventoryTransaction[]
+  invoice_line_items InvoiceLineItem[]
+
+  @@map("inventory_items")
+}
+
+model InventoryTransaction {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  item_id      String   @db.Uuid
+  performed_by String   @db.Uuid
+  type         String
+  quantity     Int
+  reference_id String?
+  notes        String?
+  created_at   DateTime @default(now())
+
+  item InventoryItem @relation(fields: [item_id], references: [id])
+
+  @@map("inventory_transactions")
+}
+
+// ─────────────────────────────────────────
+// SERVICES & BILLING
+// ─────────────────────────────────────────
+
+model Service {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clinic_id        String   @db.Uuid
+  name             String
+  category         String
+  price            Decimal  @db.Decimal(10, 2)
+  duration_minutes Int?
+  is_taxable       Boolean  @default(true)
+  is_active        Boolean  @default(true)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  clinic             Clinic            @relation(fields: [clinic_id], references: [id])
+  invoice_line_items InvoiceLineItem[]
+
+  @@map("services")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  PARTIALLY_PAID
+  OVERDUE
+  CANCELLED
+  REFUNDED
+}
+
+model Invoice {
+  id                       String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clinic_id                String        @db.Uuid
+  owner_id                 String        @db.Uuid
+  appointment_id           String?       @unique @db.Uuid
+  status                   InvoiceStatus @default(DRAFT)
+  subtotal                 Decimal       @db.Decimal(10, 2)
+  tax_amount               Decimal       @default(0) @db.Decimal(10, 2)
+  discount_amount          Decimal       @default(0) @db.Decimal(10, 2)
+  total                    Decimal       @db.Decimal(10, 2)
+  paid_amount              Decimal       @default(0) @db.Decimal(10, 2)
+  due_date                 DateTime?
+  notes                    String?
+  stripe_payment_intent_id String?
+  created_at               DateTime      @default(now())
+  updated_at               DateTime      @updatedAt
+
+  owner       Owner           @relation(fields: [owner_id], references: [id])
+  appointment Appointment?    @relation(fields: [appointment_id], references: [id])
+  line_items  InvoiceLineItem[]
+  payments    Payment[]
+
+  @@index([owner_id, status])
+  @@map("invoices")
+}
+
+model InvoiceLineItem {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  invoice_id  String   @db.Uuid
+  service_id  String?  @db.Uuid
+  item_id     String?  @db.Uuid
+  description String
+  quantity    Int      @default(1)
+  unit_price  Decimal  @db.Decimal(10, 2)
+  total       Decimal  @db.Decimal(10, 2)
+  created_at  DateTime @default(now())
+
+  invoice Invoice        @relation(fields: [invoice_id], references: [id])
+  service Service?       @relation(fields: [service_id], references: [id])
+  item    InventoryItem? @relation(fields: [item_id], references: [id])
+
+  @@map("invoice_line_items")
+}
+
+model Payment {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  invoice_id       String   @db.Uuid
+  amount           Decimal  @db.Decimal(10, 2)
+  method           String
+  stripe_charge_id String?
+  received_at      DateTime @default(now())
+  notes            String?
+
+  invoice Invoice @relation(fields: [invoice_id], references: [id])
+
+  @@map("payments")
+}
+
+// ─────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+model Notification {
+  id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  owner_id     String?            @db.Uuid
+  staff_id     String?            @db.Uuid
+  type         String
+  channel      String
+  subject      String?
+  body         String
+  status       NotificationStatus @default(PENDING)
+  scheduled_at DateTime?
+  sent_at      DateTime?
+  error_msg    String?
+  created_at   DateTime           @default(now())
+
+  @@index([status, scheduled_at])
+  @@map("notifications")
+}

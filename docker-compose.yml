@@ -1,0 +1,50 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pawcare_postgres
+    environment:
+      POSTGRES_USER: pawcare
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: pawcare_dev
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U pawcare -d pawcare_dev']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: pawcare_redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Uncomment to run pgAdmin locally for DB inspection
+  # pgadmin:
+  #   image: dpage/pgadmin4:latest
+  #   container_name: pawcare_pgadmin
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: admin@pawcare.vet
+  #     PGADMIN_DEFAULT_PASSWORD: admin
+  #   ports:
+  #     - '5050:80'
+  #   depends_on:
+  #     - postgres
+
+volumes:
+  postgres_data:
+  redis_data:
