@@ -61,11 +61,12 @@ model StaffUser {
   updated_at     DateTime  @updatedAt
   deleted_at     DateTime?
 
-  clinic         Clinic          @relation(fields: [clinic_id], references: [id])
-  refresh_tokens RefreshToken[]
-  appointments   Appointment[]
-  soap_notes     SoapNote[]
-  schedules      StaffSchedule[]
+  clinic          Clinic          @relation(fields: [clinic_id], references: [id])
+  refresh_tokens  RefreshToken[]
+  appointments    Appointment[]
+  soap_notes      SoapNote[]
+  schedules       StaffSchedule[]
+  medical_records MedicalRecord[]
 
   @@map("staff_users")
 }
@@ -270,8 +271,9 @@ model MedicalRecord {
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
 
-  pet         Pet          @relation(fields: [pet_id], references: [id])
-  appointment Appointment? @relation(fields: [appointment_id], references: [id])
+  pet         Pet           @relation(fields: [pet_id], references: [id])
+  vet         StaffUser     @relation(fields: [vet_id], references: [id])
+  appointment Appointment?  @relation(fields: [appointment_id], references: [id])
   soap_note   SoapNote?
   vitals      Vitals?
   lab_results LabResult[]

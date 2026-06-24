@@ -46,6 +46,7 @@ export const UpdatePetSchema = CreatePetSchema.omit({ owner_id: true }).partial(
 });
 
 export const PetQuerySchema = z.object({
+  search:   z.string().optional(),
   owner_id: z.string().uuid().optional(),
   species:  SpeciesEnum.optional(),
   status:   PetStatusEnum.optional(),

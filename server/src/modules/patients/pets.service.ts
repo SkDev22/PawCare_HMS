@@ -4,7 +4,7 @@ import { AppError } from '../../lib/errors';
 import type { CreatePetInput, UpdatePetInput, PetQueryInput, CreateAllergyInput } from '@pawcare/shared';
 
 export async function listPets(clinicId: string, query: PetQueryInput) {
-  const { owner_id, species, status, cursor, limit } = query;
+  const { search, owner_id, species, status, cursor, limit } = query;
 
   const pets = await prisma.pet.findMany({
     where: {
@@ -13,6 +13,7 @@ export async function listPets(clinicId: string, query: PetQueryInput) {
       ...(owner_id ? { owner_id } : {}),
       ...(species  ? { species }  : {}),
       ...(status   ? { status }   : {}),
+      ...(search   ? { name: { contains: search, mode: 'insensitive' as const } } : {}),
     },
     include: {
       owner: { select: { id: true, first_name: true, last_name: true } },

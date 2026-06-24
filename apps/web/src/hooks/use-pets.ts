@@ -5,6 +5,7 @@ import type { Pet, PaginatedResponse } from '@/types/patients';
 import type { CreatePetInput, UpdatePetInput, CreateAllergyInput } from '@pawcare/shared';
 
 export function usePets(params?: {
+  search?: string;
   owner_id?: string;
   species?: string;
   status?: string;
