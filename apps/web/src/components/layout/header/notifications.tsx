@@ -1,3 +1,5 @@
+import { useNavigate } from 'react-router-dom';
+import { formatDistanceToNow } from 'date-fns';
 import { BellIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -9,33 +11,32 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { useNotifications, useUnreadCount, useMarkRead, useMarkAllRead } from '@/hooks/use-notifications';
+import { useAuthStore } from '@/stores/auth.store';
 
-const SAMPLE_NOTIFICATIONS = [
-  {
-    id: '1',
-    title: 'Appointment reminder',
-    body: 'Rex (Golden Retriever) — wellness exam at 10:00 AM',
-    time: '5 min ago',
-    unread: true,
-  },
-  {
-    id: '2',
-    title: 'Low stock alert',
-    body: 'Amoxicillin 250mg: 3 units remaining (below reorder threshold)',
-    time: '1 hr ago',
-    unread: true,
-  },
-  {
-    id: '3',
-    title: 'Lab results ready',
-    body: 'CBC panel for Luna (Domestic Shorthair) is complete',
-    time: '2 hr ago',
-    unread: false,
-  },
-];
+function notifTitle(type: string): string {
+  const map: Record<string, string> = {
+    lab_result_abnormal:  'Abnormal Lab Result',
+    appointment_reminder: 'Appointment Reminder',
+    vaccine_due:          'Vaccine Due',
+    invoice_overdue:      'Invoice Overdue',
+    low_stock:            'Low Stock Alert',
+    system:               'System',
+  };
+  return map[type] ?? type.replace(/_/g, ' ');
+}
 
 export function Notifications() {
-  const unreadCount = SAMPLE_NOTIFICATIONS.filter((n) => n.unread).length;
+  const navigate    = useNavigate();
+  const accessToken = useAuthStore((s) => s.accessToken);
+
+  const { data: countData } = useUnreadCount();
+  const { data: notifData } = useNotifications({ limit: 8 });
+  const markRead            = useMarkRead();
+  const markAllRead         = useMarkAllRead();
+
+  const unreadCount   = accessToken ? (countData?.count ?? 0) : 0;
+  const notifications = notifData?.items ?? [];
 
   return (
     <DropdownMenu>
@@ -52,26 +53,56 @@ export function Notifications() {
         <DropdownMenuLabel className="flex items-center justify-between">
           <span>Notifications</span>
           {unreadCount > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              {unreadCount} new
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-xs">{unreadCount} new</Badge>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 text-xs px-2"
+                onClick={(e) => { e.preventDefault(); markAllRead.mutate(); }}
+                disabled={markAllRead.isPending}
+              >
+                Mark all read
+              </Button>
+            </div>
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {SAMPLE_NOTIFICATIONS.map((n) => (
-          <DropdownMenuItem key={n.id} className="flex flex-col items-start gap-1 py-3">
-            <div className="flex w-full items-center gap-2">
-              <span className="text-sm font-medium leading-none">{n.title}</span>
-              {n.unread && (
-                <span className="ml-auto size-2 shrink-0 rounded-full bg-brand-500" />
-              )}
-            </div>
-            <p className="text-muted-foreground line-clamp-2 text-xs leading-snug">{n.body}</p>
-            <span className="text-muted-foreground text-xs">{n.time}</span>
-          </DropdownMenuItem>
-        ))}
+        {notifications.length === 0 ? (
+          <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+            No notifications yet
+          </div>
+        ) : (
+          notifications.map((n) => {
+            const isUnread = !n.read_at;
+            return (
+              <DropdownMenuItem
+                key={n.id}
+                className="flex flex-col items-start gap-1 py-3 cursor-pointer"
+                onClick={() => { if (isUnread) markRead.mutate(n.id); }}
+              >
+                <div className="flex w-full items-center gap-2">
+                  <span className="text-sm font-medium leading-none">{notifTitle(n.type)}</span>
+                  {isUnread && (
+                    <span className="ml-auto size-2 shrink-0 rounded-full bg-primary" />
+                  )}
+                </div>
+                {n.subject && (
+                  <p className="text-xs text-muted-foreground font-medium">{n.subject}</p>
+                )}
+                <p className="text-muted-foreground line-clamp-2 text-xs leading-snug">{n.body}</p>
+                <span className="text-muted-foreground text-xs">
+                  {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                </span>
+              </DropdownMenuItem>
+            );
+          })
+        )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="justify-center text-xs font-medium">
+        <DropdownMenuItem
+          className="justify-center text-xs font-medium"
+          onClick={() => navigate('/notifications')}
+        >
           View all notifications
         </DropdownMenuItem>
       </DropdownMenuContent>

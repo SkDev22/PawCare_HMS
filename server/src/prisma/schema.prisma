@@ -67,6 +67,7 @@ model StaffUser {
   soap_notes      SoapNote[]
   schedules       StaffSchedule[]
   medical_records MedicalRecord[]
+  lab_orders      LabOrder[]      @relation("LabOrderVet")
 
   @@map("staff_users")
 }
@@ -169,6 +170,7 @@ model Pet {
   allergies        Allergy[]
   prescriptions    Prescription[]
   hospitalizations Hospitalization[]
+  lab_orders       LabOrder[]
 
   @@map("pets")
 }
@@ -421,6 +423,8 @@ model LabOrder {
   completed_at      DateTime?
   notes             String?
 
+  pet     Pet       @relation(fields: [pet_id], references: [id])
+  vet     StaffUser @relation("LabOrderVet", fields: [ordered_by], references: [id])
   results LabResult[]
 
   @@map("lab_orders")
@@ -662,9 +666,11 @@ model Notification {
   status       NotificationStatus @default(PENDING)
   scheduled_at DateTime?
   sent_at      DateTime?
+  read_at      DateTime?
   error_msg    String?
   created_at   DateTime           @default(now())
 
   @@index([status, scheduled_at])
+  @@index([staff_id, read_at])
   @@map("notifications")
 }

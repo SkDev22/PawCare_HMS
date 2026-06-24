@@ -16,6 +16,14 @@ import { BillingPage } from './pages/billing/BillingPage';
 import { InvoiceDetailPage } from './pages/billing/InvoiceDetailPage';
 import { StaffPage } from './pages/staff/StaffPage';
 import { StaffDetailPage } from './pages/staff/StaffDetailPage';
+import { LabPage } from './pages/lab/LabPage';
+import { LabOrderDetailPage } from './pages/lab/LabOrderDetailPage';
+import { WardPage } from './pages/ward/WardPage';
+import { HospitalizationDetailPage } from './pages/ward/HospitalizationDetailPage';
+import { InventoryPage } from './pages/inventory/InventoryPage';
+import { InventoryDetailPage } from './pages/inventory/InventoryDetailPage';
+import { ReportsPage } from './pages/reports/ReportsPage';
+import { NotificationsPage } from './pages/notifications/NotificationsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -81,6 +89,24 @@ export function App() {
           {/* Staff Management */}
           <Route path="/staff"     element={<AuthLayout><StaffPage /></AuthLayout>} />
           <Route path="/staff/:id" element={<AuthLayout><StaffDetailPage /></AuthLayout>} />
+
+          {/* Laboratory */}
+          <Route path="/lab"     element={<AuthLayout><LabPage /></AuthLayout>} />
+          <Route path="/lab/:id" element={<AuthLayout><LabOrderDetailPage /></AuthLayout>} />
+
+          {/* Ward & Hospitalization */}
+          <Route path="/ward"     element={<AuthLayout><WardPage /></AuthLayout>} />
+          <Route path="/ward/:id" element={<AuthLayout><HospitalizationDetailPage /></AuthLayout>} />
+
+          {/* Inventory */}
+          <Route path="/inventory"     element={<AuthLayout><InventoryPage /></AuthLayout>} />
+          <Route path="/inventory/:id" element={<AuthLayout><InventoryDetailPage /></AuthLayout>} />
+
+          {/* Reports */}
+          <Route path="/reports" element={<AuthLayout><ReportsPage /></AuthLayout>} />
+
+          {/* Notifications */}
+          <Route path="/notifications" element={<AuthLayout><NotificationsPage /></AuthLayout>} />
 
           {/* Default redirect */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

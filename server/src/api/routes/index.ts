@@ -5,6 +5,11 @@ import { appointmentsRouter } from '../../modules/appointments/appointments.rout
 import { emrRouter } from '../../modules/emr/emr.routes';
 import { billingRouter } from '../../modules/billing/billing.routes';
 import { staffRouter } from '../../modules/staff/staff.routes';
+import { labRouter } from '../../modules/laboratory/lab.routes';
+import { wardRouter } from '../../modules/ward/ward.routes';
+import { inventoryRouter } from '../../modules/inventory/inventory.routes';
+import { reportsRouter } from '../../modules/reports/reports.routes';
+import { notificationsRouter } from '../../modules/notifications/notifications.routes';
 
 export const apiRouter: IRouter = Router();
 
@@ -14,14 +19,8 @@ apiRouter.use('/appointments', appointmentsRouter);
 apiRouter.use('/medical-records', emrRouter);
 apiRouter.use('/billing', billingRouter);
 apiRouter.use('/staff', staffRouter);
-
-// Modules will be registered here as they are implemented:
-// apiRouter.use('/medical-records',  medicalRecordsRouter); — done above
-// apiRouter.use('/inventory',        inventoryRouter);
-// apiRouter.use('/invoices',         invoicesRouter);
-// apiRouter.use('/staff',            staffRouter);
-// apiRouter.use('/lab-orders',       labOrdersRouter);
-// apiRouter.use('/hospitalizations', hospitalizationsRouter);
-// apiRouter.use('/ward',             wardRouter);
-// apiRouter.use('/reports',          reportsRouter);
-// apiRouter.use('/portal',           portalRouter);
+apiRouter.use('/lab-orders', labRouter);
+apiRouter.use('/ward', wardRouter);
+apiRouter.use('/inventory', inventoryRouter);
+apiRouter.use('/reports', reportsRouter);
+apiRouter.use('/notifications', notificationsRouter);
