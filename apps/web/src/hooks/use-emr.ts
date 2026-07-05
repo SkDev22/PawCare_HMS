@@ -8,7 +8,14 @@ import type {
   Vitals,
   Diagnosis,
   Prescription,
+  Charge,
 } from '../types/emr';
+
+type ApiError = { response?: { data?: { error?: { message?: string } } } };
+
+function errMsg(err: ApiError, fallback: string) {
+  return err?.response?.data?.error?.message ?? fallback;
+}
 
 export function useMedicalRecords(params?: {
   search?: string;
@@ -137,15 +144,17 @@ export function useAddPrescription(recordId: string) {
       refills_remaining?: number;
       instructions?: string;
       expires_at?: string;
+      item_id?: string;
     }) =>
       api
         .post(`/medical-records/${recordId}/prescriptions`, data)
         .then((r) => r.data as Prescription),
-    onSuccess: () => {
+    onSuccess: (rx) => {
       qc.invalidateQueries({ queryKey: ['medical-records', recordId] });
+      if (rx.item_id) qc.invalidateQueries({ queryKey: ['inventory'] });
       toast.success('Prescription added');
     },
-    onError: () => toast.error('Failed to add prescription'),
+    onError: (err: ApiError) => toast.error(errMsg(err, 'Failed to add prescription')),
   });
 }
 
@@ -156,8 +165,47 @@ export function useDeactivatePrescription(recordId: string) {
       api.delete(`/medical-records/${recordId}/prescriptions/${rxId}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['medical-records', recordId] });
+      qc.invalidateQueries({ queryKey: ['inventory'] });
       toast.success('Prescription deactivated');
     },
     onError: () => toast.error('Failed to deactivate prescription'),
+  });
+}
+
+// ── Charges (visit → invoice bridge) ───────────────────────────────────────────
+
+export function useCharges(recordId: string | undefined) {
+  return useQuery<Charge[]>({
+    queryKey: ['medical-records', recordId, 'charges'],
+    queryFn: () => api.get(`/medical-records/${recordId}/charges`).then((r) => r.data),
+    enabled: !!recordId,
+  });
+}
+
+export function useAddCharge(recordId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { item_id?: string; service_id?: string; quantity: number; description?: string }) =>
+      api.post(`/medical-records/${recordId}/charges`, data).then((r) => r.data as Charge),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['medical-records', recordId, 'charges'] });
+      qc.invalidateQueries({ queryKey: ['inventory'] });
+      toast.success('Charge added');
+    },
+    onError: (err: ApiError) => toast.error(errMsg(err, 'Failed to add charge')),
+  });
+}
+
+export function useRemoveCharge(recordId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (chargeId: string) =>
+      api.delete(`/medical-records/${recordId}/charges/${chargeId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['medical-records', recordId, 'charges'] });
+      qc.invalidateQueries({ queryKey: ['inventory'] });
+      toast.success('Charge removed');
+    },
+    onError: (err: ApiError) => toast.error(errMsg(err, 'Failed to remove charge')),
   });
 }

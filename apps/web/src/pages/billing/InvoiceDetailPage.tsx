@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
-import { ArrowLeft, Plus, Trash2, CreditCard } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, CreditCard, Printer } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -381,8 +381,17 @@ export function InvoiceDetailPage() {
 
   return (
     <div className="space-y-6">
+      {/* Print-only letterhead */}
+      <div className="hidden print:block mb-4">
+        <h1 className="text-xl font-bold">PawCare HMS</h1>
+        <p className="text-sm">Invoice #{invoice.id.slice(0, 8).toUpperCase()} · {STATUS_LABEL[invoice.status]}</p>
+        <p className="text-sm text-muted-foreground">
+          Issued {format(new Date(invoice.created_at), 'MMM d, yyyy')}
+        </p>
+      </div>
+
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 print:hidden">
         <Button variant="ghost" size="sm" onClick={() => navigate('/billing')}>
           <ArrowLeft className="h-4 w-4 mr-1" />
           Billing
@@ -396,12 +405,16 @@ export function InvoiceDetailPage() {
             {STATUS_LABEL[invoice.status]}
           </Badge>
         </div>
-        <div className="ml-auto text-sm text-muted-foreground">
+        <div className="ml-auto flex items-center gap-3 text-sm text-muted-foreground">
           Created {format(new Date(invoice.created_at), 'MMM d, yyyy')}
+          <Button variant="outline" size="sm" onClick={() => window.print()}>
+            <Printer className="h-4 w-4 mr-1" />
+            Print
+          </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:grid-cols-1">
         {/* Left — line items + payments */}
         <div className="lg:col-span-2 space-y-6">
 
@@ -411,7 +424,7 @@ export function InvoiceDetailPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Line Items</CardTitle>
                 {canEdit && (
-                  <Button size="sm" variant="outline" onClick={() => setAddLineOpen(true)}>
+                  <Button size="sm" variant="outline" className="print:hidden" onClick={() => setAddLineOpen(true)}>
                     <Plus className="h-4 w-4 mr-1" />
                     Add Item
                   </Button>
@@ -432,7 +445,7 @@ export function InvoiceDetailPage() {
                         <TableHead className="text-right w-20">Qty</TableHead>
                         <TableHead className="text-right w-28">Unit Price</TableHead>
                         <TableHead className="text-right w-28">Total</TableHead>
-                        {canEdit && <TableHead className="w-10" />}
+                        {canEdit && <TableHead className="w-10 print:hidden" />}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -454,7 +467,7 @@ export function InvoiceDetailPage() {
                             ${parseFloat(item.total).toFixed(2)}
                           </TableCell>
                           {canEdit && (
-                            <TableCell>
+                            <TableCell className="print:hidden">
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -480,7 +493,7 @@ export function InvoiceDetailPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Payments</CardTitle>
                 {balance > 0.001 && invoice.status !== 'CANCELLED' && invoice.status !== 'REFUNDED' && (
-                  <Button size="sm" onClick={() => setPaymentOpen(true)}>
+                  <Button size="sm" className="print:hidden" onClick={() => setPaymentOpen(true)}>
                     <CreditCard className="h-4 w-4 mr-1" />
                     Record Payment
                   </Button>
@@ -576,7 +589,7 @@ export function InvoiceDetailPage() {
 
           {/* Status actions */}
           {nextStatuses.length > 0 && (
-            <Card>
+            <Card className="print:hidden">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Actions</CardTitle>
               </CardHeader>
@@ -630,7 +643,7 @@ export function InvoiceDetailPage() {
                 <Button
                   variant="link"
                   size="sm"
-                  className="p-0 h-auto text-xs"
+                  className="p-0 h-auto text-xs print:hidden"
                   onClick={() => navigate(`/appointments/${invoice.appointment!.id}`)}
                 >
                   View appointment →

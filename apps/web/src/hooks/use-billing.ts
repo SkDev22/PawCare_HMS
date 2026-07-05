@@ -15,6 +15,7 @@ import type {
 export function useInvoices(params?: {
   status?: InvoiceStatus;
   owner_id?: string;
+  search?: string;
   date_from?: string;
   date_to?: string;
   limit?: number;

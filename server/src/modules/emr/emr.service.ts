@@ -1,5 +1,8 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
+import { clampZero } from '../billing/billing.service';
+import { applyStockChangeTx } from '../inventory/inventory.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import type {
   CreateMedicalRecordInput,
@@ -10,12 +13,15 @@ import type {
   CreateDiagnosisInput,
   CreatePrescriptionInput,
   UpdatePrescriptionInput,
+  CreateChargeInput,
 } from '@pawcare/shared';
+
+type TxClient = Prisma.TransactionClient;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-async function assertRecordInClinic(recordId: string, clinicId: string) {
-  const record = await prisma.medicalRecord.findFirst({
+async function assertRecordInClinic(recordId: string, clinicId: string, client: TxClient = prisma) {
+  const record = await client.medicalRecord.findFirst({
     where: {
       id: recordId,
       pet: { owner: { clinic_id: clinicId } },
@@ -85,6 +91,10 @@ const recordFullIncludes = {
   prescriptions: {
     where: { is_active: true },
     orderBy: { created_at: 'desc' as const },
+    include: {
+      item:   { select: { id: true, name: true } },
+      charge: { select: { id: true, total: true } },
+    },
   },
   lab_results: {
     take: 20,
@@ -300,23 +310,45 @@ export async function addPrescription(
   prescribedBy: string,
   data: CreatePrescriptionInput,
 ) {
-  const record = await assertRecordInClinic(recordId, clinicId);
+  return prisma.$transaction(async (tx) => {
+    const record = await assertRecordInClinic(recordId, clinicId, tx);
 
-  return prisma.prescription.create({
-    data: {
-      pet_id:            record.pet_id,
-      medical_record_id: recordId,
-      prescribed_by:     prescribedBy,
-      drug_name:         data.drug_name,
-      dosage:            data.dosage,
-      frequency:         data.frequency,
-      duration_days:     data.duration_days    ?? null,
-      quantity:          data.quantity          ?? null,
-      refills_remaining: data.refills_remaining,
-      instructions:      data.instructions     ?? null,
-      dispensed_at:      data.dispensed_at ? new Date(data.dispensed_at) : null,
-      expires_at:        data.expires_at   ? new Date(data.expires_at)   : null,
-    },
+    // When the drug is dispensed from clinic stock (item_id given), also create the
+    // matching billing charge + stock deduction in the same transaction, so the Rx
+    // and the bill can never drift apart. Pharmacy-fulfilled drugs (no item_id) are
+    // documentation-only — nothing is billed or deducted.
+    let chargeId: string | null = null;
+    if (data.item_id) {
+      const charge = await createChargeTx(tx, recordId, clinicId, prescribedBy, {
+        item_id: data.item_id,
+        quantity: data.quantity ?? 1,
+        description: data.drug_name,
+      });
+      chargeId = charge.id;
+    }
+
+    return tx.prescription.create({
+      data: {
+        pet_id:            record.pet_id,
+        medical_record_id: recordId,
+        prescribed_by:     prescribedBy,
+        drug_name:         data.drug_name,
+        dosage:            data.dosage,
+        frequency:         data.frequency,
+        duration_days:     data.duration_days    ?? null,
+        quantity:          data.quantity          ?? null,
+        refills_remaining: data.refills_remaining,
+        instructions:      data.instructions     ?? null,
+        dispensed_at:      data.dispensed_at ? new Date(data.dispensed_at) : null,
+        expires_at:        data.expires_at   ? new Date(data.expires_at)   : null,
+        ...(data.item_id ? { item_id: data.item_id } : {}),
+        ...(chargeId    ? { charge_id: chargeId }    : {}),
+      },
+      include: {
+        item:   { select: { id: true, name: true } },
+        charge: { select: { id: true, total: true } },
+      },
+    });
   });
 }
 
@@ -352,15 +384,231 @@ export async function updatePrescription(
   });
 }
 
-export async function deactivatePrescription(rxId: string, clinicId: string) {
-  const rx = await prisma.prescription.findFirst({
-    where: { id: rxId, pet: { owner: { clinic_id: clinicId } } },
-    select: { id: true },
-  });
-  if (!rx) throw new AppError('NOT_FOUND', 'Prescription not found', 404);
+export async function deactivatePrescription(rxId: string, clinicId: string, staffId: string) {
+  return prisma.$transaction(async (tx) => {
+    const rx = await tx.prescription.findFirst({
+      where: { id: rxId, pet: { owner: { clinic_id: clinicId } } },
+      select: { id: true, medical_record_id: true, charge_id: true },
+    });
+    if (!rx) throw new AppError('NOT_FOUND', 'Prescription not found', 404);
 
-  await prisma.prescription.update({
-    where: { id: rxId },
-    data: { is_active: false },
+    await tx.prescription.update({
+      where: { id: rxId },
+      data: { is_active: false },
+    });
+
+    // If this Rx was dispensed from clinic stock, reverse the billing/stock effects too —
+    // but only while the invoice is still editable (never touch a paid/finalized invoice).
+    if (rx.charge_id && rx.medical_record_id) {
+      const charge = await tx.medicalRecordCharge.findUnique({
+        where: { id: rx.charge_id },
+        select: { invoice_line_item: { select: { invoice: { select: { status: true } } } } },
+      });
+      const invoiceStatus = charge?.invoice_line_item?.invoice.status;
+      if (!invoiceStatus || ['DRAFT', 'SENT'].includes(invoiceStatus)) {
+        await removeChargeTx(tx, rx.medical_record_id, rx.charge_id, clinicId, staffId);
+      }
+    }
   });
+}
+
+// ── Charges (visit → invoice bridge) ───────────────────────────────────────────
+
+const chargeIncludes = {
+  item:    { select: { id: true, name: true, category: true, unit: true } },
+  service: { select: { id: true, name: true, category: true } },
+} as const;
+
+export async function listCharges(recordId: string, clinicId: string) {
+  await assertRecordInClinic(recordId, clinicId);
+
+  return prisma.medicalRecordCharge.findMany({
+    where: { medical_record_id: recordId },
+    include: chargeIncludes,
+    orderBy: { created_at: 'asc' },
+  });
+}
+
+async function createChargeTx(
+  tx: TxClient,
+  recordId: string,
+  clinicId: string,
+  staffId: string,
+  data: CreateChargeInput,
+) {
+  const record = await tx.medicalRecord.findFirst({
+    where: { id: recordId, pet: { owner: { clinic_id: clinicId } } },
+    select: {
+      id: true,
+      appointment_id: true,
+      pet: { select: { owner_id: true } },
+    },
+  });
+  if (!record) throw new AppError('NOT_FOUND', 'Medical record not found', 404);
+
+  let unitPrice: Decimal;
+  let description: string;
+  let resolvedItemId: string | null = null;
+
+  if (data.item_id) {
+    const item = await tx.inventoryItem.findFirst({
+      where: { id: data.item_id, clinic_id: clinicId, is_active: true },
+    });
+    if (!item) throw new AppError('NOT_FOUND', 'Inventory item not found', 404);
+    if (item.selling_price === null) {
+      throw new AppError('BAD_REQUEST', `"${item.name}" has no selling price configured`, 400);
+    }
+    unitPrice = item.selling_price;
+    description = data.description ?? item.name;
+    resolvedItemId = item.id;
+  } else {
+    const serviceId = data.service_id;
+    if (!serviceId) throw new AppError('BAD_REQUEST', 'Either item_id or service_id is required', 400);
+    const service = await tx.service.findFirst({
+      where: { id: serviceId, clinic_id: clinicId, is_active: true },
+    });
+    if (!service) throw new AppError('NOT_FOUND', 'Service not found', 404);
+    unitPrice = service.price;
+    description = data.description ?? service.name;
+  }
+
+  const total = unitPrice.times(data.quantity);
+
+  // Resolve the invoice this charge belongs to: prefer the appointment's invoice,
+  // otherwise reuse whichever invoice this record's earlier charges (if any) already
+  // billed to, otherwise start a fresh one. A record isn't required to have an
+  // appointment — most are created directly from the EMR screen without one.
+  let invoice = record.appointment_id
+    ? await tx.invoice.findUnique({ where: { appointment_id: record.appointment_id } })
+    : null;
+
+  if (!invoice) {
+    const priorCharge = await tx.medicalRecordCharge.findFirst({
+      where: { medical_record_id: recordId, invoice_line_item_id: { not: null } },
+      select: { invoice_line_item: { select: { invoice_id: true } } },
+      orderBy: { created_at: 'asc' },
+    });
+    if (priorCharge?.invoice_line_item) {
+      invoice = await tx.invoice.findUnique({ where: { id: priorCharge.invoice_line_item.invoice_id } });
+    }
+  }
+
+  if (!invoice) {
+    invoice = await tx.invoice.create({
+      data: {
+        clinic_id: clinicId,
+        owner_id: record.pet.owner_id,
+        ...(record.appointment_id ? { appointment_id: record.appointment_id } : {}),
+        subtotal: new Decimal(0),
+        tax_amount: new Decimal(0),
+        discount_amount: new Decimal(0),
+        total: new Decimal(0),
+        paid_amount: new Decimal(0),
+      },
+    });
+  }
+  if (!['DRAFT', 'SENT'].includes(invoice.status)) {
+    throw new AppError('BAD_REQUEST', 'Cannot add charges to a finalized invoice', 400);
+  }
+
+  const lineItem = await tx.invoiceLineItem.create({
+    data: {
+      invoice_id: invoice.id,
+      ...(data.item_id ? { item_id: data.item_id } : {}),
+      ...(data.service_id ? { service_id: data.service_id } : {}),
+      description,
+      quantity: data.quantity,
+      unit_price: unitPrice,
+      total,
+    },
+  });
+
+  const newSubtotal = invoice.subtotal.plus(total);
+  const newTotal = clampZero(newSubtotal.plus(invoice.tax_amount).minus(invoice.discount_amount));
+  await tx.invoice.update({
+    where: { id: invoice.id },
+    data: { subtotal: newSubtotal, total: newTotal },
+  });
+
+  const charge = await tx.medicalRecordCharge.create({
+    data: {
+      medical_record_id: recordId,
+      ...(data.item_id ? { item_id: data.item_id } : {}),
+      ...(data.service_id ? { service_id: data.service_id } : {}),
+      description,
+      quantity: data.quantity,
+      unit_price: unitPrice,
+      total,
+      invoice_line_item_id: lineItem.id,
+      created_by: staffId,
+    },
+    include: chargeIncludes,
+  });
+
+  if (resolvedItemId) {
+    await applyStockChangeTx(tx, resolvedItemId, clinicId, staffId, {
+      type: 'dispensed',
+      quantity: -data.quantity,
+      reference_id: charge.id,
+      notes: `Dispensed for visit ${recordId}`,
+    });
+  }
+
+  return charge;
+}
+
+export async function addCharge(
+  recordId: string,
+  clinicId: string,
+  staffId: string,
+  data: CreateChargeInput,
+) {
+  return prisma.$transaction((tx) => createChargeTx(tx, recordId, clinicId, staffId, data));
+}
+
+async function removeChargeTx(
+  tx: TxClient,
+  recordId: string,
+  chargeId: string,
+  clinicId: string,
+  staffId: string,
+) {
+  const charge = await tx.medicalRecordCharge.findFirst({
+    where: { id: chargeId, medical_record_id: recordId, medical_record: { pet: { owner: { clinic_id: clinicId } } } },
+    include: { invoice_line_item: { include: { invoice: true } } },
+  });
+  if (!charge) throw new AppError('NOT_FOUND', 'Charge not found', 404);
+
+  const invoice = charge.invoice_line_item?.invoice;
+  if (invoice && !['DRAFT', 'SENT'].includes(invoice.status)) {
+    throw new AppError('BAD_REQUEST', 'Cannot remove a charge from a finalized invoice', 400);
+  }
+
+  await tx.medicalRecordCharge.delete({ where: { id: chargeId } });
+
+  if (charge.invoice_line_item_id) {
+    await tx.invoiceLineItem.delete({ where: { id: charge.invoice_line_item_id } });
+  }
+
+  if (invoice) {
+    const newSubtotal = clampZero(invoice.subtotal.minus(charge.total));
+    const newTotal = clampZero(newSubtotal.plus(invoice.tax_amount).minus(invoice.discount_amount));
+    await tx.invoice.update({
+      where: { id: invoice.id },
+      data: { subtotal: newSubtotal, total: newTotal },
+    });
+  }
+
+  if (charge.item_id) {
+    await applyStockChangeTx(tx, charge.item_id, clinicId, staffId, {
+      type: 'adjustment',
+      quantity: charge.quantity,
+      reference_id: charge.id,
+      notes: `Reversed charge for visit ${recordId}`,
+    });
+  }
+}
+
+export async function removeCharge(recordId: string, chargeId: string, clinicId: string, staffId: string) {
+  return prisma.$transaction((tx) => removeChargeTx(tx, recordId, chargeId, clinicId, staffId));
 }

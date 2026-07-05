@@ -11,6 +11,7 @@ import {
   CreateDiagnosisSchema,
   CreatePrescriptionSchema,
   UpdatePrescriptionSchema,
+  CreateChargeSchema,
 } from '@pawcare/shared';
 import type { MedicalRecordQueryInput } from '@pawcare/shared';
 import * as svc from './emr.service';
@@ -173,7 +174,49 @@ emrRouter.delete(
   authorize('MEDICAL_RECORD_WRITE'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await svc.deactivatePrescription(req.params.rxId, authed(req).user.clinic_id);
+      const user = authed(req).user;
+      await svc.deactivatePrescription(req.params.rxId, user.clinic_id, user.id);
+      res.status(204).end();
+    } catch (err) { next(err); }
+  },
+);
+
+// ── Charges (visit → invoice bridge) ────────────────────────────────────────────
+
+emrRouter.get(
+  '/:id/charges',
+  authenticate,
+  authorize('MEDICAL_RECORD_READ'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const charges = await svc.listCharges(req.params.id, authed(req).user.clinic_id);
+      res.json(charges);
+    } catch (err) { next(err); }
+  },
+);
+
+emrRouter.post(
+  '/:id/charges',
+  authenticate,
+  authorize('MEDICAL_RECORD_WRITE'),
+  validate({ body: CreateChargeSchema }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = authed(req).user;
+      const charge = await svc.addCharge(req.params.id, user.clinic_id, user.id, req.body);
+      res.status(201).json(charge);
+    } catch (err) { next(err); }
+  },
+);
+
+emrRouter.delete(
+  '/:id/charges/:chargeId',
+  authenticate,
+  authorize('MEDICAL_RECORD_WRITE'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = authed(req).user;
+      await svc.removeCharge(req.params.id, req.params.chargeId, user.clinic_id, user.id);
       res.status(204).end();
     } catch (err) { next(err); }
   },

@@ -60,6 +60,7 @@ export interface Appointment {
   reason:        string | null;
   notes:         string | null;
   is_walk_in:    boolean;
+  checked_in_at: string | null;
   cancelled_at:  string | null;
   cancel_reason: string | null;
   created_at:    string;

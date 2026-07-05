@@ -173,14 +173,16 @@ interface Props {
   onClose:     () => void;
   editAppt?:   Appointment;
   defaultDate?: string;
+  defaultWalkIn?: boolean;
 }
 
-export function AppointmentForm({ open, onClose, editAppt, defaultDate }: Props) {
+export function AppointmentForm({ open, onClose, editAppt, defaultDate, defaultWalkIn }: Props) {
   const isEdit = !!editAppt;
   const { data: vets = [] }  = useVets();
   const { data: rooms = [] } = useRooms();
 
   const todayStr = defaultDate ?? new Date().toISOString().slice(0, 10);
+  const nowStr = new Date().toTimeString().slice(0, 5);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema),
@@ -190,11 +192,11 @@ export function AppointmentForm({ open, onClose, editAppt, defaultDate }: Props)
       room_id:          '',
       type:             'WELLNESS_EXAM',
       date:             todayStr,
-      start_time:       '09:00',
+      start_time:       defaultWalkIn ? nowStr : '09:00',
       duration_minutes: '30',
       reason:           '',
       notes:            '',
-      is_walk_in:       false,
+      is_walk_in:       !!defaultWalkIn,
     },
   });
 
@@ -219,11 +221,11 @@ export function AppointmentForm({ open, onClose, editAppt, defaultDate }: Props)
     } else {
       form.reset({
         pet_id: '', vet_id: '', room_id: '',
-        type: 'WELLNESS_EXAM', date: todayStr, start_time: '09:00',
-        duration_minutes: '30', reason: '', notes: '', is_walk_in: false,
+        type: 'WELLNESS_EXAM', date: todayStr, start_time: defaultWalkIn ? nowStr : '09:00',
+        duration_minutes: '30', reason: '', notes: '', is_walk_in: !!defaultWalkIn,
       });
     }
-  }, [editAppt, open, form, todayStr]);
+  }, [editAppt, open, form, todayStr, defaultWalkIn, nowStr]);
 
   const create = useCreateAppointment();
   const update = useUpdateAppointment(editAppt?.id ?? '');

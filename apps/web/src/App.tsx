@@ -10,6 +10,7 @@ import { PetsPage } from './pages/patients/PetsPage';
 import { PetDetailPage } from './pages/patients/PetDetailPage';
 import { AppointmentsPage } from './pages/appointments/AppointmentsPage';
 import { AppointmentDetailPage } from './pages/appointments/AppointmentDetailPage';
+import { QueuePage } from './pages/appointments/QueuePage';
 import { EmrPage } from './pages/emr/EmrPage';
 import { EmrDetailPage } from './pages/emr/EmrDetailPage';
 import { BillingPage } from './pages/billing/BillingPage';
@@ -75,8 +76,9 @@ export function App() {
           <Route path="/patients/:id" element={<AuthLayout><PetDetailPage /></AuthLayout>} />
 
           {/* Appointments */}
-          <Route path="/appointments"     element={<AuthLayout><AppointmentsPage /></AuthLayout>} />
-          <Route path="/appointments/:id" element={<AuthLayout><AppointmentDetailPage /></AuthLayout>} />
+          <Route path="/appointments"       element={<AuthLayout><AppointmentsPage /></AuthLayout>} />
+          <Route path="/appointments/queue" element={<AuthLayout><QueuePage /></AuthLayout>} />
+          <Route path="/appointments/:id"   element={<AuthLayout><AppointmentDetailPage /></AuthLayout>} />
 
           {/* Medical Records (EMR) */}
           <Route path="/emr"     element={<AuthLayout><EmrPage /></AuthLayout>} />

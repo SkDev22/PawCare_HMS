@@ -54,6 +54,10 @@ export type Prescription = {
   dispensed_at: string | null;
   expires_at: string | null;
   is_active: boolean;
+  item_id: string | null;
+  charge_id: string | null;
+  item: { id: string; name: string } | null;
+  charge: { id: string; total: string } | null;
   created_at: string;
   updated_at: string;
 };
@@ -148,6 +152,20 @@ export type MedicalRecord = {
   prescriptions: Prescription[];
   lab_results: LabResult[];
   _count: { attachments: number };
+};
+
+export type Charge = {
+  id: string;
+  medical_record_id: string;
+  item_id: string | null;
+  service_id: string | null;
+  description: string;
+  quantity: number;
+  unit_price: string;
+  total: string;
+  created_at: string;
+  item: { id: string; name: string; category: string; unit: string } | null;
+  service: { id: string; name: string; category: string } | null;
 };
 
 export type PaginatedMedicalRecords = {

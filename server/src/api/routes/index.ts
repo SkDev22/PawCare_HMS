@@ -10,10 +10,12 @@ import { wardRouter } from '../../modules/ward/ward.routes';
 import { inventoryRouter } from '../../modules/inventory/inventory.routes';
 import { reportsRouter } from '../../modules/reports/reports.routes';
 import { notificationsRouter } from '../../modules/notifications/notifications.routes';
+import { dashboardRouter } from '../../modules/dashboard/dashboard.routes';
 
 export const apiRouter: IRouter = Router();
 
 apiRouter.use('/auth', authRouter);
+apiRouter.use('/dashboard', dashboardRouter);
 apiRouter.use('/', patientsRouter);
 apiRouter.use('/appointments', appointmentsRouter);
 apiRouter.use('/medical-records', emrRouter);

@@ -6,12 +6,11 @@ import { z } from 'zod';
 import { format } from 'date-fns';
 import {
   ChevronLeft, AlertTriangle, Stethoscope, Pill, Activity,
-  Trash2, Plus, ExternalLink,
+  Trash2, Plus, ExternalLink, Receipt, Search, X, Package, Printer,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Separator } from '../../components/ui/separator';
 import { Skeleton } from '../../components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Textarea } from '../../components/ui/textarea';
@@ -26,6 +25,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '../../components/ui/table';
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '../../components/ui/select';
+import {
   useMedicalRecord,
   useUpsertSoapNote,
   useUpsertVitals,
@@ -33,8 +35,14 @@ import {
   useRemoveDiagnosis,
   useAddPrescription,
   useDeactivatePrescription,
+  useCharges,
+  useAddCharge,
+  useRemoveCharge,
 } from '../../hooks/use-emr';
-import type { MedicalRecord, Diagnosis, Prescription } from '../../types/emr';
+import { useInventoryItems } from '../../hooks/use-inventory';
+import { useServices } from '../../hooks/use-billing';
+import { useDebounce } from '../../hooks/use-debounce';
+import type { MedicalRecord, Diagnosis, Prescription, Charge } from '../../types/emr';
 
 // ── SOAP Note Tab ──────────────────────────────────────────────────────────────
 
@@ -435,7 +443,7 @@ function DiagnosesTab({ record }: { record: MedicalRecord }) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                className="h-7 w-7 text-muted-foreground hover:text-destructive print:hidden"
                 onClick={() => removeDx.mutate(dx.id)}
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -477,13 +485,21 @@ function AddPrescriptionDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const addRx = useAddPrescription(recordId);
+  const [addedCount, setAddedCount] = useState(0);
+  const [fulfillment, setFulfillment] = useState<'clinic' | 'pharmacy'>('pharmacy');
+  const [selectedItem, setSelectedItem] = useState<{ id: string; name: string; selling_price: string } | null>(null);
+  const defaultValues = {
+    drug_name: '', dosage: '', frequency: '',
+    refills_remaining: 0, instructions: '', expires_at: '',
+  };
   const form = useForm<z.infer<typeof PrescriptionSchema>>({
     resolver: zodResolver(PrescriptionSchema),
-    defaultValues: {
-      drug_name: '', dosage: '', frequency: '',
-      refills_remaining: 0, instructions: '', expires_at: '',
-    },
+    defaultValues,
   });
+
+  const resetFulfillment = () => { setFulfillment('pharmacy'); setSelectedItem(null); };
+  const quantity = form.watch('quantity');
+  const canSubmit = fulfillment === 'pharmacy' || (!!selectedItem && !!quantity && quantity > 0);
 
   const onSubmit = (values: z.infer<typeof PrescriptionSchema>) => {
     addRx.mutate(
@@ -496,13 +512,17 @@ function AddPrescriptionDialog({
         ...(values.quantity      !== undefined ? { quantity:      values.quantity }      : {}),
         ...(values.instructions  ? { instructions: values.instructions }                 : {}),
         ...(values.expires_at    ? { expires_at:   values.expires_at }                   : {}),
+        ...(fulfillment === 'clinic' && selectedItem ? { item_id: selectedItem.id } : {}),
       },
-      { onSuccess: () => { form.reset(); onOpenChange(false); } },
+      { onSuccess: () => { form.reset(defaultValues); resetFulfillment(); setAddedCount((n) => n + 1); } },
     );
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => { onOpenChange(v); if (!v) { form.reset(defaultValues); resetFulfillment(); setAddedCount(0); } }}
+    >
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Add Prescription</DialogTitle>
@@ -619,6 +639,51 @@ function AddPrescriptionDialog({
                 )}
               />
             </div>
+
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Fulfilled by</label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={fulfillment === 'clinic' ? 'default' : 'outline'}
+                  onClick={() => setFulfillment('clinic')}
+                >
+                  Clinic stock
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={fulfillment === 'pharmacy' ? 'default' : 'outline'}
+                  onClick={() => { setFulfillment('pharmacy'); setSelectedItem(null); }}
+                >
+                  Owner fills at pharmacy
+                </Button>
+              </div>
+            </div>
+
+            {fulfillment === 'clinic' && (
+              <div className="space-y-2 rounded-md border border-border p-3 bg-muted/30">
+                <label className="text-xs font-medium text-muted-foreground block">Match to inventory item</label>
+                {selectedItem ? (
+                  <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-background text-sm">
+                    <Package className="size-3.5 text-muted-foreground shrink-0" />
+                    <span className="flex-1 truncate">{selectedItem.name}</span>
+                    <button type="button" onClick={() => setSelectedItem(null)} className="text-muted-foreground hover:text-foreground">
+                      <X className="size-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <ItemSearch onSelect={setSelectedItem} />
+                )}
+                {selectedItem && (
+                  <p className="text-xs text-muted-foreground">
+                    Will bill ${(Number(selectedItem.selling_price) * (quantity || 0)).toFixed(2)} and deduct {quantity || 0} from stock.
+                  </p>
+                )}
+              </div>
+            )}
+
             <FormField
               control={form.control}
               name="instructions"
@@ -632,13 +697,20 @@ function AddPrescriptionDialog({
                 </FormItem>
               )}
             />
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={addRx.isPending}>
-                {addRx.isPending ? 'Adding...' : 'Add Prescription'}
-              </Button>
+            <div className="flex items-center justify-between gap-2">
+              {addedCount > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {addedCount} added — keep adding or close when done.
+                </p>
+              ) : <span />}
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  {addedCount > 0 ? 'Done' : 'Cancel'}
+                </Button>
+                <Button type="submit" disabled={addRx.isPending || !canSubmit}>
+                  {addRx.isPending ? 'Adding...' : 'Add Prescription'}
+                </Button>
+              </div>
             </div>
           </form>
         </Form>
@@ -681,8 +753,15 @@ function PrescriptionsTab({ record }: { record: MedicalRecord }) {
               <TableRow key={rx.id}>
                 <TableCell>
                   <div className="font-medium text-sm">{rx.drug_name}</div>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    {rx.charge ? (
+                      <Badge variant="success" className="text-xs">Clinic · ${rx.charge.total}</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs">Pharmacy</Badge>
+                    )}
+                  </div>
                   {rx.instructions && (
-                    <div className="text-xs text-muted-foreground mt-0.5 max-w-[200px] truncate">
+                    <div className="text-xs text-muted-foreground mt-1 max-w-[200px] truncate">
                       {rx.instructions}
                     </div>
                   )}
@@ -705,7 +784,7 @@ function PrescriptionsTab({ record }: { record: MedicalRecord }) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive print:hidden"
                     onClick={() => deactivate.mutate(rx.id)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -718,6 +797,250 @@ function PrescriptionsTab({ record }: { record: MedicalRecord }) {
       )}
 
       <AddPrescriptionDialog
+        recordId={record.id}
+        open={addOpen}
+        onOpenChange={setAddOpen}
+      />
+    </div>
+  );
+}
+
+// ── Charges Tab (billable drugs / equipment / services used this visit) ───────
+
+function ItemSearch({ onSelect }: { onSelect: (item: { id: string; name: string; selling_price: string }) => void }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const debouncedQuery = useDebounce(query, 250);
+  const { data } = useInventoryItems(debouncedQuery ? { search: debouncedQuery, limit: 8 } : undefined);
+  const results = (data?.items ?? []).filter((i) => i.selling_price !== null);
+
+  return (
+    <div className="relative">
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+      <Input
+        className="pl-8"
+        placeholder="Search drugs, equipment, supplies…"
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+      />
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md max-h-52 overflow-y-auto">
+          {!results.length ? (
+            <p className="px-3 py-4 text-center text-sm text-muted-foreground">
+              {debouncedQuery ? 'No priced items found.' : 'Type to search the inventory catalog.'}
+            </p>
+          ) : (
+            results.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onMouseDown={() => { onSelect({ id: item.id, name: item.name, selling_price: item.selling_price! }); setQuery(''); setOpen(false); }}
+                className="w-full flex items-center justify-between gap-2.5 px-3 py-2.5 text-left hover:bg-accent transition-colors"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Package className="size-3.5 text-primary shrink-0" />
+                  <span className="text-sm truncate">{item.name}</span>
+                </div>
+                <span className="text-xs text-muted-foreground shrink-0">${item.selling_price} / {item.unit}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AddChargeDialog({
+  recordId,
+  open,
+  onOpenChange,
+}: {
+  recordId: string;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const addCharge = useAddCharge(recordId);
+  const { data: services = [] } = useServices();
+  const [mode, setMode] = useState<'item' | 'service'>('item');
+  const [selectedItem, setSelectedItem] = useState<{ id: string; name: string; selling_price: string } | null>(null);
+  const [serviceId, setServiceId] = useState('');
+  const [quantity, setQuantity] = useState(1);
+  const [addedCount, setAddedCount] = useState(0);
+
+  const resetSelection = () => { setSelectedItem(null); setServiceId(''); setQuantity(1); };
+  const resetAll = () => { resetSelection(); setMode('item'); setAddedCount(0); };
+
+  const canSubmit = mode === 'item' ? !!selectedItem : !!serviceId;
+  const selectedService = services.find((s) => s.id === serviceId);
+  const unitPrice = mode === 'item' ? selectedItem?.selling_price : selectedService?.price;
+
+  const onSubmit = () => {
+    addCharge.mutate(
+      {
+        quantity,
+        ...(mode === 'item' ? { item_id: selectedItem!.id } : { service_id: serviceId }),
+      },
+      { onSuccess: () => { resetSelection(); setAddedCount((n) => n + 1); } },
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) resetAll(); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add Charge</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={mode === 'item' ? 'default' : 'outline'}
+              onClick={() => setMode('item')}
+            >
+              Drug / Equipment
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={mode === 'service' ? 'default' : 'outline'}
+              onClick={() => setMode('service')}
+            >
+              Service
+            </Button>
+          </div>
+
+          {mode === 'item' ? (
+            selectedItem ? (
+              <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-background text-sm">
+                <Package className="size-3.5 text-muted-foreground shrink-0" />
+                <span className="flex-1 truncate">{selectedItem.name}</span>
+                <button type="button" onClick={() => setSelectedItem(null)} className="text-muted-foreground hover:text-foreground">
+                  <X className="size-3.5" />
+                </button>
+              </div>
+            ) : (
+              <ItemSearch onSelect={setSelectedItem} />
+            )
+          ) : (
+            <Select value={serviceId} onValueChange={setServiceId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a service…" />
+              </SelectTrigger>
+              <SelectContent>
+                {services.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.name} — ${s.price}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Quantity</label>
+            <Input
+              type="number"
+              min={1}
+              value={quantity}
+              onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))}
+            />
+          </div>
+
+          {unitPrice && (
+            <p className="text-sm text-muted-foreground">
+              Total: <span className="font-medium text-foreground">${(Number(unitPrice) * quantity).toFixed(2)}</span>
+            </p>
+          )}
+
+          <div className="flex items-center justify-between gap-2">
+            {addedCount > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {addedCount} item{addedCount > 1 ? 's' : ''} added — keep adding or close when done.
+              </p>
+            ) : <span />}
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                {addedCount > 0 ? 'Done' : 'Cancel'}
+              </Button>
+              <Button type="button" disabled={!canSubmit || addCharge.isPending} onClick={onSubmit}>
+                {addCharge.isPending ? 'Adding…' : 'Add Charge'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ChargesTab({ record }: { record: MedicalRecord }) {
+  const [addOpen, setAddOpen] = useState(false);
+  const { data: charges = [], isLoading } = useCharges(record.id);
+  const removeCharge = useRemoveCharge(record.id);
+
+  const total = charges.reduce((sum, c) => sum + Number(c.total), 0);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <p className="text-sm text-muted-foreground">
+          Drugs, equipment, and services used this visit — synced to the invoice automatically.
+        </p>
+        <Button size="sm" onClick={() => setAddOpen(true)}>
+          <Plus className="h-4 w-4 mr-1" />
+          Add Charge
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <Skeleton className="h-32 w-full" />
+      ) : charges.length === 0 ? (
+        <div className="text-center py-10 text-muted-foreground text-sm">
+          No charges added yet.
+        </div>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Description</TableHead>
+              <TableHead>Qty</TableHead>
+              <TableHead>Unit Price</TableHead>
+              <TableHead>Total</TableHead>
+              <TableHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {charges.map((c: Charge) => (
+              <TableRow key={c.id}>
+                <TableCell className="text-sm font-medium">{c.description}</TableCell>
+                <TableCell className="text-sm">{c.quantity}</TableCell>
+                <TableCell className="text-sm">${c.unit_price}</TableCell>
+                <TableCell className="text-sm font-medium">${c.total}</TableCell>
+                <TableCell>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive print:hidden"
+                    onClick={() => removeCharge.mutate(c.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+            <TableRow>
+              <TableCell colSpan={3} className="text-sm font-semibold text-right">Total</TableCell>
+              <TableCell className="text-sm font-semibold">${total.toFixed(2)}</TableCell>
+              <TableCell />
+            </TableRow>
+          </TableBody>
+        </Table>
+      )}
+
+      <AddChargeDialog
         recordId={record.id}
         open={addOpen}
         onOpenChange={setAddOpen}
@@ -750,66 +1073,63 @@ function PetInfoCard({ record }: { record: MedicalRecord }) {
           Patient
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm">
-        <div>
-          <Link
-            to={`/patients/${pet.id}`}
-            className="font-semibold hover:underline text-base"
-          >
-            {pet.name}
-          </Link>
-          <div className="text-muted-foreground text-xs mt-0.5">
-            {SPECIES_LABEL[pet.species] ?? pet.species}
-            {pet.breed ? ` · ${pet.breed}` : ''}
+      <CardContent>
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4 sm:gap-x-6 text-sm divide-y sm:divide-y-0 sm:divide-x divide-border">
+          <div className="sm:pr-6">
+            <Link
+              to={`/patients/${pet.id}`}
+              className="font-semibold hover:underline text-base"
+            >
+              {pet.name}
+            </Link>
+            <div className="text-muted-foreground text-xs mt-0.5">
+              {SPECIES_LABEL[pet.species] ?? pet.species}
+              {pet.breed ? ` · ${pet.breed}` : ''}
+            </div>
+            {pet.date_of_birth && (
+              <div className="text-xs text-muted-foreground mt-1">
+                DOB: {format(new Date(pet.date_of_birth), 'MMM d, yyyy')}
+              </div>
+            )}
+            {pet.sex && (
+              <div className="text-xs text-muted-foreground">Sex: {pet.sex}</div>
+            )}
           </div>
-        </div>
-        {pet.date_of_birth && (
-          <div className="text-xs text-muted-foreground">
-            DOB: {format(new Date(pet.date_of_birth), 'MMM d, yyyy')}
-          </div>
-        )}
-        {pet.sex && (
-          <div className="text-xs text-muted-foreground">Sex: {pet.sex}</div>
-        )}
-        <Separator />
-        <div>
-          <p className="text-xs font-medium text-muted-foreground mb-1">Owner</p>
-          <Link
-            to={`/owners/${owner.id}`}
-            className="font-medium hover:underline"
-          >
-            {owner.first_name} {owner.last_name}
-          </Link>
-          <div className="text-xs text-muted-foreground mt-0.5">{owner.phone}</div>
-          {owner.email && (
-            <div className="text-xs text-muted-foreground">{owner.email}</div>
-          )}
-        </div>
 
-        {pet.allergies.length > 0 && (
-          <>
-            <Separator />
-            <div>
+          <div className="pt-4 sm:pt-0 sm:pl-6 sm:pr-6">
+            <p className="text-xs font-medium text-muted-foreground mb-1">Owner</p>
+            <Link
+              to={`/owners/${owner.id}`}
+              className="font-medium hover:underline"
+            >
+              {owner.first_name} {owner.last_name}
+            </Link>
+            <div className="text-xs text-muted-foreground mt-0.5">{owner.phone}</div>
+            {owner.email && (
+              <div className="text-xs text-muted-foreground">{owner.email}</div>
+            )}
+          </div>
+
+          {pet.allergies.length > 0 && (
+            <div className="pt-4 sm:pt-0 sm:pl-6 sm:flex-1 sm:min-w-[180px]">
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-2">
                 <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
                 Allergies
               </div>
-              <div className="space-y-1">
+              <div className="flex flex-wrap gap-1.5">
                 {pet.allergies.map((a) => (
-                  <div key={a.id} className="flex items-center justify-between">
-                    <span className="text-xs">{a.allergen}</span>
-                    <Badge
-                      variant={SEVERITY_VARIANT[a.severity ?? ''] ?? 'secondary'}
-                      className="text-xs"
-                    >
-                      {a.severity ?? 'unknown'}
-                    </Badge>
-                  </div>
+                  <Badge
+                    key={a.id}
+                    variant={SEVERITY_VARIANT[a.severity ?? ''] ?? 'secondary'}
+                    className="text-xs"
+                  >
+                    {a.allergen} · {a.severity ?? 'unknown'}
+                  </Badge>
                 ))}
               </div>
             </div>
-          </>
-        )}
+          )}
+        </div>
       </CardContent>
     </Card>
   );
@@ -821,37 +1141,39 @@ function RecordMetaCard({ record }: { record: MedicalRecord }) {
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold">Visit Details</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2 text-sm">
-        <div className="flex justify-between">
-          <span className="text-muted-foreground text-xs">Date</span>
-          <span className="text-xs font-medium">
-            {format(new Date(record.visit_date), 'PPP')}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground text-xs">Veterinarian</span>
-          <span className="text-xs font-medium">
-            Dr. {record.vet.first_name} {record.vet.last_name}
-          </span>
-        </div>
-        {record.appointment && (
-          <div className="flex justify-between items-center">
-            <span className="text-muted-foreground text-xs">Appointment</span>
-            <Link
-              to={`/appointments/${record.appointment.id}`}
-              className="text-xs text-primary hover:underline flex items-center gap-1"
-            >
-              {record.appointment.type.replace('_', ' ')}
-              <ExternalLink className="h-3 w-3" />
-            </Link>
+      <CardContent>
+        <div className="flex flex-wrap gap-x-6 gap-y-3 text-sm">
+          <div>
+            <span className="text-muted-foreground text-xs block">Date</span>
+            <span className="text-xs font-medium">
+              {format(new Date(record.visit_date), 'PPP')}
+            </span>
           </div>
-        )}
-        {record._count.attachments > 0 && (
-          <div className="flex justify-between">
-            <span className="text-muted-foreground text-xs">Attachments</span>
-            <span className="text-xs">{record._count.attachments}</span>
+          <div>
+            <span className="text-muted-foreground text-xs block">Veterinarian</span>
+            <span className="text-xs font-medium">
+              Dr. {record.vet.first_name} {record.vet.last_name}
+            </span>
           </div>
-        )}
+          {record.appointment && (
+            <div>
+              <span className="text-muted-foreground text-xs block">Appointment</span>
+              <Link
+                to={`/appointments/${record.appointment.id}`}
+                className="text-xs text-primary hover:underline flex items-center gap-1"
+              >
+                {record.appointment.type.replace('_', ' ')}
+                <ExternalLink className="h-3 w-3" />
+              </Link>
+            </div>
+          )}
+          {record._count.attachments > 0 && (
+            <div>
+              <span className="text-muted-foreground text-xs block">Attachments</span>
+              <span className="text-xs">{record._count.attachments}</span>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
@@ -863,15 +1185,11 @@ function DetailSkeleton() {
   return (
     <div className="space-y-6">
       <Skeleton className="h-9 w-64" />
-      <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-4 space-y-4">
-          <Skeleton className="h-64 w-full rounded-lg" />
-          <Skeleton className="h-32 w-full rounded-lg" />
-        </div>
-        <div className="col-span-8">
-          <Skeleton className="h-96 w-full rounded-lg" />
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Skeleton className="h-32 w-full rounded-lg lg:col-span-2" />
+        <Skeleton className="h-32 w-full rounded-lg" />
       </div>
+      <Skeleton className="h-96 w-full rounded-lg" />
     </div>
   );
 }
@@ -901,7 +1219,7 @@ export function EmrDetailPage() {
         <Button
           variant="ghost"
           size="sm"
-          className="mt-0.5"
+          className="mt-0.5 print:hidden"
           onClick={() => navigate('/emr')}
         >
           <ChevronLeft className="h-4 w-4" />
@@ -916,6 +1234,10 @@ export function EmrDetailPage() {
             {record.vet.specialization ? ` (${record.vet.specialization})` : ''}
           </p>
         </div>
+        <Button variant="outline" size="sm" className="print:hidden" onClick={() => window.print()}>
+          <Printer className="h-4 w-4 mr-1" />
+          Print
+        </Button>
       </div>
 
       {/* Chief Complaint */}
@@ -930,72 +1252,81 @@ export function EmrDetailPage() {
         </Card>
       )}
 
-      {/* Main grid */}
-      <div className="grid grid-cols-12 gap-6">
-        {/* Sidebar */}
-        <div className="col-span-12 md:col-span-4 space-y-4">
+      {/* Patient details — top row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
           <PetInfoCard record={record} />
-          <RecordMetaCard record={record} />
         </div>
-
-        {/* Content */}
-        <div className="col-span-12 md:col-span-8">
-          <Tabs defaultValue="soap">
-            <TabsList className="w-full justify-start">
-              <TabsTrigger value="soap" className="flex items-center gap-1.5">
-                <FileTextIcon className="h-3.5 w-3.5" />
-                SOAP Note
-              </TabsTrigger>
-              <TabsTrigger value="vitals" className="flex items-center gap-1.5">
-                <Activity className="h-3.5 w-3.5" />
-                Vitals
-              </TabsTrigger>
-              <TabsTrigger value="diagnoses" className="flex items-center gap-1.5">
-                <Stethoscope className="h-3.5 w-3.5" />
-                Diagnoses ({record.diagnoses.length})
-              </TabsTrigger>
-              <TabsTrigger value="prescriptions" className="flex items-center gap-1.5">
-                <Pill className="h-3.5 w-3.5" />
-                Rx ({record.prescriptions.length})
-              </TabsTrigger>
-            </TabsList>
-
-            <div className="mt-4">
-              <TabsContent value="soap">
-                <Card>
-                  <CardContent className="pt-5">
-                    <SoapNoteTab record={record} />
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="vitals">
-                <Card>
-                  <CardContent className="pt-5">
-                    <VitalsTab record={record} />
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="diagnoses">
-                <Card>
-                  <CardContent className="pt-5">
-                    <DiagnosesTab record={record} />
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="prescriptions">
-                <Card>
-                  <CardContent className="pt-5">
-                    <PrescriptionsTab record={record} />
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </div>
-          </Tabs>
-        </div>
+        <RecordMetaCard record={record} />
       </div>
+
+      {/* Medical record content — full width */}
+      <Tabs defaultValue="soap">
+        <TabsList className="w-full justify-start print:hidden">
+          <TabsTrigger value="soap" className="flex items-center gap-1.5">
+            <FileTextIcon className="h-3.5 w-3.5" />
+            SOAP Note
+          </TabsTrigger>
+          <TabsTrigger value="vitals" className="flex items-center gap-1.5">
+            <Activity className="h-3.5 w-3.5" />
+            Vitals
+          </TabsTrigger>
+          <TabsTrigger value="diagnoses" className="flex items-center gap-1.5">
+            <Stethoscope className="h-3.5 w-3.5" />
+            Diagnoses ({record.diagnoses.length})
+          </TabsTrigger>
+          <TabsTrigger value="prescriptions" className="flex items-center gap-1.5">
+            <Pill className="h-3.5 w-3.5" />
+            Rx ({record.prescriptions.length})
+          </TabsTrigger>
+          <TabsTrigger value="charges" className="flex items-center gap-1.5">
+            <Receipt className="h-3.5 w-3.5" />
+            Charges
+          </TabsTrigger>
+        </TabsList>
+
+        <div className="mt-4">
+          <TabsContent value="soap">
+            <Card>
+              <CardContent className="pt-5">
+                <SoapNoteTab record={record} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="vitals">
+            <Card>
+              <CardContent className="pt-5">
+                <VitalsTab record={record} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="diagnoses">
+            <Card>
+              <CardContent className="pt-5">
+                <DiagnosesTab record={record} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="prescriptions">
+            <Card>
+              <CardContent className="pt-5">
+                <PrescriptionsTab record={record} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="charges">
+            <Card>
+              <CardContent className="pt-5">
+                <ChargesTab record={record} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </div>
+      </Tabs>
     </div>
   );
 }

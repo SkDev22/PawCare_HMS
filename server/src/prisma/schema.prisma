@@ -68,6 +68,7 @@ model StaffUser {
   schedules       StaffSchedule[]
   medical_records MedicalRecord[]
   lab_orders      LabOrder[]      @relation("LabOrderVet")
+  medical_record_charges MedicalRecordCharge[]
 
   @@map("staff_users")
 }
@@ -227,6 +228,7 @@ model Appointment {
   reason        String?
   notes         String?
   is_walk_in    Boolean           @default(false)
+  checked_in_at DateTime?
   cancelled_at  DateTime?
   cancel_reason String?
   created_at    DateTime          @default(now())
@@ -282,6 +284,7 @@ model MedicalRecord {
   prescriptions Prescription[]
   attachments Attachment[]
   diagnoses   Diagnosis[]
+  charges     MedicalRecordCharge[]
 
   @@index([pet_id, visit_date])
   @@map("medical_records")
@@ -390,11 +393,15 @@ model Prescription {
   dispensed_at      DateTime?
   expires_at        DateTime?
   is_active         Boolean   @default(true)
+  item_id           String?   @db.Uuid
+  charge_id         String?   @unique @db.Uuid
   created_at        DateTime  @default(now())
   updated_at        DateTime  @updatedAt
 
-  pet            Pet            @relation(fields: [pet_id], references: [id])
-  medical_record MedicalRecord? @relation(fields: [medical_record_id], references: [id])
+  pet            Pet                  @relation(fields: [pet_id], references: [id])
+  medical_record MedicalRecord?       @relation(fields: [medical_record_id], references: [id])
+  item           InventoryItem?       @relation(fields: [item_id], references: [id])
+  charge         MedicalRecordCharge? @relation(fields: [charge_id], references: [id])
 
   @@map("prescriptions")
 }
@@ -535,6 +542,8 @@ model InventoryItem {
 
   transactions       InventoryTransaction[]
   invoice_line_items InvoiceLineItem[]
+  charges            MedicalRecordCharge[]
+  prescriptions      Prescription[]
 
   @@map("inventory_items")
 }
@@ -572,6 +581,7 @@ model Service {
 
   clinic             Clinic            @relation(fields: [clinic_id], references: [id])
   invoice_line_items InvoiceLineItem[]
+  charges            MedicalRecordCharge[]
 
   @@map("services")
 }
@@ -626,6 +636,7 @@ model InvoiceLineItem {
   invoice Invoice        @relation(fields: [invoice_id], references: [id])
   service Service?       @relation(fields: [service_id], references: [id])
   item    InventoryItem? @relation(fields: [item_id], references: [id])
+  charge  MedicalRecordCharge?
 
   @@map("invoice_line_items")
 }
@@ -642,6 +653,34 @@ model Payment {
   invoice Invoice @relation(fields: [invoice_id], references: [id])
 
   @@map("payments")
+}
+
+// ─────────────────────────────────────────
+// MEDICAL RECORD CHARGES (visit → invoice bridge)
+// ─────────────────────────────────────────
+
+model MedicalRecordCharge {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  medical_record_id     String   @db.Uuid
+  item_id               String?  @db.Uuid
+  service_id            String?  @db.Uuid
+  description           String
+  quantity              Int      @default(1)
+  unit_price            Decimal  @db.Decimal(10, 2)
+  total                 Decimal  @db.Decimal(10, 2)
+  invoice_line_item_id  String?  @unique @db.Uuid
+  created_by            String   @db.Uuid
+  created_at            DateTime @default(now())
+
+  medical_record    MedicalRecord    @relation(fields: [medical_record_id], references: [id])
+  item              InventoryItem?   @relation(fields: [item_id], references: [id])
+  service           Service?         @relation(fields: [service_id], references: [id])
+  invoice_line_item InvoiceLineItem? @relation(fields: [invoice_line_item_id], references: [id])
+  created_by_staff  StaffUser        @relation(fields: [created_by], references: [id])
+  prescription      Prescription?
+
+  @@index([medical_record_id])
+  @@map("medical_record_charges")
 }
 
 // ─────────────────────────────────────────

@@ -59,6 +59,21 @@ appointmentsRouter.post(
   },
 );
 
+// ─── Queue (FCFS front-desk view) ────────────────────────────────────────────
+
+appointmentsRouter.get(
+  '/queue',
+  authenticate,
+  authorize('APPOINTMENT_READ'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const date = (req.query.date as string) ?? new Date().toISOString().slice(0, 10);
+      const queue = await svc.getQueue(authed(req).user.clinic_id, date);
+      res.json(queue);
+    } catch (err) { next(err); }
+  },
+);
+
 // ─── Calendar view ────────────────────────────────────────────────────────────
 
 appointmentsRouter.get(

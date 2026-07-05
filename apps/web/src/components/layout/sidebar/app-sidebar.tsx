@@ -36,7 +36,15 @@ const NAV_GROUPS = [
   {
     title: 'Clinical',
     items: [
-      { title: 'Appointments', href: '/appointments', icon: CalendarDays },
+      {
+        title: 'Appointments',
+        href: '/appointments',
+        icon: CalendarDays,
+        items: [
+          { title: 'Queue', href: '/appointments/queue' },
+          { title: 'Calendar', href: '/appointments' },
+        ],
+      },
       {
         title: 'Patients',
         href: '/patients',

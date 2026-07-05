@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { Plus, Receipt, Search } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
+import { useDebounce } from '../../hooks/use-debounce';
 import { Badge } from '../../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import {
@@ -66,9 +67,12 @@ export function BillingPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<InvoiceStatus | 'ALL'>('ALL');
   const [createOpen, setCreateOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
 
   const { data, isLoading } = useInvoices({
     ...(tab !== 'ALL' ? { status: tab } : {}),
+    ...(debouncedSearch ? { search: debouncedSearch } : {}),
   });
 
   const invoices = data?.items ?? [];
@@ -102,16 +106,28 @@ export function BillingPage() {
         </Dialog>
       </div>
 
-      {/* Status tabs */}
-      <Tabs value={tab} onValueChange={(v) => setTab(v as InvoiceStatus | 'ALL')}>
-        <TabsList className="flex-wrap h-auto gap-1">
-          {STATUS_TABS.map((t) => (
-            <TabsTrigger key={t.value} value={t.value} className="text-xs">
-              {t.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      {/* Search + status tabs */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as InvoiceStatus | 'ALL')}>
+          <TabsList className="flex-wrap h-auto gap-1">
+            {STATUS_TABS.map((t) => (
+              <TabsTrigger key={t.value} value={t.value} className="text-xs">
+                {t.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+
+        <div className="relative sm:w-64">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+          <Input
+            className="pl-8"
+            placeholder="Search owner or patient name…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
 
       {/* Table */}
       <Card>
@@ -128,7 +144,9 @@ export function BillingPage() {
               <Receipt className="h-10 w-10 text-muted-foreground mb-3" />
               <p className="text-sm font-medium">No invoices found</p>
               <p className="text-xs text-muted-foreground mt-1">
-                {tab !== 'ALL' ? 'Try a different filter.' : 'Create a new invoice to get started.'}
+                {debouncedSearch
+                  ? `No matches for "${debouncedSearch}".`
+                  : tab !== 'ALL' ? 'Try a different filter.' : 'Create a new invoice to get started.'}
               </p>
             </div>
           ) : (

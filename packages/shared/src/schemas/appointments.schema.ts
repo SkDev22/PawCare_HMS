@@ -32,15 +32,24 @@ export const CreateAppointmentSchema = z
     vet_id:     z.string().uuid('Invalid vet ID'),
     room_id:    z.string().uuid('Invalid room ID').optional(),
     type:       AppointmentTypeEnum,
-    start_at:   z.string().min(1, 'Start time is required'),
-    end_at:     z.string().min(1, 'End time is required'),
+    start_at:   z.string().min(1).optional(),
+    end_at:     z.string().min(1).optional(),
     reason:     z.string().max(1000).optional(),
     notes:      z.string().max(2000).optional(),
     is_walk_in: z.boolean().default(false),
   })
-  .refine((d) => new Date(d.end_at) > new Date(d.start_at), {
-    message: 'End time must be after start time',
-    path: ['end_at'],
+  .superRefine((d, ctx) => {
+    if (!d.is_walk_in) {
+      if (!d.start_at) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Start time is required', path: ['start_at'] });
+      }
+      if (!d.end_at) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'End time is required', path: ['end_at'] });
+      }
+    }
+    if (d.start_at && d.end_at && new Date(d.end_at) <= new Date(d.start_at)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'End time must be after start time', path: ['end_at'] });
+    }
   });
 
 export const UpdateAppointmentSchema = z.object({

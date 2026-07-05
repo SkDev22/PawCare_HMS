@@ -53,6 +53,14 @@ export function useAppointment(id: string | undefined) {
   });
 }
 
+export function useQueue(date: string) {
+  return useQuery<Appointment[]>({
+    queryKey: ['appointments', 'queue', date],
+    queryFn: () => api.get('/appointments/queue', { params: { date } }).then((r) => r.data),
+    refetchInterval: 15_000,
+  });
+}
+
 // ─── Vets & Rooms dropdowns ───────────────────────────────────────────────────
 
 export function useVets() {

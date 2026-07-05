@@ -32,7 +32,7 @@ async function assertInvoice(id: string, clinicId: string) {
   return invoice;
 }
 
-function clampZero(d: Decimal) {
+export function clampZero(d: Decimal) {
   return d.isNegative() ? new Decimal(0) : d;
 }
 
@@ -71,13 +71,22 @@ const invoiceFullIncludes = {
 // ── Invoices ───────────────────────────────────────────────────────────────────
 
 export async function listInvoices(clinicId: string, query: InvoiceQueryInput) {
-  const { status, owner_id, date_from, date_to, cursor, limit } = query;
+  const { status, owner_id, search, date_from, date_to, cursor, limit } = query;
 
   const invoices = await prisma.invoice.findMany({
     where: {
       clinic_id: clinicId,
       ...(status   ? { status }   : {}),
       ...(owner_id ? { owner_id } : {}),
+      ...(search
+        ? {
+            OR: [
+              { owner: { first_name: { contains: search, mode: 'insensitive' as const } } },
+              { owner: { last_name:  { contains: search, mode: 'insensitive' as const } } },
+              { appointment: { pet: { name: { contains: search, mode: 'insensitive' as const } } } },
+            ],
+          }
+        : {}),
       ...((date_from ?? date_to)
         ? {
             created_at: {

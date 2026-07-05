@@ -12,7 +12,7 @@ import type {
 
 function dayBounds(dateStr: string) {
   const start = new Date(`${dateStr}T00:00:00.000Z`);
-  const end   = new Date(`${dateStr}T23:59:59.999Z`);
+  const end = new Date(`${dateStr}T23:59:59.999Z`);
   return { start, end };
 }
 
@@ -74,9 +74,9 @@ export async function listAppointments(clinicId: string, query: AppointmentQuery
     where: {
       clinic_id: clinicId,
       ...(dateFilter ? { start_at: { gte: dateFilter.start, lte: dateFilter.end } } : {}),
-      ...(status  ? { status }   : {}),
-      ...(vet_id  ? { vet_id }   : {}),
-      ...(pet_id  ? { pet_id }   : {}),
+      ...(status ? { status } : {}),
+      ...(vet_id ? { vet_id } : {}),
+      ...(pet_id ? { pet_id } : {}),
     },
     include: appointmentIncludes,
     orderBy: { start_at: 'asc' },
@@ -85,7 +85,7 @@ export async function listAppointments(clinicId: string, query: AppointmentQuery
   });
 
   const hasMore = appointments.length > limit;
-  const items   = hasMore ? appointments.slice(0, limit) : appointments;
+  const items = hasMore ? appointments.slice(0, limit) : appointments;
 
   return { items, nextCursor: hasMore ? items[items.length - 1]?.id : null, hasMore };
 }
@@ -135,6 +135,8 @@ export async function getAppointment(id: string, clinicId: string) {
   return appt;
 }
 
+const WALK_IN_DEFAULT_DURATION_MS = 30 * 60 * 1000;
+
 export async function createAppointment(clinicId: string, data: CreateAppointmentInput) {
   const pet = await prisma.pet.findFirst({
     where: { id: data.pet_id, deleted_at: null, owner: { clinic_id: clinicId } },
@@ -148,23 +150,27 @@ export async function createAppointment(clinicId: string, data: CreateAppointmen
   });
   if (!vet) throw new AppError('NOT_FOUND', 'Veterinarian not found in this clinic', 404);
 
-  const startAt = new Date(data.start_at);
-  const endAt   = new Date(data.end_at);
+  const isWalkIn = data.is_walk_in ?? false;
+  const now = new Date();
+  const startAt = data.start_at ? new Date(data.start_at) : now;
+  const endAt = data.end_at ? new Date(data.end_at) : new Date(startAt.getTime() + WALK_IN_DEFAULT_DURATION_MS);
 
-  await assertNoConflict(data.vet_id, startAt, endAt);
+  if (!isWalkIn) {
+    await assertNoConflict(data.vet_id, startAt, endAt);
+  }
 
   return prisma.appointment.create({
     data: {
-      clinic_id:  clinicId,
-      pet_id:     data.pet_id,
-      vet_id:     data.vet_id,
-      type:       data.type,
-      start_at:   startAt,
-      end_at:     endAt,
-      is_walk_in: data.is_walk_in ?? false,
+      clinic_id: clinicId,
+      pet_id: data.pet_id,
+      vet_id: data.vet_id,
+      type: data.type,
+      start_at: startAt,
+      end_at: endAt,
+      is_walk_in: isWalkIn,
       ...(data.room_id !== undefined && { room_id: data.room_id }),
-      ...(data.reason  !== undefined && { reason: data.reason }),
-      ...(data.notes   !== undefined && { notes: data.notes }),
+      ...(data.reason !== undefined && { reason: data.reason }),
+      ...(data.notes !== undefined && { notes: data.notes }),
     },
     include: appointmentIncludes,
   });
@@ -185,22 +191,22 @@ export async function updateAppointment(
   }
 
   if (data.vet_id || data.start_at || data.end_at) {
-    const newVetId  = data.vet_id  ?? existing.vet_id;
-    const newStart  = data.start_at ? new Date(data.start_at) : existing.start_at;
-    const newEnd    = data.end_at   ? new Date(data.end_at)   : existing.end_at;
+    const newVetId = data.vet_id ?? existing.vet_id;
+    const newStart = data.start_at ? new Date(data.start_at) : existing.start_at;
+    const newEnd = data.end_at ? new Date(data.end_at) : existing.end_at;
     await assertNoConflict(newVetId, newStart, newEnd, id);
   }
 
   return prisma.appointment.update({
     where: { id },
     data: {
-      ...(data.vet_id     !== undefined && { vet_id: data.vet_id }),
-      ...(data.room_id    !== undefined && { room_id: data.room_id }),
-      ...(data.type       !== undefined && { type: data.type }),
-      ...(data.start_at   !== undefined && { start_at: new Date(data.start_at) }),
-      ...(data.end_at     !== undefined && { end_at: new Date(data.end_at) }),
-      ...(data.reason     !== undefined && { reason: data.reason }),
-      ...(data.notes      !== undefined && { notes: data.notes }),
+      ...(data.vet_id !== undefined && { vet_id: data.vet_id }),
+      ...(data.room_id !== undefined && { room_id: data.room_id }),
+      ...(data.type !== undefined && { type: data.type }),
+      ...(data.start_at !== undefined && { start_at: new Date(data.start_at) }),
+      ...(data.end_at !== undefined && { end_at: new Date(data.end_at) }),
+      ...(data.reason !== undefined && { reason: data.reason }),
+      ...(data.notes !== undefined && { notes: data.notes }),
       ...(data.is_walk_in !== undefined && { is_walk_in: data.is_walk_in }),
     },
     include: appointmentIncludes,
@@ -222,12 +228,29 @@ export async function updateStatus(
     where: { id },
     data: {
       status: data.status,
+      ...(data.status === 'CHECKED_IN' && { checked_in_at: new Date() }),
       ...(data.status === 'CANCELLED' && {
-        cancelled_at:  new Date(),
+        cancelled_at: new Date(),
         cancel_reason: data.cancel_reason ?? null,
       }),
     },
-    select: { id: true, status: true, cancelled_at: true, cancel_reason: true },
+    select: { id: true, status: true, checked_in_at: true, cancelled_at: true, cancel_reason: true },
+  });
+}
+
+// ─── Queue (FCFS front-desk view) ────────────────────────────────────────────
+
+export async function getQueue(clinicId: string, date: string) {
+  const { start, end } = dayBounds(date);
+
+  return prisma.appointment.findMany({
+    where: {
+      clinic_id: clinicId,
+      status: { in: ['CHECKED_IN', 'IN_PROGRESS'] },
+      start_at: { gte: start, lte: end },
+    },
+    include: appointmentIncludes,
+    orderBy: [{ checked_in_at: { sort: 'asc', nulls: 'last' } }, { start_at: 'asc' }],
   });
 }
 

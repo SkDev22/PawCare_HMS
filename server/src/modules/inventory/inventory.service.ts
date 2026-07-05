@@ -1,11 +1,14 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
+import { AppError } from '../../lib/errors';
 import type {
   CreateInventoryItemInput,
   UpdateInventoryItemInput,
   LogTransactionInput,
   InventoryQuery,
 } from '@pawcare/shared';
+
+type TxClient = Prisma.TransactionClient;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -143,33 +146,53 @@ export async function updateItem(id: string, clinicId: string, data: UpdateInven
 
 // ── Transactions ─────────────────────────────────────────────────────────────
 
+/**
+ * Core stock-change logic, composable into a caller-owned transaction (`tx`).
+ * Prisma doesn't support nesting `$transaction` calls, so callers that need to
+ * combine a stock change with other writes (e.g. EMR billing charges) pass
+ * their own transaction client here instead of going through `logTransaction`.
+ */
+export async function applyStockChangeTx(
+  tx:       TxClient,
+  itemId:   string,
+  clinicId: string,
+  staffId:  string,
+  data:     LogTransactionInput,
+) {
+  const item = await tx.inventoryItem.findFirst({ where: { id: itemId, clinic_id: clinicId } });
+  if (!item) throw new AppError('NOT_FOUND', 'Item not found', 404);
+
+  const resultingQuantity = item.quantity_on_hand + data.quantity;
+  if (resultingQuantity < 0) {
+    throw new AppError('CONFLICT', `Insufficient stock for "${item.name}"`, 409);
+  }
+
+  const txRecord = await tx.inventoryTransaction.create({
+    data: {
+      item_id:      itemId,
+      performed_by: staffId,
+      type:         data.type,
+      quantity:     data.quantity,
+      ...(data.reference_id ? { reference_id: data.reference_id } : {}),
+      ...(data.notes ? { notes: data.notes } : {}),
+    },
+  });
+
+  await tx.inventoryItem.update({
+    where: { id: itemId },
+    data:  { quantity_on_hand: resultingQuantity },
+  });
+
+  return txRecord;
+}
+
 export async function logTransaction(
   itemId:   string,
   clinicId: string,
   staffId:  string,
   data:     LogTransactionInput,
 ) {
-  await assertItem(itemId, clinicId);
-
-  return prisma.$transaction(async (tx) => {
-    const txRecord = await tx.inventoryTransaction.create({
-      data: {
-        item_id:      itemId,
-        performed_by: staffId,
-        type:         data.type,
-        quantity:     data.quantity,
-        ...(data.reference_id ? { reference_id: data.reference_id } : {}),
-        ...(data.notes ? { notes: data.notes } : {}),
-      },
-    });
-
-    await tx.inventoryItem.update({
-      where: { id: itemId },
-      data:  { quantity_on_hand: { increment: data.quantity } },
-    });
-
-    return txRecord;
-  });
+  return prisma.$transaction((tx) => applyStockChangeTx(tx, itemId, clinicId, staffId, data));
 }
 
 export async function listTransactions(itemId: string, clinicId: string, cursor?: string, limit = 20) {

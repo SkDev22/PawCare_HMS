@@ -1,4 +1,7 @@
 export const PERMISSIONS = {
+  // Dashboard
+  DASHBOARD_READ:       ['ADMIN', 'VETERINARIAN', 'NURSE', 'RECEPTIONIST', 'LAB_TECHNICIAN'] as const,
+
   // Patient records
   PATIENT_READ:         ['ADMIN', 'VETERINARIAN', 'NURSE', 'RECEPTIONIST'] as const,
   PATIENT_WRITE:        ['ADMIN', 'VETERINARIAN'] as const,
