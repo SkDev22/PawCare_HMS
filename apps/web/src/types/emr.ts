@@ -104,6 +104,7 @@ export type RecordPet = {
   breed: string | null;
   date_of_birth: string | null;
   sex: string | null;
+  weight_kg: string | null;
   owner: RecordPetOwner;
   allergies: RecordPetAllergy[];
 };

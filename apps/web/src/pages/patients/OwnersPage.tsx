@@ -26,9 +26,13 @@ import { OwnerForm } from "@/components/patients/OwnerForm";
 import { useDebounce } from "@/hooks/use-debounce";
 import type { Owner } from "@/types/patients";
 import { MoreHorizontal, Pencil, Trash2, Eye } from "lucide-react";
+import { useAuthStore } from "@/stores/auth.store";
+import { hasPermission } from "@/lib/permissions";
 
 export function OwnersPage() {
   const navigate = useNavigate();
+  const role = useAuthStore((s) => s.user?.role);
+  const canWrite = hasPermission(role, "PATIENT_WRITE");
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editOwner, setEditOwner] = useState<Owner | undefined>();
@@ -68,10 +72,12 @@ export function OwnersPage() {
             Manage client records and contact information
           </p>
         </div>
-        <Button onClick={() => setShowForm(true)}>
-          <Plus className="w-4 h-4" />
-          Add owner
-        </Button>
+        {canWrite && (
+          <Button onClick={() => setShowForm(true)}>
+            <Plus className="w-4 h-4" />
+            Add owner
+          </Button>
+        )}
       </div>
 
       {/* Search */}
@@ -175,16 +181,20 @@ export function OwnersPage() {
                         >
                           <Eye className="w-4 h-4 mr-2" /> View
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEdit(owner)}>
-                          <Pencil className="w-4 h-4 mr-2" /> Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => handleDelete(owner.id)}
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" /> Remove
-                        </DropdownMenuItem>
+                        {canWrite && (
+                          <>
+                            <DropdownMenuItem onClick={() => handleEdit(owner)}>
+                              <Pencil className="w-4 h-4 mr-2" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => handleDelete(owner.id)}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" /> Remove
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

@@ -130,11 +130,14 @@ const VitalsSchema = z.object({
 function VitalsTab({ record }: { record: MedicalRecord }) {
   const upsert = useUpsertVitals(record.id);
   const v = record.vitals;
+  // Fall back to the pet's registration weight until this record has its own recorded vitals.
+  const registrationWeight = record.pet.weight_kg ? parseFloat(record.pet.weight_kg) : undefined;
+  const weightFromRegistration = !v?.weight_kg && registrationWeight !== undefined;
 
   const form = useForm<z.infer<typeof VitalsSchema>>({
     resolver: zodResolver(VitalsSchema),
     defaultValues: {
-      weight_kg:            v?.weight_kg    ? parseFloat(v.weight_kg)    : undefined,
+      weight_kg:            v?.weight_kg     ? parseFloat(v.weight_kg)     : registrationWeight,
       temperature_c:        v?.temperature_c ? parseFloat(v.temperature_c) : undefined,
       heart_rate_bpm:       v?.heart_rate_bpm       ?? undefined,
       respiratory_rate:     v?.respiratory_rate     ?? undefined,
@@ -174,6 +177,11 @@ function VitalsTab({ record }: { record: MedicalRecord }) {
                     onChange={(e) => field.onChange(e.target.value === '' ? undefined : e.target.valueAsNumber)}
                   />
                 </FormControl>
+                {weightFromRegistration && (
+                  <p className="text-xs text-muted-foreground">
+                    Prefilled from patient registration — update if it has changed.
+                  </p>
+                )}
                 <FormMessage />
               </FormItem>
             )}

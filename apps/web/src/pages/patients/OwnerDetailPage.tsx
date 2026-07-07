@@ -20,10 +20,14 @@ import { OwnerForm } from "@/components/patients/OwnerForm";
 import { PetForm } from "@/components/patients/PetForm";
 import { speciesBadgeVariant, speciesIcon } from "@/lib/patient-utils";
 import type { Owner } from "@/types/patients";
+import { useAuthStore } from "@/stores/auth.store";
+import { hasPermission } from "@/lib/permissions";
 
 export function OwnerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const role = useAuthStore((s) => s.user?.role);
+  const canWrite = hasPermission(role, "PATIENT_WRITE");
   const { data: owner, isLoading, error } = useOwner(id);
 
   const [editOpen, setEditOpen] = useState(false);
@@ -115,14 +119,16 @@ export function OwnerDetailPage() {
                 )}
               </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setEditOpen(true)}
-              >
-                <Pencil className="w-4 h-4" />
-                Edit
-              </Button>
+              {canWrite && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditOpen(true)}
+                >
+                  <Pencil className="w-4 h-4" />
+                  Edit
+                </Button>
+              )}
             </div>
           )}
         </CardContent>
@@ -132,7 +138,7 @@ export function OwnerDetailPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between py-4">
           <CardTitle className="text-base">Pets</CardTitle>
-          {owner && (
+          {owner && canWrite && (
             <Button size="sm" onClick={() => setAddPetOpen(true)}>
               <Plus className="w-4 h-4" />
               Add pet

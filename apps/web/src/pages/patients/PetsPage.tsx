@@ -17,6 +17,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { speciesIcon, speciesBadgeVariant, calcAge } from '@/lib/patient-utils';
 import type { Species, PetStatus } from '@/types/patients';
+import { useAuthStore } from '@/stores/auth.store';
+import { hasPermission } from '@/lib/permissions';
 
 const SPECIES_OPTIONS: { label: string; value: Species }[] = [
   { label: 'Dog',          value: 'DOG' },
@@ -30,6 +32,8 @@ const SPECIES_OPTIONS: { label: string; value: Species }[] = [
 
 export function PetsPage() {
   const navigate = useNavigate();
+  const role = useAuthStore((s) => s.user?.role);
+  const canWrite = hasPermission(role, 'PATIENT_WRITE');
   const [speciesFilter, setSpeciesFilter] = useState<string>('');
   const [statusFilter, setStatusFilter]   = useState<string>('');
   const [search, setSearch] = useState('');
@@ -55,10 +59,12 @@ export function PetsPage() {
           <h1 className="text-2xl font-bold">Patients</h1>
           <p className="text-sm text-muted-foreground mt-0.5">All registered pets</p>
         </div>
-        <Button onClick={() => navigate('/owners')}>
-          <Plus className="w-4 h-4" />
-          Add via owner
-        </Button>
+        {canWrite && (
+          <Button onClick={() => navigate('/owners')}>
+            <Plus className="w-4 h-4" />
+            Add via owner
+          </Button>
+        )}
       </div>
 
       {/* Filters */}

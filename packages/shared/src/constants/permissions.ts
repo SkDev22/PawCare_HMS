@@ -3,8 +3,8 @@ export const PERMISSIONS = {
   DASHBOARD_READ:       ['ADMIN', 'VETERINARIAN', 'NURSE', 'RECEPTIONIST', 'LAB_TECHNICIAN'] as const,
 
   // Patient records
-  PATIENT_READ:         ['ADMIN', 'VETERINARIAN', 'NURSE', 'RECEPTIONIST'] as const,
-  PATIENT_WRITE:        ['ADMIN', 'VETERINARIAN'] as const,
+  PATIENT_READ:         ['ADMIN', 'VETERINARIAN', 'NURSE', 'RECEPTIONIST', 'LAB_TECHNICIAN'] as const,
+  PATIENT_WRITE:        ['ADMIN', 'VETERINARIAN', 'RECEPTIONIST'] as const,
   MEDICAL_RECORD_READ:  ['ADMIN', 'VETERINARIAN', 'NURSE'] as const,
   MEDICAL_RECORD_WRITE: ['ADMIN', 'VETERINARIAN'] as const,
   SOAP_NOTE_WRITE:      ['ADMIN', 'VETERINARIAN'] as const,
@@ -21,7 +21,7 @@ export const PERMISSIONS = {
 
   // Inventory
   INVENTORY_READ:       ['ADMIN', 'VETERINARIAN', 'NURSE', 'RECEPTIONIST'] as const,
-  INVENTORY_WRITE:      ['ADMIN', 'NURSE', 'LAB_TECHNICIAN'] as const,
+  INVENTORY_WRITE:      ['ADMIN', 'NURSE', 'LAB_TECHNICIAN', 'RECEPTIONIST'] as const,
 
   // Staff management
   STAFF_READ:           ['ADMIN'] as const,
@@ -35,7 +35,7 @@ export const PERMISSIONS = {
   LAB_RESULT_WRITE:     ['ADMIN', 'LAB_TECHNICIAN'] as const,
 
   // Ward
-  WARD_READ:            ['ADMIN', 'VETERINARIAN', 'NURSE'] as const,
+  WARD_READ:            ['ADMIN', 'VETERINARIAN', 'NURSE', 'RECEPTIONIST'] as const,
   WARD_WRITE:           ['ADMIN', 'NURSE', 'VETERINARIAN'] as const,
 } as const;
 
