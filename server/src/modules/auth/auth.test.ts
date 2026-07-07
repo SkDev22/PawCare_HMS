@@ -80,17 +80,41 @@ describe('Auth — POST /api/v1/auth/login', () => {
 });
 
 describe('Auth — POST /api/v1/auth/refresh', () => {
+  let clinicId: string;
   let refreshCookie: string;
 
   beforeAll(async () => {
+    const clinic = await prisma.clinic.create({
+      data: { name: 'Test Clinic — Refresh' },
+    });
+    clinicId = clinic.id;
+
+    await prisma.staffUser.create({
+      data: {
+        clinic_id: clinicId,
+        email: 'vet-refresh@test.pawcare',
+        password_hash: await bcrypt.hash('Secure@123', 12),
+        first_name: 'Jane',
+        last_name: 'Doe',
+        role: 'VETERINARIAN',
+      },
+    });
+
     // Log in to get the cookie
     const res = await request
       .post('/api/v1/auth/login')
-      .send({ email: 'vet@test.pawcare', password: 'Secure@123' });
+      .send({ email: 'vet-refresh@test.pawcare', password: 'Secure@123' });
 
     // Extract Set-Cookie header
     const cookies = res.headers['set-cookie'] as string[] | string;
     refreshCookie = Array.isArray(cookies) ? cookies[0] : cookies;
+  });
+
+  afterAll(async () => {
+    await prisma.refreshToken.deleteMany();
+    await prisma.staffUser.deleteMany({ where: { clinic_id: clinicId } });
+    await prisma.clinic.delete({ where: { id: clinicId } });
+    await prisma.$disconnect();
   });
 
   it('returns a new accessToken with valid refresh cookie', async () => {
