@@ -1,31 +1,42 @@
-import { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Users } from 'lucide-react';
-import { useOwners, useDeleteOwner } from '@/hooks/use-owners';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Card } from '@/components/ui/card';
+import { useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { Search, Plus, Users } from "lucide-react";
+import { useOwners, useDeleteOwner } from "@/hooks/use-owners";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Card } from "@/components/ui/card";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { OwnerForm } from '@/components/patients/OwnerForm';
-import { useDebounce } from '@/hooks/use-debounce';
-import type { Owner } from '@/types/patients';
-import { MoreHorizontal, Pencil, Trash2, Eye } from 'lucide-react';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { OwnerForm } from "@/components/patients/OwnerForm";
+import { useDebounce } from "@/hooks/use-debounce";
+import type { Owner } from "@/types/patients";
+import { MoreHorizontal, Pencil, Trash2, Eye } from "lucide-react";
 
 export function OwnersPage() {
   const navigate = useNavigate();
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editOwner, setEditOwner] = useState<Owner | undefined>();
 
   const debouncedSearch = useDebounce(search, 300);
-  const { data, isLoading } = useOwners(debouncedSearch ? { search: debouncedSearch } : undefined);
+  const { data, isLoading } = useOwners(
+    debouncedSearch ? { search: debouncedSearch } : undefined,
+  );
   const deleteOwner = useDeleteOwner();
 
   const handleEdit = useCallback((owner: Owner) => {
@@ -38,11 +49,14 @@ export function OwnersPage() {
     setEditOwner(undefined);
   }, []);
 
-  const handleDelete = useCallback((id: string) => {
-    if (window.confirm('Remove this owner? This cannot be undone.')) {
-      deleteOwner.mutate(id);
-    }
-  }, [deleteOwner]);
+  const handleDelete = useCallback(
+    (id: string) => {
+      if (window.confirm("Remove this owner? This cannot be undone.")) {
+        deleteOwner.mutate(id);
+      }
+    },
+    [deleteOwner],
+  );
 
   return (
     <div className="space-y-6">
@@ -88,22 +102,37 @@ export function OwnersPage() {
             {isLoading &&
               Array.from({ length: 6 }).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-36" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-8" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-36" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-28" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-40" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-8" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-16" />
+                  </TableCell>
                   <TableCell />
                 </TableRow>
               ))}
 
             {!isLoading && data?.items.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-16 text-muted-foreground">
+                <TableCell
+                  colSpan={6}
+                  className="text-center py-16 text-muted-foreground"
+                >
                   <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
                   <p className="font-medium">No owners found</p>
                   <p className="text-sm mt-1">
-                    {search ? 'Try a different search term.' : 'Add your first owner to get started.'}
+                    {search
+                      ? "Try a different search term."
+                      : "Add your first owner to get started."}
                   </p>
                 </TableCell>
               </TableRow>
@@ -119,8 +148,12 @@ export function OwnersPage() {
                   <TableCell className="font-medium">
                     {owner.first_name} {owner.last_name}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{owner.phone}</TableCell>
-                  <TableCell className="text-muted-foreground">{owner.email ?? '—'}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {owner.phone}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {owner.email ?? "—"}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="secondary">{owner._count?.pets ?? 0}</Badge>
                   </TableCell>
@@ -137,7 +170,9 @@ export function OwnersPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => navigate(`/owners/${owner.id}`)}>
+                        <DropdownMenuItem
+                          onClick={() => navigate(`/owners/${owner.id}`)}
+                        >
                           <Eye className="w-4 h-4 mr-2" /> View
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleEdit(owner)}>
@@ -159,7 +194,11 @@ export function OwnersPage() {
         </Table>
       </Card>
 
-      <OwnerForm open={showForm} onClose={handleCloseForm} {...(editOwner ? { editOwner } : {})} />
+      <OwnerForm
+        open={showForm}
+        onClose={handleCloseForm}
+        {...(editOwner ? { editOwner } : {})}
+      />
     </div>
   );
 }

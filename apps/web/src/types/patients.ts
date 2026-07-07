@@ -31,7 +31,6 @@ export interface Pet {
   weight_kg:     string | null;
   sex:           PetSex | null;
   color:         string | null;
-  microchip_id:  string | null;
   photo_url:     string | null;
   insurance_id:  string | null;
   status:        PetStatus;

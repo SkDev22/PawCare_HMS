@@ -322,7 +322,6 @@ model Pet {
   weight_kg       Decimal?    @db.Decimal(6, 2)
   sex             String?     // "M" | "F" | "M_NEUTERED" | "F_SPAYED"
   color           String?
-  microchip_id    String?     @unique
   photo_url       String?
   insurance_id    String?
   status          PetStatus   @default(ACTIVE)
@@ -923,7 +922,6 @@ POST   /api/pets/:id/allergies  — add allergy
 **Business rules:**
 - A pet must always have an owner before creation
 - Deceased pets are soft-deleted (`status = DECEASED`, never hard deleted)
-- Microchip IDs are globally unique — check on save
 - Weight history is tracked across all vitals records; surface trend in pet summary
 
 ---

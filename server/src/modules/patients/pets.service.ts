@@ -104,13 +104,6 @@ export async function createPet(clinicId: string, data: CreatePetInput) {
     throw new AppError('NOT_FOUND', 'Owner not found or does not belong to this clinic', 404);
   }
 
-  if (data.microchip_id) {
-    const existing = await prisma.pet.findUnique({ where: { microchip_id: data.microchip_id } });
-    if (existing) {
-      throw new AppError('CONFLICT', 'A pet with this microchip ID already exists', 409);
-    }
-  }
-
   return prisma.pet.create({
     data: {
       owner_id:      data.owner_id,
@@ -121,7 +114,6 @@ export async function createPet(clinicId: string, data: CreatePetInput) {
       ...(data.breed        !== undefined && { breed: data.breed }),
       ...(data.sex          !== undefined && { sex: data.sex }),
       ...(data.color        !== undefined && { color: data.color }),
-      ...(data.microchip_id !== undefined && { microchip_id: data.microchip_id }),
       ...(data.insurance_id !== undefined && { insurance_id: data.insurance_id }),
       ...(data.notes        !== undefined && { notes: data.notes }),
     },
@@ -135,13 +127,6 @@ export async function updatePet(id: string, clinicId: string, data: UpdatePetInp
 
   if (!pet) {
     throw new AppError('NOT_FOUND', 'Pet not found', 404);
-  }
-
-  if (data.microchip_id && data.microchip_id !== pet.microchip_id) {
-    const conflict = await prisma.pet.findUnique({ where: { microchip_id: data.microchip_id } });
-    if (conflict) {
-      throw new AppError('CONFLICT', 'A pet with this microchip ID already exists', 409);
-    }
   }
 
   return prisma.pet.update({
@@ -160,7 +145,6 @@ export async function updatePet(id: string, clinicId: string, data: UpdatePetInp
       }),
       ...(data.sex          !== undefined && { sex: data.sex }),
       ...(data.color        !== undefined && { color: data.color }),
-      ...(data.microchip_id !== undefined && { microchip_id: data.microchip_id }),
       ...(data.insurance_id !== undefined && { insurance_id: data.insurance_id }),
       ...(data.notes        !== undefined && { notes: data.notes }),
       ...(data.status       !== undefined && { status: data.status }),

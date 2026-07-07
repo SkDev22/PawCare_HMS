@@ -36,7 +36,6 @@ export function PetForm({ open, onClose, ownerId, editPet }: Props) {
       weight_kg:     undefined,
       sex:           undefined,
       color:         '',
-      microchip_id:  '',
       insurance_id:  '',
       notes:         '',
     },
@@ -53,12 +52,11 @@ export function PetForm({ open, onClose, ownerId, editPet }: Props) {
         weight_kg:     editPet.weight_kg ? Number(editPet.weight_kg) : undefined,
         sex:           editPet.sex ?? undefined,
         color:         editPet.color ?? '',
-        microchip_id:  editPet.microchip_id ?? '',
         insurance_id:  editPet.insurance_id ?? '',
         notes:         editPet.notes ?? '',
       });
     } else {
-      form.reset({ owner_id: ownerId, name: '', species: 'DOG', breed: '', date_of_birth: '', weight_kg: undefined, sex: undefined, color: '', microchip_id: '', insurance_id: '', notes: '' });
+      form.reset({ owner_id: ownerId, name: '', species: 'DOG', breed: '', date_of_birth: '', weight_kg: undefined, sex: undefined, color: '', insurance_id: '', notes: '' });
     }
   }, [editPet, ownerId, form]);
 
@@ -196,30 +194,17 @@ export function PetForm({ open, onClose, ownerId, editPet }: Props) {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="color"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Color / markings</FormLabel>
-                    <FormControl><Input placeholder="Golden brown" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="microchip_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Microchip ID</FormLabel>
-                    <FormControl><Input placeholder="985112345678900" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="color"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Color / markings</FormLabel>
+                  <FormControl><Input placeholder="Golden brown" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

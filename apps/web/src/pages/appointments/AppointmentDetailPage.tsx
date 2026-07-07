@@ -162,6 +162,10 @@ function StatusActionBar({ status, apptId }: ActionBarProps) {
             <CheckCircle2 className="size-3.5" />
             Confirm
           </Button>
+          <Button size="sm" variant="outline" onClick={() => act('CHECKED_IN')} disabled={isBusy}>
+            <UserCheck className="size-3.5" />
+            Check in
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setShowCancel(true)} disabled={isBusy}>
             <XCircle className="size-3.5" />
             Cancel

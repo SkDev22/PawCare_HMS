@@ -155,7 +155,6 @@ model Pet {
   weight_kg    Decimal?  @db.Decimal(6, 2)
   sex          String?
   color        String?
-  microchip_id String?   @unique
   photo_url    String?
   insurance_id String?
   status       PetStatus @default(ACTIVE)

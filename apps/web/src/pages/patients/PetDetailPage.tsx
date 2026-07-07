@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  ArrowLeft, AlertCircle, Pencil, Plus, Weight, Thermometer, Calendar,
+  ArrowLeft, AlertCircle, Pencil, Plus, Weight, Calendar,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { usePet, useAddAllergy } from '@/hooks/use-pets';
@@ -110,12 +110,6 @@ export function PetDetailPage() {
                       {Number(pet.weight_kg).toFixed(1)} kg
                     </span>
                   )}
-                  {pet?.microchip_id && (
-                    <span className="flex items-center gap-1.5">
-                      <Thermometer className="w-3.5 h-3.5" />
-                      Chip: {pet.microchip_id}
-                    </span>
-                  )}
                 </div>
 
                 {pet?.owner && (
@@ -165,7 +159,6 @@ export function PetDetailPage() {
               ) : (
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div><span className="text-muted-foreground">Insurance ID</span><p className="mt-0.5 font-medium">{pet?.insurance_id ?? '—'}</p></div>
-                  <div><span className="text-muted-foreground">Microchip</span><p className="mt-0.5 font-medium">{pet?.microchip_id ?? '—'}</p></div>
                   <div className="col-span-2">
                     <span className="text-muted-foreground">Notes</span>
                     <p className="mt-0.5">{pet?.notes ?? '—'}</p>

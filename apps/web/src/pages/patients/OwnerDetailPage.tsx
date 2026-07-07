@@ -1,17 +1,25 @@
-import { useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Plus, Mail, Phone, MapPin, AlertCircle, Pencil } from 'lucide-react';
-import { useOwner } from '@/hooks/use-owners';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Separator } from '@/components/ui/separator';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { OwnerForm } from '@/components/patients/OwnerForm';
-import { PetForm } from '@/components/patients/PetForm';
-import { speciesBadgeVariant, speciesIcon } from '@/lib/patient-utils';
-import type { Owner } from '@/types/patients';
+import { useState } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import {
+  ArrowLeft,
+  Plus,
+  Mail,
+  Phone,
+  MapPin,
+  AlertCircle,
+  Pencil,
+} from "lucide-react";
+import { useOwner } from "@/hooks/use-owners";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { OwnerForm } from "@/components/patients/OwnerForm";
+import { PetForm } from "@/components/patients/PetForm";
+import { speciesBadgeVariant, speciesIcon } from "@/lib/patient-utils";
+import type { Owner } from "@/types/patients";
 
 export function OwnerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -26,7 +34,7 @@ export function OwnerDetailPage() {
       <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
         <AlertCircle className="w-10 h-10 opacity-40" />
         <p className="font-medium">Owner not found</p>
-        <Button variant="outline" size="sm" onClick={() => navigate('/owners')}>
+        <Button variant="outline" size="sm" onClick={() => navigate("/owners")}>
           Back to owners
         </Button>
       </div>
@@ -35,19 +43,24 @@ export function OwnerDetailPage() {
 
   const initials = owner
     ? `${owner.first_name[0]}${owner.last_name[0]}`.toUpperCase()
-    : '??';
+    : "??";
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 w-full">
       {/* Back */}
-      <Button variant="ghost" size="sm" className="-ml-2" onClick={() => navigate('/owners')}>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="-ml-2"
+        onClick={() => navigate("/owners")}
+      >
         <ArrowLeft className="w-4 h-4" />
         Owners
       </Button>
 
       {/* Header card */}
-      <Card>
-        <CardContent className="p-6">
+      <div>
+        <CardContent>
           {isLoading ? (
             <div className="flex gap-4">
               <Skeleton className="h-16 w-16 rounded-full" />
@@ -57,7 +70,7 @@ export function OwnerDetailPage() {
               </div>
             </div>
           ) : (
-            <div className="flex items-start gap-4">
+            <div className="flex items-start gap-4 max-w-3xl">
               <Avatar className="h-16 w-16 text-xl">
                 <AvatarFallback className="bg-primary/10 text-primary">
                   {initials}
@@ -96,20 +109,24 @@ export function OwnerDetailPage() {
                 </div>
 
                 {owner?.emergency_contact && (
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-sm text-muted-foreground font-bold mt-2">
                     Emergency: {owner.emergency_contact}
                   </p>
                 )}
               </div>
 
-              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditOpen(true)}
+              >
                 <Pencil className="w-4 h-4" />
                 Edit
               </Button>
             </div>
           )}
         </CardContent>
-      </Card>
+      </div>
 
       {/* Pets section */}
       <Card>
@@ -126,7 +143,10 @@ export function OwnerDetailPage() {
         <CardContent className="p-0">
           {isLoading &&
             Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-4 px-6 py-4 border-b last:border-0">
+              <div
+                key={i}
+                className="flex items-center gap-4 px-6 py-4 border-b last:border-0"
+              >
                 <Skeleton className="h-10 w-10 rounded-full" />
                 <div className="space-y-1.5 flex-1">
                   <Skeleton className="h-4 w-32" />
@@ -157,7 +177,7 @@ export function OwnerDetailPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium">{pet.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {pet.species} {pet.breed ? `· ${pet.breed}` : ''}
+                    {pet.species} {pet.breed ? `· ${pet.breed}` : ""}
                   </p>
                 </div>
 
@@ -171,8 +191,16 @@ export function OwnerDetailPage() {
 
       {owner && (
         <>
-          <OwnerForm open={editOpen} onClose={() => setEditOpen(false)} editOwner={owner as Owner} />
-          <PetForm open={addPetOpen} onClose={() => setAddPetOpen(false)} ownerId={owner.id} />
+          <OwnerForm
+            open={editOpen}
+            onClose={() => setEditOpen(false)}
+            editOwner={owner as Owner}
+          />
+          <PetForm
+            open={addPetOpen}
+            onClose={() => setAddPetOpen(false)}
+            ownerId={owner.id}
+          />
         </>
       )}
     </div>

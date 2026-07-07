@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -12,7 +12,7 @@ import {
   BedDouble,
   UserCog,
   Settings,
-} from 'lucide-react';
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -22,56 +22,55 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-} from '@/components/ui/sidebar';
-import { NavMain } from './nav-main';
-import { NavUser } from './nav-user';
+} from "@/components/ui/sidebar";
+import { NavMain } from "./nav-main";
+import { NavUser } from "./nav-user";
 
 const NAV_GROUPS = [
   {
-    title: 'Main',
-    items: [
-      { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    ],
+    title: "Main",
+    items: [{ title: "Dashboard", href: "/dashboard", icon: LayoutDashboard }],
   },
   {
-    title: 'Clinical',
+    title: "Clinical",
     items: [
       {
-        title: 'Appointments',
-        href: '/appointments',
+        title: "Appointments",
+        href: "/appointments",
         icon: CalendarDays,
         items: [
-          { title: 'Queue', href: '/appointments/queue' },
-          { title: 'Calendar', href: '/appointments' },
+          // { title: "Calendar", href: "/appointments" },
+          { title: "All Appointments", href: "/appointments" },
+          { title: "Queue", href: "/appointments/queue" },
         ],
       },
       {
-        title: 'Patients',
-        href: '/patients',
+        title: "Patients",
+        href: "/patients",
         icon: PawPrint,
         items: [
-          { title: 'Owners', href: '/owners' },
-          { title: 'Pets', href: '/patients' },
+          { title: "Owners", href: "/owners" },
+          { title: "Pets", href: "/patients" },
         ],
       },
-      { title: 'Medical Records', href: '/emr', icon: FileText },
-      { title: 'Laboratory', href: '/laboratory', icon: FlaskConical },
-      { title: 'Ward', href: '/ward', icon: BedDouble },
+      { title: "Medical Records", href: "/emr", icon: FileText },
+      { title: "Laboratory", href: "/laboratory", icon: FlaskConical },
+      { title: "Ward", href: "/ward", icon: BedDouble },
     ],
   },
   {
-    title: 'Operations',
+    title: "Operations",
     items: [
-      { title: 'Billing', href: '/billing', icon: Receipt },
-      { title: 'Inventory', href: '/inventory', icon: Package },
-      { title: 'Reports', href: '/reports', icon: BarChart3 },
+      { title: "Billing", href: "/billing", icon: Receipt },
+      { title: "Inventory", href: "/inventory", icon: Package },
+      { title: "Reports", href: "/reports", icon: BarChart3 },
     ],
   },
   {
-    title: 'System',
+    title: "System",
     items: [
-      { title: 'Staff', href: '/staff', icon: UserCog },
-      { title: 'Settings', href: '/settings', icon: Settings },
+      { title: "Staff", href: "/staff", icon: UserCog },
+      { title: "Settings", href: "/settings", icon: Settings },
     ],
   },
 ];
@@ -89,7 +88,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">PawCare HMS</span>
-                  <span className="text-muted-foreground truncate text-xs">Hospital Management</span>
+                  <span className="text-muted-foreground truncate text-xs">
+                    Hospital Management
+                  </span>
                 </div>
               </a>
             </SidebarMenuButton>

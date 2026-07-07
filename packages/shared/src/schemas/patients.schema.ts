@@ -36,7 +36,6 @@ export const CreatePetSchema = z.object({
   weight_kg:      z.coerce.number().positive().max(999).optional(),
   sex:            PetSexEnum.optional(),
   color:          z.string().max(100).optional(),
-  microchip_id:   z.string().max(50).optional(),
   insurance_id:   z.string().max(100).optional(),
   notes:          z.string().max(2000).optional(),
 });

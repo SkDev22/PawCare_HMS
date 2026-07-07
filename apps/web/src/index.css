@@ -4,6 +4,15 @@
 /* Class-based dark mode */
 @custom-variant dark (&:is(.dark *));
 
+/* Hides scrollbar visually while keeping the element scrollable */
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
 /*
   @theme inline: maps Tailwind utility names to our CSS custom properties.
   "inline" keeps the var() references alive at runtime so theming works.
