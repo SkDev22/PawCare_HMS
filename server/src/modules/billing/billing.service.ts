@@ -1,6 +1,6 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
-import { Decimal } from '@prisma/client/runtime/library';
 import type {
   CreateInvoiceInput,
   UpdateInvoiceInput,
@@ -12,6 +12,9 @@ import type {
 } from '@pawcare/shared';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+const { Decimal } = Prisma;
+type Decimal = Prisma.Decimal;
 
 const MODIFIABLE_STATUSES = ['DRAFT', 'SENT'] as const;
 

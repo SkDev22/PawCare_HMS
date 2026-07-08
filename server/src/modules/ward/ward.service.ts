@@ -1,32 +1,33 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, KennelStatus } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import type {
   AdmitPetInput,
   DischargePetInput,
   AddCareLogInput,
   HospitalizationQuery,
+  CreateKennelInput,
 } from '@pawcare/shared';
 
 // ── Kennel helpers ──────────────────────────────────────────────────────────
 
 const KENNEL_SELECT = {
-  id:          true,
-  label:       true,
-  size:        true,
-  is_occupied: true,
-  notes:       true,
-  room:        { select: { id: true, name: true, clinic_id: true } },
+  id:      true,
+  label:   true,
+  size:    true,
+  status:  true,
+  notes:   true,
+  room:    { select: { id: true, name: true, clinic_id: true } },
 } as const;
 
-export async function listKennels(clinicId: string) {
+export async function listKennels(clinicId: string, status?: KennelStatus) {
   const kennels = await prisma.kennelUnit.findMany({
-    where:   { room: { clinic_id: clinicId } },
+    where:   { room: { clinic_id: clinicId }, ...(status ? { status } : {}) },
     select:  KENNEL_SELECT,
     orderBy: [{ room: { name: 'asc' } }, { label: 'asc' }],
   });
 
   // Attach active hospitalization to occupied kennels
-  const occupiedIds = kennels.filter((k) => k.is_occupied).map((k) => k.id);
+  const occupiedIds = kennels.filter((k) => k.status === 'OCCUPIED').map((k) => k.id);
   const activeHosps =
     occupiedIds.length > 0
       ? await prisma.hospitalization.findMany({
@@ -53,6 +54,45 @@ export async function listKennels(clinicId: string) {
     ...k,
     active_hospitalization: hospByKennel.get(k.id) ?? null,
   }));
+}
+
+export async function createKennel(clinicId: string, data: CreateKennelInput) {
+  const room = await prisma.room.findFirst({
+    where: { id: data.room_id, clinic_id: clinicId },
+  });
+  if (!room) throw Object.assign(new Error('Room not found'), { status: 404 });
+
+  const kennel = await prisma.kennelUnit.create({
+    data: {
+      room_id: data.room_id,
+      label:   data.label,
+      size:    data.size,
+      ...(data.notes ? { notes: data.notes } : {}),
+    },
+    select: KENNEL_SELECT,
+  });
+
+  return { ...kennel, active_hospitalization: null };
+}
+
+export async function updateKennelStatus(id: string, clinicId: string, status: KennelStatus) {
+  const kennel = await prisma.kennelUnit.findFirst({
+    where: { id, room: { clinic_id: clinicId } },
+  });
+  if (!kennel) throw Object.assign(new Error('Kennel not found'), { status: 404 });
+  if (kennel.status === 'OCCUPIED') {
+    throw Object.assign(
+      new Error("Discharge the patient before changing this kennel's status"),
+      { status: 409 },
+    );
+  }
+
+  const updated = await prisma.kennelUnit.update({
+    where:  { id },
+    data:   { status },
+    select: KENNEL_SELECT,
+  });
+  return { ...updated, active_hospitalization: null };
 }
 
 // ── Hospitalization helpers ─────────────────────────────────────────────────
@@ -155,7 +195,9 @@ export async function admitPet(clinicId: string, staffId: string, data: AdmitPet
     where: { id: data.kennel_id, room: { clinic_id: clinicId } },
   });
   if (!kennel) throw Object.assign(new Error('Kennel not found'), { status: 404 });
-  if (kennel.is_occupied) throw Object.assign(new Error('Kennel is already occupied'), { status: 409 });
+  if (kennel.status !== 'AVAILABLE') {
+    throw Object.assign(new Error('Kennel is not available'), { status: 409 });
+  }
 
   // Verify pet belongs to this clinic
   const pet = await prisma.pet.findFirst({
@@ -177,7 +219,7 @@ export async function admitPet(clinicId: string, staffId: string, data: AdmitPet
         kennel: { select: { id: true, label: true } },
       },
     });
-    await tx.kennelUnit.update({ where: { id: data.kennel_id }, data: { is_occupied: true } });
+    await tx.kennelUnit.update({ where: { id: data.kennel_id }, data: { status: 'OCCUPIED' } });
     return hosp;
   });
 }
@@ -198,7 +240,9 @@ export async function discharge(id: string, clinicId: string, data: DischargePet
       },
       include: { kennel: { select: { id: true, label: true } } },
     });
-    await tx.kennelUnit.update({ where: { id: hosp.kennel_id }, data: { is_occupied: false } });
+    // Discharge doesn't return the kennel straight to service — it needs
+    // cleaning before the next patient can be admitted.
+    await tx.kennelUnit.update({ where: { id: hosp.kennel_id }, data: { status: 'CLEANING' } });
     return updated;
   });
 }

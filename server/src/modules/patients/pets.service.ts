@@ -1,7 +1,10 @@
-import { Decimal } from '@prisma/client/runtime/library';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import type { CreatePetInput, UpdatePetInput, PetQueryInput, CreateAllergyInput } from '@pawcare/shared';
+
+const { Decimal } = Prisma;
+type Decimal = Prisma.Decimal;
 
 export async function listPets(clinicId: string, query: PetQueryInput) {
   const { search, owner_id, species, status, cursor, limit } = query;

@@ -17,7 +17,7 @@ async function main() {
         phone: '+1-555-0100',
         address: '123 Vet Lane, Springfield',
         timezone: 'America/New_York',
-        currency: 'USD',
+        currency: 'LKR',
       },
     });
     console.log(`✅ Created clinic: ${clinic.name} (${clinic.id})`);
@@ -112,6 +112,34 @@ async function main() {
     console.log('✅ Created 8 sample services');
   } else {
     console.log(`ℹ️  Services already has ${serviceCount} entr${serviceCount === 1 ? 'y' : 'ies'}`);
+  }
+
+  // Create ward rooms and kennels
+  const wardRoomCount = await prisma.room.count({ where: { clinic_id: clinic.id, type: 'ward' } });
+
+  if (wardRoomCount === 0) {
+    const wardA = await prisma.room.create({
+      data: { clinic_id: clinic.id, name: 'Ward A', type: 'ward' },
+    });
+    const wardB = await prisma.room.create({
+      data: { clinic_id: clinic.id, name: 'Ward B', type: 'ward' },
+    });
+
+    await prisma.kennelUnit.createMany({
+      data: [
+        { room_id: wardA.id, label: 'K-01', size: 'small' },
+        { room_id: wardA.id, label: 'K-02', size: 'small' },
+        { room_id: wardA.id, label: 'K-03', size: 'medium' },
+        { room_id: wardA.id, label: 'K-04', size: 'medium' },
+        { room_id: wardB.id, label: 'K-05', size: 'large' },
+        { room_id: wardB.id, label: 'K-06', size: 'large' },
+        { room_id: wardB.id, label: 'Cat Suite 1', size: 'small' },
+        { room_id: wardB.id, label: 'Cat Suite 2', size: 'small' },
+      ],
+    });
+    console.log('✅ Created 2 ward rooms with 8 kennels');
+  } else {
+    console.log(`ℹ️  Ward rooms already exist (${wardRoomCount})`);
   }
 
   console.log('\n🎉 Seed complete!');

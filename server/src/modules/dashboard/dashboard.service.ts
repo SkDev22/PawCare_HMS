@@ -127,7 +127,7 @@ async function getWardOccupancyStat(clinicId: string, yesterday: Date) {
 
   const [total, occupied, occupiedYesterday] = await Promise.all([
     prisma.kennelUnit.count({ where: { room: { clinic_id: clinicId } } }),
-    prisma.kennelUnit.count({ where: { room: { clinic_id: clinicId }, is_occupied: true } }),
+    prisma.kennelUnit.count({ where: { room: { clinic_id: clinicId }, status: 'OCCUPIED' } }),
     prisma.hospitalization.count({
       where: {
         kennel: { room: { clinic_id: clinicId } },

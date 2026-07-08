@@ -7,8 +7,11 @@ import {
   DischargePetSchema,
   AddCareLogSchema,
   HospitalizationQuerySchema,
+  CreateKennelSchema,
+  KennelQuerySchema,
+  UpdateKennelStatusSchema,
 } from '@pawcare/shared';
-import type { HospitalizationQuery } from '@pawcare/shared';
+import type { HospitalizationQuery, KennelQuery } from '@pawcare/shared';
 import * as svc from './ward.service';
 
 export const wardRouter: IRouter = Router();
@@ -23,10 +26,42 @@ wardRouter.get(
   '/kennels',
   authenticate,
   authorize('WARD_READ'),
+  validate({ query: KennelQuerySchema }),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const kennels = await svc.listKennels(authed(req).user.clinic_id);
+      const { status } = req.query as unknown as KennelQuery;
+      const kennels = await svc.listKennels(authed(req).user.clinic_id, status);
       res.json(kennels);
+    } catch (err) { next(err); }
+  },
+);
+
+wardRouter.post(
+  '/kennels',
+  authenticate,
+  authorize('WARD_WRITE'),
+  validate({ body: CreateKennelSchema }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const kennel = await svc.createKennel(authed(req).user.clinic_id, req.body);
+      res.status(201).json(kennel);
+    } catch (err) { next(err); }
+  },
+);
+
+wardRouter.patch(
+  '/kennels/:id/status',
+  authenticate,
+  authorize('WARD_WRITE'),
+  validate({ body: UpdateKennelStatusSchema }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const kennel = await svc.updateKennelStatus(
+        req.params.id,
+        authed(req).user.clinic_id,
+        req.body.status,
+      );
+      res.json(kennel);
     } catch (err) { next(err); }
   },
 );

@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ─────────────────────────────────────────
@@ -19,7 +18,7 @@ model Clinic {
   email      String?
   logo_url   String?
   timezone   String   @default("UTC")
-  currency   String   @default("USD")
+  currency   String   @default("LKR")
   is_active  Boolean  @default(true)
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -458,13 +457,20 @@ model LabResult {
 // WARD & HOSPITALIZATION
 // ─────────────────────────────────────────
 
+enum KennelStatus {
+  AVAILABLE
+  OCCUPIED
+  CLEANING
+  OUT_OF_SERVICE
+}
+
 model KennelUnit {
-  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  room_id     String  @db.Uuid
-  label       String
-  size        String
-  is_occupied Boolean @default(false)
-  notes       String?
+  id      String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  room_id String       @db.Uuid
+  label   String
+  size    String
+  status  KennelStatus @default(AVAILABLE)
+  notes   String?
 
   room             Room              @relation(fields: [room_id], references: [id])
   hospitalizations Hospitalization[]

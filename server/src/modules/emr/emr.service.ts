@@ -3,7 +3,6 @@ import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { clampZero } from '../billing/billing.service';
 import { applyStockChangeTx } from '../inventory/inventory.service';
-import { Decimal } from '@prisma/client/runtime/library';
 import type {
   CreateMedicalRecordInput,
   UpdateMedicalRecordInput,
@@ -17,6 +16,9 @@ import type {
 } from '@pawcare/shared';
 
 type TxClient = Prisma.TransactionClient;
+
+const { Decimal } = Prisma;
+type Decimal = Prisma.Decimal;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 

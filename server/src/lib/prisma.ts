@@ -1,8 +1,11 @@
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { logger } from './logger';
 
 function createPrismaClient() {
+  const adapter = new PrismaPg(process.env['DATABASE_URL']!);
   const client = new PrismaClient({
+    adapter,
     log: [
       { emit: 'event', level: 'error' },
       { emit: 'event', level: 'warn' },
