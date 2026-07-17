@@ -22,6 +22,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useInventoryItems, useInventoryAlerts, useCreateInventoryItem } from '../../hooks/use-inventory';
 import { useDebounce } from '../../hooks/use-debounce';
+import { formatCurrency } from '../../lib/currency';
 import type { ItemCategory, InventoryItem } from '../../types/inventory';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -336,7 +337,7 @@ export function InventoryPage() {
                           <StockBadge qty={item.quantity_on_hand} threshold={item.reorder_threshold} />
                         </td>
                         <td className="px-4 py-4 text-right">
-                          ${Number(item.unit_cost).toFixed(2)}
+                          {formatCurrency(item.unit_cost)}
                         </td>
                         <td className="px-4 py-4">
                           {item.expiry_date ? (

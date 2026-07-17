@@ -1,5 +1,7 @@
 export type KennelSize = 'small' | 'medium' | 'large';
 
+export type KennelStatus = 'AVAILABLE' | 'OCCUPIED' | 'CLEANING' | 'OUT_OF_SERVICE';
+
 export type KennelRoom = { id: string; name: string; clinic_id: string };
 
 export type ActiveHospitalization = {
@@ -20,7 +22,7 @@ export type KennelUnit = {
   id:                     string;
   label:                  string;
   size:                   string;
-  is_occupied:            boolean;
+  status:                 KennelStatus;
   notes:                  string | null;
   room:                   KennelRoom;
   active_hospitalization: ActiveHospitalization | null;

@@ -38,6 +38,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatCurrency } from "@/lib/currency";
 
 const STATUS_CONFIG: Record<
   string,
@@ -87,14 +88,6 @@ const APPOINTMENT_TYPE_LABELS: Record<string, string> = {
   LAB_ONLY: "Lab Only",
 };
 
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-US", {
     hour: "2-digit",
@@ -136,7 +129,7 @@ export function DashboardPage() {
         },
         {
           label: "Monthly Revenue",
-          value: formatCurrency(data.stats.monthlyRevenue.amount),
+          value: formatCurrency(data.stats.monthlyRevenue.amount, { maximumFractionDigits: 0 }),
           sub: `${data.stats.monthlyRevenue.outstandingInvoicesCount} outstanding invoices`,
           trend: `${data.stats.monthlyRevenue.trend >= 0 ? "+" : ""}${data.stats.monthlyRevenue.trend.toFixed(1)}% vs last month`,
           up: data.stats.monthlyRevenue.trend >= 0,

@@ -21,6 +21,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useInventoryItem, useLogTransaction, useUpdateInventoryItem } from '../../hooks/use-inventory';
+import { formatCurrency } from '../../lib/currency';
 import type { TransactionType } from '../../types/inventory';
 
 // ── Transaction type display ──────────────────────────────────────────────────
@@ -252,7 +253,7 @@ export function InventoryDetailPage() {
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Unit Cost</p>
-            <p className="text-2xl font-bold">${Number(item.unit_cost).toFixed(2)}</p>
+            <p className="text-2xl font-bold">{formatCurrency(item.unit_cost)}</p>
           </CardContent>
         </Card>
         <Card className={expiringSoon ? 'border-orange-300' : ''}>
@@ -298,7 +299,7 @@ export function InventoryDetailPage() {
             {item.selling_price && (
               <div>
                 <p className="text-xs text-muted-foreground">Selling Price</p>
-                <p>${Number(item.selling_price).toFixed(2)}</p>
+                <p>{formatCurrency(item.selling_price)}</p>
               </div>
             )}
             <div>

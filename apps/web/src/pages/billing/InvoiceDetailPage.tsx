@@ -28,6 +28,7 @@ import {
   useInvoice, useServices, useAddLineItem, useRemoveLineItem,
   useRecordPayment, useUpdateInvoiceStatus,
 } from '../../hooks/use-billing';
+import { formatCurrency } from '../../lib/currency';
 import type { InvoiceStatus, PaymentMethod, LineItem, Service } from '../../types/billing';
 
 // ── Status helpers ──────────────────────────────────────────────────────────
@@ -147,7 +148,7 @@ function AddLineItemDialog({
                 <SelectContent>
                   {services.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
-                      {s.name} — ${parseFloat(s.price).toFixed(2)}
+                      {s.name} — {formatCurrency(s.price)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -187,7 +188,7 @@ function AddLineItemDialog({
                 name="unit_price"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Unit Price ($)</FormLabel>
+                    <FormLabel>Unit Price (LKR)</FormLabel>
                     <FormControl>
                       <Input type="number" min="0" step="0.01" {...field} />
                     </FormControl>
@@ -199,7 +200,7 @@ function AddLineItemDialog({
 
             {total > 0 && (
               <p className="text-sm text-muted-foreground text-right">
-                Line total: <span className="font-medium text-foreground">${total.toFixed(2)}</span>
+                Line total: <span className="font-medium text-foreground">{formatCurrency(total)}</span>
               </p>
             )}
 
@@ -251,7 +252,7 @@ function RecordPaymentDialog({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Balance due: <span className="font-semibold text-foreground">${balanceDue.toFixed(2)}</span>
+              Balance due: <span className="font-semibold text-foreground">{formatCurrency(balanceDue)}</span>
             </p>
 
             <FormField
@@ -259,7 +260,7 @@ function RecordPaymentDialog({
               name="amount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Amount ($) *</FormLabel>
+                  <FormLabel>Amount (LKR) *</FormLabel>
                   <FormControl>
                     <Input type="number" min="0.01" step="0.01" max={balanceDue > 0 ? balanceDue : undefined} {...field} />
                   </FormControl>
@@ -461,10 +462,10 @@ export function InvoiceDetailPage() {
                           </TableCell>
                           <TableCell className="text-right text-sm">{item.quantity}</TableCell>
                           <TableCell className="text-right text-sm">
-                            ${parseFloat(item.unit_price).toFixed(2)}
+                            {formatCurrency(item.unit_price)}
                           </TableCell>
                           <TableCell className="text-right text-sm font-medium">
-                            ${parseFloat(item.total).toFixed(2)}
+                            {formatCurrency(item.total)}
                           </TableCell>
                           {canEdit && (
                             <TableCell className="print:hidden">
@@ -529,7 +530,7 @@ export function InvoiceDetailPage() {
                             {p.notes ?? '—'}
                           </TableCell>
                           <TableCell className="text-right text-sm font-medium text-emerald-600">
-                            ${parseFloat(p.amount).toFixed(2)}
+                            {formatCurrency(p.amount)}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -552,32 +553,32 @@ export function InvoiceDetailPage() {
             <CardContent className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span>${subtotal.toFixed(2)}</span>
+                <span>{formatCurrency(subtotal)}</span>
               </div>
               {tax > 0 && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Tax</span>
-                  <span>${tax.toFixed(2)}</span>
+                  <span>{formatCurrency(tax)}</span>
                 </div>
               )}
               {discount > 0 && (
                 <div className="flex justify-between text-emerald-600">
                   <span>Discount</span>
-                  <span>−${discount.toFixed(2)}</span>
+                  <span>−{formatCurrency(discount)}</span>
                 </div>
               )}
               <Separator />
               <div className="flex justify-between font-semibold">
                 <span>Total</span>
-                <span>${total.toFixed(2)}</span>
+                <span>{formatCurrency(total)}</span>
               </div>
               <div className="flex justify-between text-emerald-600">
                 <span>Paid</span>
-                <span>${paid.toFixed(2)}</span>
+                <span>{formatCurrency(paid)}</span>
               </div>
               <div className={`flex justify-between font-bold ${balance > 0.001 ? 'text-destructive' : 'text-emerald-600'}`}>
                 <span>Balance Due</span>
-                <span>${balance.toFixed(2)}</span>
+                <span>{formatCurrency(balance)}</span>
               </div>
               {invoice.due_date && (
                 <p className="text-xs text-muted-foreground pt-1">

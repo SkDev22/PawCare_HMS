@@ -26,7 +26,30 @@ export const HospitalizationQuerySchema = z.object({
   limit:       z.coerce.number().int().min(1).max(100).default(20),
 });
 
-export type AdmitPetInput        = z.infer<typeof AdmitPetSchema>;
-export type DischargePetInput    = z.infer<typeof DischargePetSchema>;
-export type AddCareLogInput      = z.infer<typeof AddCareLogSchema>;
-export type HospitalizationQuery = z.infer<typeof HospitalizationQuerySchema>;
+export const KennelStatusEnum = z.enum(['AVAILABLE', 'OCCUPIED', 'CLEANING', 'OUT_OF_SERVICE']);
+
+export const CreateKennelSchema = z.object({
+  room_id: z.string().uuid('Valid room ID required'),
+  label:   z.string().min(1, 'Label is required').max(50),
+  size:    z.enum(['small', 'medium', 'large']),
+  notes:   z.string().max(500).optional(),
+});
+
+export const KennelQuerySchema = z.object({
+  status: KennelStatusEnum.optional(),
+});
+
+// OCCUPIED is set only by admitting a patient and cleared only by discharge —
+// it can't be assigned through this manual transition endpoint.
+export const UpdateKennelStatusSchema = z.object({
+  status: z.enum(['AVAILABLE', 'CLEANING', 'OUT_OF_SERVICE']),
+});
+
+export type AdmitPetInput          = z.infer<typeof AdmitPetSchema>;
+export type DischargePetInput      = z.infer<typeof DischargePetSchema>;
+export type AddCareLogInput        = z.infer<typeof AddCareLogSchema>;
+export type HospitalizationQuery   = z.infer<typeof HospitalizationQuerySchema>;
+export type KennelStatusValue      = z.infer<typeof KennelStatusEnum>;
+export type CreateKennelInput      = z.infer<typeof CreateKennelSchema>;
+export type KennelQuery            = z.infer<typeof KennelQuerySchema>;
+export type UpdateKennelStatusInput = z.infer<typeof UpdateKennelStatusSchema>;

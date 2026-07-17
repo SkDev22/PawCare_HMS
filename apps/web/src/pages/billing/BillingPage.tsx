@@ -17,6 +17,7 @@ import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Skeleton } from '../../components/ui/skeleton';
 import { useInvoices } from '../../hooks/use-billing';
 import { InvoiceForm } from './components/InvoiceForm';
+import { formatCurrency } from '../../lib/currency';
 import type { InvoiceStatus } from '../../types/billing';
 
 const STATUS_TABS: Array<{ label: string; value: InvoiceStatus | 'ALL' }> = [
@@ -48,10 +49,6 @@ const STATUS_LABEL: Record<InvoiceStatus, string> = {
   CANCELLED:      'Cancelled',
   REFUNDED:       'Refunded',
 };
-
-function fmt(val: string) {
-  return `$${parseFloat(val).toFixed(2)}`;
-}
 
 function TableSkeleton() {
   return (
@@ -198,14 +195,14 @@ export function BillingPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right text-sm font-medium">
-                          {fmt(invoice.total)}
+                          {formatCurrency(invoice.total)}
                         </TableCell>
                         <TableCell className="text-right text-sm text-muted-foreground">
-                          {fmt(invoice.paid_amount)}
+                          {formatCurrency(invoice.paid_amount)}
                         </TableCell>
                         <TableCell className="text-right text-sm font-medium">
                           <span className={bal > 0.001 ? 'text-destructive' : 'text-emerald-600'}>
-                            {fmt(bal.toFixed(2))}
+                            {formatCurrency(bal)}
                           </span>
                         </TableCell>
                       </TableRow>

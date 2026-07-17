@@ -79,6 +79,19 @@ export function useRooms() {
   });
 }
 
+export function useCreateRoom() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name: string; type: string }) =>
+      api.post('/appointments/rooms', data).then((r) => r.data as Room),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['appointments', 'rooms'] });
+      toast.success('Room added');
+    },
+    onError: (err: ApiError) => toast.error(errMsg(err, 'Failed to add room')),
+  });
+}
+
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 export function useCreateAppointment() {

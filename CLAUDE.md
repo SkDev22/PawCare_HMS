@@ -200,7 +200,7 @@ model Clinic {
   email         String?
   logo_url      String?
   timezone      String    @default("UTC")
-  currency      String    @default("USD")
+  currency      String    @default("LKR")
   is_active     Boolean   @default(true)
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
@@ -585,13 +585,20 @@ model LabResult {
 // WARD & HOSPITALIZATION
 // ─────────────────────────────────────────
 
+enum KennelStatus {
+  AVAILABLE
+  OCCUPIED
+  CLEANING
+  OUT_OF_SERVICE
+}
+
 model KennelUnit {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  room_id     String    @db.Uuid
-  label       String    // e.g. "K-01", "Cat Suite 3"
-  size        String    // "small" | "medium" | "large"
-  is_occupied Boolean   @default(false)
-  notes       String?
+  id      String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  room_id String       @db.Uuid
+  label   String       // e.g. "K-01", "Cat Suite 3"
+  size    String       // "small" | "medium" | "large"
+  status  KennelStatus @default(AVAILABLE)
+  notes   String?
 
   room              Room            @relation(fields: [room_id], references: [id])
   hospitalizations  Hospitalization[]
@@ -1068,7 +1075,9 @@ POST   /api/lab-orders/:id/results           — add/update results
 
 **Key endpoints:**
 ```
-GET    /api/ward/kennels                     — list kennels with occupancy
+GET    /api/ward/kennels                     — list kennels (filter by ?status=)
+POST   /api/ward/kennels                     — create a kennel in a ward room
+PATCH  /api/ward/kennels/:id/status          — manually transition a kennel's status
 POST   /api/hospitalizations                 — admit pet
 GET    /api/hospitalizations/:id             — detail with care logs
 POST   /api/hospitalizations/:id/care-logs  — add care log entry
@@ -1076,7 +1085,10 @@ PATCH  /api/hospitalizations/:id/discharge  — discharge pet
 ```
 
 **Business rules:**
-- A pet cannot be admitted to an already-occupied kennel
+- Every kennel has a `status`: `AVAILABLE`, `OCCUPIED`, `CLEANING`, or `OUT_OF_SERVICE`
+- A pet can only be admitted to a kennel with status `AVAILABLE`; admission sets it to `OCCUPIED`
+- Discharge does not return a kennel straight to service — it moves to `CLEANING` and staff must manually mark it `AVAILABLE` once cleaned
+- `OCCUPIED` can only be set via admission and cleared via discharge — the manual status endpoint rejects transitions into/out of `OCCUPIED` directly
 - Care logs are required at least once per 12-hour shift for hospitalized patients
 - Discharge generates a discharge summary document and a final invoice
 

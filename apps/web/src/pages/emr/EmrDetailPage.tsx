@@ -42,6 +42,7 @@ import {
 import { useInventoryItems } from '../../hooks/use-inventory';
 import { useServices } from '../../hooks/use-billing';
 import { useDebounce } from '../../hooks/use-debounce';
+import { formatCurrency } from '../../lib/currency';
 import type { MedicalRecord, Diagnosis, Prescription, Charge } from '../../types/emr';
 
 // ── SOAP Note Tab ──────────────────────────────────────────────────────────────
@@ -686,7 +687,7 @@ function AddPrescriptionDialog({
                 )}
                 {selectedItem && (
                   <p className="text-xs text-muted-foreground">
-                    Will bill ${(Number(selectedItem.selling_price) * (quantity || 0)).toFixed(2)} and deduct {quantity || 0} from stock.
+                    Will bill {formatCurrency(Number(selectedItem.selling_price) * (quantity || 0))} and deduct {quantity || 0} from stock.
                   </p>
                 )}
               </div>
@@ -763,7 +764,7 @@ function PrescriptionsTab({ record }: { record: MedicalRecord }) {
                   <div className="font-medium text-sm">{rx.drug_name}</div>
                   <div className="flex items-center gap-1.5 mt-1">
                     {rx.charge ? (
-                      <Badge variant="success" className="text-xs">Clinic · ${rx.charge.total}</Badge>
+                      <Badge variant="success" className="text-xs">Clinic · {formatCurrency(rx.charge.total)}</Badge>
                     ) : (
                       <Badge variant="outline" className="text-xs">Pharmacy</Badge>
                     )}
@@ -851,7 +852,7 @@ function ItemSearch({ onSelect }: { onSelect: (item: { id: string; name: string;
                   <Package className="size-3.5 text-primary shrink-0" />
                   <span className="text-sm truncate">{item.name}</span>
                 </div>
-                <span className="text-xs text-muted-foreground shrink-0">${item.selling_price} / {item.unit}</span>
+                <span className="text-xs text-muted-foreground shrink-0">{formatCurrency(item.selling_price!)} / {item.unit}</span>
               </button>
             ))
           )}
@@ -941,7 +942,7 @@ function AddChargeDialog({
               </SelectTrigger>
               <SelectContent>
                 {services.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.name} — ${s.price}</SelectItem>
+                  <SelectItem key={s.id} value={s.id}>{s.name} — {formatCurrency(s.price)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -959,7 +960,7 @@ function AddChargeDialog({
 
           {unitPrice && (
             <p className="text-sm text-muted-foreground">
-              Total: <span className="font-medium text-foreground">${(Number(unitPrice) * quantity).toFixed(2)}</span>
+              Total: <span className="font-medium text-foreground">{formatCurrency(Number(unitPrice) * quantity)}</span>
             </p>
           )}
 
@@ -1025,8 +1026,8 @@ function ChargesTab({ record }: { record: MedicalRecord }) {
               <TableRow key={c.id}>
                 <TableCell className="text-sm font-medium">{c.description}</TableCell>
                 <TableCell className="text-sm">{c.quantity}</TableCell>
-                <TableCell className="text-sm">${c.unit_price}</TableCell>
-                <TableCell className="text-sm font-medium">${c.total}</TableCell>
+                <TableCell className="text-sm">{formatCurrency(c.unit_price)}</TableCell>
+                <TableCell className="text-sm font-medium">{formatCurrency(c.total)}</TableCell>
                 <TableCell>
                   <Button
                     variant="ghost"
@@ -1041,7 +1042,7 @@ function ChargesTab({ record }: { record: MedicalRecord }) {
             ))}
             <TableRow>
               <TableCell colSpan={3} className="text-sm font-semibold text-right">Total</TableCell>
-              <TableCell className="text-sm font-semibold">${total.toFixed(2)}</TableCell>
+              <TableCell className="text-sm font-semibold">{formatCurrency(total)}</TableCell>
               <TableCell />
             </TableRow>
           </TableBody>

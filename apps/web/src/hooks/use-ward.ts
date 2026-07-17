@@ -16,6 +16,40 @@ export function useKennels() {
   });
 }
 
+export function useCreateKennel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      room_id: string;
+      label:   string;
+      size:    string;
+      notes?:  string;
+    }) => api.post('/ward/kennels', data).then((r) => r.data as KennelUnit),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['kennels'] });
+      toast.success('Kennel added');
+    },
+    onError: (err: { response?: { data?: { error?: { message?: string } } } }) => {
+      toast.error(err?.response?.data?.error?.message ?? 'Failed to add kennel');
+    },
+  });
+}
+
+export function useUpdateKennelStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      api.patch(`/ward/kennels/${id}/status`, { status }).then((r) => r.data as KennelUnit),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['kennels'] });
+      toast.success('Kennel status updated');
+    },
+    onError: (err: { response?: { data?: { error?: { message?: string } } } }) => {
+      toast.error(err?.response?.data?.error?.message ?? 'Failed to update kennel status');
+    },
+  });
+}
+
 export function useHospitalizations(params?: {
   active_only?: boolean;
   pet_id?:      string;

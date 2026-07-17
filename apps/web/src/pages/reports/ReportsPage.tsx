@@ -18,6 +18,7 @@ import {
   useInventoryUsageReport,
   useOutstandingBalances,
 } from '../../hooks/use-reports';
+import { formatCurrency } from '../../lib/currency';
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -53,13 +54,13 @@ function RevenueTab({ start, end }: { start: string; end: string }) {
         <Card>
           <CardContent className="p-6">
             <p className="text-sm text-muted-foreground">Total Revenue</p>
-            <p className="text-3xl font-bold mt-1">${data.totalRevenue.toFixed(2)}</p>
+            <p className="text-3xl font-bold mt-1">{formatCurrency(data.totalRevenue)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-6">
             <p className="text-sm text-muted-foreground">Outstanding</p>
-            <p className="text-3xl font-bold mt-1 text-orange-600">${data.totalOutstanding.toFixed(2)}</p>
+            <p className="text-3xl font-bold mt-1 text-orange-600">{formatCurrency(data.totalOutstanding)}</p>
           </CardContent>
         </Card>
       </div>
@@ -73,8 +74,8 @@ function RevenueTab({ start, end }: { start: string; end: string }) {
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={data.dailySeries}>
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(v) => format(new Date(v), 'MMM d')} />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
-                <Tooltip formatter={(v: number) => [`$${v.toFixed(2)}`, 'Revenue']} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatCurrency(v, { maximumFractionDigits: 0 })} />
+                <Tooltip formatter={(v: number) => [formatCurrency(v), 'Revenue']} />
                 <Bar dataKey="amount" fill="#6366f1" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -95,7 +96,7 @@ function RevenueTab({ start, end }: { start: string; end: string }) {
                     <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v: number) => `$${v.toFixed(2)}`} />
+                <Tooltip formatter={(v: number) => formatCurrency(v)} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
@@ -291,25 +292,25 @@ function BalancesTab() {
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Total Outstanding</p>
-            <p className="text-2xl font-bold text-orange-600">${data.totalOutstanding.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-orange-600">{formatCurrency(data.totalOutstanding)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Current (0–0d)</p>
-            <p className="text-xl font-bold">${data.buckets.current.toFixed(2)}</p>
+            <p className="text-xl font-bold">{formatCurrency(data.buckets.current)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">1–30 Days</p>
-            <p className="text-xl font-bold text-yellow-600">${data.buckets.days30.toFixed(2)}</p>
+            <p className="text-xl font-bold text-yellow-600">{formatCurrency(data.buckets.days30)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">31–60 Days</p>
-            <p className="text-xl font-bold text-orange-600">${data.buckets.days60.toFixed(2)}</p>
+            <p className="text-xl font-bold text-orange-600">{formatCurrency(data.buckets.days60)}</p>
           </CardContent>
         </Card>
       </div>
@@ -319,7 +320,7 @@ function BalancesTab() {
           <CardContent className="p-4 flex items-center gap-3">
             <AlertCircle className="h-5 w-5 text-red-600 shrink-0" />
             <div>
-              <p className="text-sm font-medium text-red-700">90+ Day Overdue: ${data.buckets.days90plus.toFixed(2)}</p>
+              <p className="text-sm font-medium text-red-700">90+ Day Overdue: {formatCurrency(data.buckets.days90plus)}</p>
               <p className="text-xs text-red-600">
                 {data.items.filter((i) => i.daysOverdue > 90).length} invoice(s) seriously overdue
               </p>
@@ -357,9 +358,9 @@ function BalancesTab() {
                           {inv.status}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-right">${Number(inv.total).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right">{formatCurrency(inv.total)}</td>
                       <td className="px-4 py-3 text-right font-medium text-red-600">
-                        ${inv.balance.toFixed(2)}
+                        {formatCurrency(inv.balance)}
                       </td>
                       <td className="px-4 py-3 text-right">
                         {inv.daysOverdue > 0 ? (
