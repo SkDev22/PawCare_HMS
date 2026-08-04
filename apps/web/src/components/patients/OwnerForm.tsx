@@ -1,62 +1,92 @@
-import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { CreateOwnerSchema, type CreateOwnerInput } from '@pawcare/shared';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useEffect, useRef } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { CreateOwnerSchema, type CreateOwnerInput } from "@pawcare/shared";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
-} from '@/components/ui/dialog';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
-} from '@/components/ui/form';
-import { useCreateOwner, useUpdateOwner } from '@/hooks/use-owners';
-import type { Owner } from '@/types/patients';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { useCreateOwner, useUpdateOwner } from "@/hooks/use-owners";
+import type { Owner } from "@/types/patients";
 
 interface Props {
-  open:        boolean;
-  onClose:     () => void;
+  open: boolean;
+  onClose: () => void;
   editOwner?: Owner;
 }
 
 export function OwnerForm({ open, onClose, editOwner }: Props) {
   const isEdit = !!editOwner;
 
+  // Tracks whether the user has directly typed into Emergency contact —
+  // once they have, phone changes stop overwriting it.
+  const emergencyContactEditedRef = useRef(false);
+
   const form = useForm<CreateOwnerInput>({
     resolver: zodResolver(CreateOwnerSchema),
     defaultValues: {
-      first_name:        '',
-      last_name:         '',
-      email:             '',
-      phone:             '',
-      address:           '',
-      emergency_contact: '',
-      preferred_contact: 'email',
-      portal_enabled:    false,
+      first_name: "",
+      last_name: "",
+      email: "",
+      phone: "",
+      address: "",
+      emergency_contact: "",
+      preferred_contact: "phone",
+      portal_enabled: false,
     },
   });
 
   useEffect(() => {
+    emergencyContactEditedRef.current = false;
     if (editOwner) {
       form.reset({
-        first_name:        editOwner.first_name,
-        last_name:         editOwner.last_name,
-        email:             editOwner.email ?? '',
-        phone:             editOwner.phone,
-        address:           editOwner.address ?? '',
-        emergency_contact: editOwner.emergency_contact ?? '',
+        first_name: editOwner.first_name,
+        last_name: editOwner.last_name,
+        email: editOwner.email ?? "",
+        phone: editOwner.phone,
+        address: editOwner.address ?? "",
+        emergency_contact: editOwner.emergency_contact ?? "",
         preferred_contact: editOwner.preferred_contact,
-        portal_enabled:    editOwner.portal_enabled,
+        portal_enabled: editOwner.portal_enabled,
       });
     } else {
-      form.reset({ first_name: '', last_name: '', email: '', phone: '', address: '', emergency_contact: '', preferred_contact: 'email', portal_enabled: false });
+      form.reset({
+        first_name: "",
+        last_name: "",
+        email: "",
+        phone: "",
+        address: "",
+        emergency_contact: "",
+        preferred_contact: "phone",
+        portal_enabled: false,
+      });
     }
   }, [editOwner, form]);
 
   const create = useCreateOwner();
-  const update = useUpdateOwner(editOwner?.id ?? '');
+  const update = useUpdateOwner(editOwner?.id ?? "");
 
   const onSubmit = async (values: CreateOwnerInput) => {
     try {
@@ -74,12 +104,19 @@ export function OwnerForm({ open, onClose, editOwner }: Props) {
   const isPending = create.isPending || update.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-lg">
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Edit Owner' : 'Add New Owner'}</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit Owner" : "Add New Owner"}</DialogTitle>
           <DialogDescription>
-            {isEdit ? "Update the owner's contact information." : "Register a new client / pet owner."}
+            {isEdit
+              ? "Update the owner's contact information."
+              : "Register a new client / pet owner."}
           </DialogDescription>
         </DialogHeader>
 
@@ -92,7 +129,9 @@ export function OwnerForm({ open, onClose, editOwner }: Props) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>First name</FormLabel>
-                    <FormControl><Input placeholder="Jane" {...field} /></FormControl>
+                    <FormControl>
+                      <Input placeholder="Jane" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -103,7 +142,9 @@ export function OwnerForm({ open, onClose, editOwner }: Props) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Last name</FormLabel>
-                    <FormControl><Input placeholder="Smith" {...field} /></FormControl>
+                    <FormControl>
+                      <Input placeholder="Smith" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -117,7 +158,13 @@ export function OwnerForm({ open, onClose, editOwner }: Props) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Email</FormLabel>
-                    <FormControl><Input type="email" placeholder="jane@example.com" {...field} /></FormControl>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="jane@example.com"
+                        {...field}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -127,8 +174,21 @@ export function OwnerForm({ open, onClose, editOwner }: Props) {
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone *</FormLabel>
-                    <FormControl><Input placeholder="+1-555-0100" {...field} /></FormControl>
+                    <FormLabel>
+                      Phone <span className="text-destructive">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="077 123 4567"
+                        {...field}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          if (!emergencyContactEditedRef.current) {
+                            form.setValue("emergency_contact", e.target.value);
+                          }
+                        }}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -142,7 +202,11 @@ export function OwnerForm({ open, onClose, editOwner }: Props) {
                 <FormItem>
                   <FormLabel>Address</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="123 Main St, Springfield" rows={2} {...field} />
+                    <Textarea
+                      placeholder="123 Main St, Springfield"
+                      rows={2}
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -156,7 +220,16 @@ export function OwnerForm({ open, onClose, editOwner }: Props) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Emergency contact</FormLabel>
-                    <FormControl><Input placeholder="Name / phone" {...field} /></FormControl>
+                    <FormControl>
+                      <Input
+                        placeholder="Name / phone"
+                        {...field}
+                        onChange={(e) => {
+                          emergencyContactEditedRef.current = true;
+                          field.onChange(e);
+                        }}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -169,7 +242,9 @@ export function OwnerForm({ open, onClose, editOwner }: Props) {
                     <FormLabel>Preferred contact</FormLabel>
                     <Select value={field.value} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="email">Email</SelectItem>
@@ -184,11 +259,20 @@ export function OwnerForm({ open, onClose, editOwner }: Props) {
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                disabled={isPending}
+              >
                 Cancel
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending ? 'Saving…' : isEdit ? 'Save changes' : 'Create owner'}
+                {isPending
+                  ? "Saving…"
+                  : isEdit
+                    ? "Save changes"
+                    : "Create owner"}
               </Button>
             </DialogFooter>
           </form>

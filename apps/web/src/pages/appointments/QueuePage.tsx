@@ -119,9 +119,9 @@ export function QueuePage() {
           <h1 className="text-2xl font-bold tracking-tight">
             Front Desk Queue
           </h1>
-          <p className="text-sm text-muted-foreground">
+          {/* <p className="text-sm text-muted-foreground">
             First-come, first-served — ordered by check-in time.
-          </p>
+          </p> */}
         </div>
         <Button onClick={() => setShowRegister(true)}>
           <UserPlus className="size-4" />

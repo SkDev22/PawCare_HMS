@@ -1,61 +1,104 @@
-import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { format, formatDistanceToNow } from 'date-fns';
+import { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { format, formatDistanceToNow } from "date-fns";
 import {
-  ArrowLeft, BedDouble, Clock, Stethoscope, CheckCircle2, AlertTriangle,
-  Plus, Pill, Eye, Activity, Utensils,
-} from 'lucide-react';
-import { Button } from '../../components/ui/button';
-import { Badge } from '../../components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Skeleton } from '../../components/ui/skeleton';
+  ArrowLeft,
+  BedDouble,
+  Clock,
+  Stethoscope,
+  CheckCircle2,
+  AlertTriangle,
+  Plus,
+  Pill,
+  Eye,
+  Activity,
+  Utensils,
+} from "lucide-react";
+import { Button } from "../../components/ui/button";
+import { Badge } from "../../components/ui/badge";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from '../../components/ui/dialog';
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/card";
+import { Skeleton } from "../../components/ui/skeleton";
 import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
-} from '../../components/ui/form';
-import { Textarea } from '../../components/ui/textarea';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "../../components/ui/dialog";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '../../components/ui/select';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { useHospitalization, useDischarge, useAddCareLog } from '../../hooks/use-ward';
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "../../components/ui/form";
+import { Textarea } from "../../components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import {
+  useHospitalization,
+  useDischarge,
+  useAddCareLog,
+} from "../../hooks/use-ward";
 
 // ── Icon map ──────────────────────────────────────────────────────────────────
 
 const LOG_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  feeding:     Utensils,
-  medication:  Pill,
-  vitals:      Activity,
+  feeding: Utensils,
+  medication: Pill,
+  vitals: Activity,
   observation: Eye,
 };
 
 // ── Discharge Dialog ──────────────────────────────────────────────────────────
 
 const DischargeSchema = z.object({
-  discharge_notes: z.string().max(2000).default(''),
+  discharge_notes: z.string().max(2000).default(""),
 });
 
 function DischargeDialog({
   hospId,
   open,
   onOpenChange,
-}: { hospId: string; open: boolean; onOpenChange: (v: boolean) => void }) {
-  const navigate  = useNavigate();
+}: {
+  hospId: string;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const navigate = useNavigate();
   const discharge = useDischarge(hospId);
 
   const form = useForm<z.infer<typeof DischargeSchema>>({
-    resolver:      zodResolver(DischargeSchema),
-    defaultValues: { discharge_notes: '' },
+    resolver: zodResolver(DischargeSchema),
+    defaultValues: { discharge_notes: "" },
   });
 
   function onSubmit(values: z.infer<typeof DischargeSchema>) {
     discharge.mutate(
-      { ...(values.discharge_notes ? { discharge_notes: values.discharge_notes } : {}) },
-      { onSuccess: () => { onOpenChange(false); navigate('/ward'); } },
+      {
+        ...(values.discharge_notes
+          ? { discharge_notes: values.discharge_notes }
+          : {}),
+      },
+      {
+        onSuccess: () => {
+          onOpenChange(false);
+          navigate("/ward");
+        },
+      },
     );
   }
 
@@ -70,21 +113,33 @@ function DischargeDialog({
         </p>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField control={form.control} name="discharge_notes" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Discharge Notes</FormLabel>
-                <FormControl>
-                  <Textarea placeholder="Care instructions, follow-up plan..." rows={4} {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
+            <FormField
+              control={form.control}
+              name="discharge_notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Discharge Notes</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Care instructions, follow-up plan..."
+                      rows={4}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
                 Cancel
               </Button>
               <Button type="submit" disabled={discharge.isPending}>
-                {discharge.isPending ? 'Discharging...' : 'Confirm Discharge'}
+                {discharge.isPending ? "Discharging..." : "Confirm Discharge"}
               </Button>
             </div>
           </form>
@@ -97,23 +152,32 @@ function DischargeDialog({
 // ── Care Log Dialog ───────────────────────────────────────────────────────────
 
 const CareLogSchema = z.object({
-  type:  z.enum(['feeding', 'medication', 'vitals', 'observation']),
-  notes: z.string().min(1, 'Notes are required').max(2000),
+  type: z.enum(["feeding", "medication", "vitals", "observation"]),
+  notes: z.string().min(1, "Notes are required").max(2000),
 });
 
 function AddCareLogDialog({
   hospId,
   open,
   onOpenChange,
-}: { hospId: string; open: boolean; onOpenChange: (v: boolean) => void }) {
+}: {
+  hospId: string;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
   const addLog = useAddCareLog(hospId);
-  const form   = useForm<z.infer<typeof CareLogSchema>>({
-    resolver:      zodResolver(CareLogSchema),
-    defaultValues: { type: 'observation', notes: '' },
+  const form = useForm<z.infer<typeof CareLogSchema>>({
+    resolver: zodResolver(CareLogSchema),
+    defaultValues: { type: "observation", notes: "" },
   });
 
   function onSubmit(values: z.infer<typeof CareLogSchema>) {
-    addLog.mutate(values, { onSuccess: () => { onOpenChange(false); form.reset(); } });
+    addLog.mutate(values, {
+      onSuccess: () => {
+        onOpenChange(false);
+        form.reset();
+      },
+    });
   }
 
   return (
@@ -124,42 +188,65 @@ function AddCareLogDialog({
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField control={form.control} name="type" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Type *</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="feeding">Feeding</SelectItem>
-                    <SelectItem value="medication">Medication</SelectItem>
-                    <SelectItem value="vitals">Vitals Check</SelectItem>
-                    <SelectItem value="observation">Observation</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )} />
+            <FormField
+              control={form.control}
+              name="type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Type <span className="text-destructive">*</span>
+                  </FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="feeding">Feeding</SelectItem>
+                      <SelectItem value="medication">Medication</SelectItem>
+                      <SelectItem value="vitals">Vitals Check</SelectItem>
+                      <SelectItem value="observation">Observation</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <FormField control={form.control} name="notes" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Notes *</FormLabel>
-                <FormControl>
-                  <Textarea placeholder="Describe the care given or observations..." rows={4} {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Notes <span className="text-destructive">*</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Describe the care given or observations..."
+                      rows={4}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
                 Cancel
               </Button>
               <Button type="submit" disabled={addLog.isPending}>
-                {addLog.isPending ? 'Saving...' : 'Add Entry'}
+                {addLog.isPending ? "Saving..." : "Add Entry"}
               </Button>
             </div>
           </form>
@@ -172,10 +259,10 @@ function AddCareLogDialog({
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function HospitalizationDetailPage() {
-  const { id }      = useParams<{ id: string }>();
-  const navigate    = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [dischargeOpen, setDischargeOpen] = useState(false);
-  const [careLogOpen, setCareLogOpen]     = useState(false);
+  const [careLogOpen, setCareLogOpen] = useState(false);
 
   const { data: hosp, isLoading } = useHospitalization(id);
 
@@ -194,15 +281,20 @@ export function HospitalizationDetailPage() {
   if (!hosp) {
     return (
       <div className="text-center py-20">
-        <p className="text-muted-foreground">Hospitalization record not found.</p>
-        <Button variant="link" onClick={() => navigate('/ward')}>Back to Ward</Button>
+        <p className="text-muted-foreground">
+          Hospitalization record not found.
+        </p>
+        <Button variant="link" onClick={() => navigate("/ward")}>
+          Back to Ward
+        </Button>
       </div>
     );
   }
 
-  const isActive      = !hosp.discharged_at;
-  const dayCount      = Math.ceil(
-    (new Date(hosp.discharged_at ?? new Date()).getTime() - new Date(hosp.admitted_at).getTime()) /
+  const isActive = !hosp.discharged_at;
+  const dayCount = Math.ceil(
+    (new Date(hosp.discharged_at ?? new Date()).getTime() -
+      new Date(hosp.admitted_at).getTime()) /
       (1000 * 60 * 60 * 24),
   );
 
@@ -210,18 +302,22 @@ export function HospitalizationDetailPage() {
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* Back + Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/ward')}>
+        <Button variant="ghost" size="icon" onClick={() => navigate("/ward")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-semibold">{hosp.pet.name}</h1>
-            <Badge variant={isActive ? 'warning' : 'secondary'} className="text-xs">
-              {isActive ? 'Inpatient' : 'Discharged'}
+            <Badge
+              variant={isActive ? "warning" : "secondary"}
+              className="text-xs"
+            >
+              {isActive ? "Inpatient" : "Discharged"}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground capitalize">
-            {hosp.pet.species.toLowerCase()} · {hosp.kennel.label} · {hosp.kennel.room.name}
+            {hosp.pet.species.toLowerCase()} · {hosp.kennel.label} ·{" "}
+            {hosp.kennel.room.name}
           </p>
         </div>
         {isActive && (
@@ -230,7 +326,10 @@ export function HospitalizationDetailPage() {
               <Plus className="h-4 w-4 mr-2" />
               Care Log
             </Button>
-            <Button variant="destructive" onClick={() => setDischargeOpen(true)}>
+            <Button
+              variant="destructive"
+              onClick={() => setDischargeOpen(true)}
+            >
               <CheckCircle2 className="h-4 w-4 mr-2" />
               Discharge
             </Button>
@@ -260,9 +359,13 @@ export function HospitalizationDetailPage() {
               )}
               <div>
                 <p className="text-muted-foreground text-xs">Owner</p>
-                <p>{hosp.pet.owner.first_name} {hosp.pet.owner.last_name}</p>
+                <p>
+                  {hosp.pet.owner.first_name} {hosp.pet.owner.last_name}
+                </p>
                 {hosp.pet.owner.phone && (
-                  <p className="text-muted-foreground text-xs">{hosp.pet.owner.phone}</p>
+                  <p className="text-muted-foreground text-xs">
+                    {hosp.pet.owner.phone}
+                  </p>
                 )}
               </div>
             </CardContent>
@@ -281,22 +384,31 @@ export function HospitalizationDetailPage() {
               </div>
               <div>
                 <p className="text-muted-foreground text-xs">Admitted</p>
-                <p>{format(new Date(hosp.admitted_at), 'MMM d, yyyy h:mm a')}</p>
+                <p>
+                  {format(new Date(hosp.admitted_at), "MMM d, yyyy h:mm a")}
+                </p>
                 <p className="text-muted-foreground text-xs">
-                  {formatDistanceToNow(new Date(hosp.admitted_at), { addSuffix: true })}
+                  {formatDistanceToNow(new Date(hosp.admitted_at), {
+                    addSuffix: true,
+                  })}
                 </p>
               </div>
               {hosp.estimated_stay_days && (
                 <div>
-                  <p className="text-muted-foreground text-xs">Estimated Stay</p>
-                  <p>{hosp.estimated_stay_days} day{hosp.estimated_stay_days !== 1 ? 's' : ''}</p>
+                  <p className="text-muted-foreground text-xs">
+                    Estimated Stay
+                  </p>
+                  <p>
+                    {hosp.estimated_stay_days} day
+                    {hosp.estimated_stay_days !== 1 ? "s" : ""}
+                  </p>
                 </div>
               )}
               <div>
                 <p className="text-muted-foreground text-xs">Duration</p>
                 <p className="flex items-center gap-1">
                   <Clock className="h-3 w-3" />
-                  {dayCount} day{dayCount !== 1 ? 's' : ''}
+                  {dayCount} day{dayCount !== 1 ? "s" : ""}
                 </p>
               </div>
               {hosp.admitted_by_staff && (
@@ -308,10 +420,14 @@ export function HospitalizationDetailPage() {
               {hosp.discharged_at && (
                 <div className="pt-2 border-t">
                   <p className="text-muted-foreground text-xs">Discharged</p>
-                  <p>{format(new Date(hosp.discharged_at), 'MMM d, yyyy h:mm a')}</p>
+                  <p>
+                    {format(new Date(hosp.discharged_at), "MMM d, yyyy h:mm a")}
+                  </p>
                   {hosp.discharge_notes && (
                     <div className="mt-1">
-                      <p className="text-muted-foreground text-xs">Discharge Notes</p>
+                      <p className="text-muted-foreground text-xs">
+                        Discharge Notes
+                      </p>
                       <p className="text-sm">{hosp.discharge_notes}</p>
                     </div>
                   )}
@@ -326,10 +442,15 @@ export function HospitalizationDetailPage() {
           <Card>
             <CardHeader className="pb-3 flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-medium">
-                Care Log ({hosp.care_logs.length} entr{hosp.care_logs.length !== 1 ? 'ies' : 'y'})
+                Care Log ({hosp.care_logs.length} entr
+                {hosp.care_logs.length !== 1 ? "ies" : "y"})
               </CardTitle>
               {isActive && (
-                <Button size="sm" variant="outline" onClick={() => setCareLogOpen(true)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCareLogOpen(true)}
+                >
                   <Plus className="h-3 w-3 mr-1" />
                   Add
                 </Button>
@@ -339,7 +460,9 @@ export function HospitalizationDetailPage() {
               {hosp.care_logs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12">
                   <AlertTriangle className="h-8 w-8 text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground">No care logs yet</p>
+                  <p className="text-sm text-muted-foreground">
+                    No care logs yet
+                  </p>
                   {isActive && (
                     <p className="text-xs text-muted-foreground mt-1">
                       Log feeding, medication, vitals, or observations here.
@@ -359,18 +482,25 @@ export function HospitalizationDetailPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
-                            <Badge variant="secondary" className="text-xs capitalize">
+                            <Badge
+                              variant="secondary"
+                              className="text-xs capitalize"
+                            >
                               {log.type}
                             </Badge>
                             {log.performed_by_staff && (
                               <span className="text-xs text-muted-foreground">
-                                {log.performed_by_staff.first_name} {log.performed_by_staff.last_name}
+                                {log.performed_by_staff.first_name}{" "}
+                                {log.performed_by_staff.last_name}
                               </span>
                             )}
                           </div>
                           <p className="text-sm">{log.notes}</p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {format(new Date(log.logged_at), 'MMM d, yyyy h:mm a')}
+                            {format(
+                              new Date(log.logged_at),
+                              "MMM d, yyyy h:mm a",
+                            )}
                           </p>
                         </div>
                       </div>

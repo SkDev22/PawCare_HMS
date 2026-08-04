@@ -68,9 +68,9 @@ export function OwnersPage() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Owners</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          {/* <p className="text-sm text-muted-foreground mt-0.5">
             Manage client records and contact information
-          </p>
+          </p> */}
         </div>
         {canWrite && (
           <Button onClick={() => setShowForm(true)}>

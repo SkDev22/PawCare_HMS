@@ -1,55 +1,105 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, Plus, PawPrint, MoreHorizontal, Eye } from 'lucide-react';
-import { usePets } from '@/hooks/use-pets';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Card } from '@/components/ui/card';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Search, Plus, PawPrint, MoreHorizontal, Eye } from "lucide-react";
+import { usePets } from "@/hooks/use-pets";
+import { useDebounce } from "@/hooks/use-debounce";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Card } from "@/components/ui/card";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { speciesIcon, speciesBadgeVariant, calcAge } from '@/lib/patient-utils';
-import type { Species, PetStatus } from '@/types/patients';
-import { useAuthStore } from '@/stores/auth.store';
-import { hasPermission } from '@/lib/permissions';
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { speciesIcon, speciesBadgeVariant, calcAge } from "@/lib/patient-utils";
+import type { Species, PetStatus } from "@/types/patients";
+import { useAuthStore } from "@/stores/auth.store";
+import { hasPermission } from "@/lib/permissions";
+
+const PAGE_SIZE = 20;
 
 const SPECIES_OPTIONS: { label: string; value: Species }[] = [
-  { label: 'Dog',          value: 'DOG' },
-  { label: 'Cat',          value: 'CAT' },
-  { label: 'Bird',         value: 'BIRD' },
-  { label: 'Rabbit',       value: 'RABBIT' },
-  { label: 'Reptile',      value: 'REPTILE' },
-  { label: 'Small mammal', value: 'SMALL_MAMMAL' },
-  { label: 'Other',        value: 'OTHER' },
+  { label: "Dog", value: "DOG" },
+  { label: "Cat", value: "CAT" },
+  { label: "Bird", value: "BIRD" },
+  { label: "Rabbit", value: "RABBIT" },
+  { label: "Reptile", value: "REPTILE" },
+  { label: "Small mammal", value: "SMALL_MAMMAL" },
+  { label: "Other", value: "OTHER" },
 ];
 
 export function PetsPage() {
   const navigate = useNavigate();
   const role = useAuthStore((s) => s.user?.role);
-  const canWrite = hasPermission(role, 'PATIENT_WRITE');
-  const [speciesFilter, setSpeciesFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter]   = useState<string>('');
-  const [search, setSearch] = useState('');
+  const canWrite = hasPermission(role, "PATIENT_WRITE");
+  const [speciesFilter, setSpeciesFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 300);
 
-  const { data, isLoading } = usePets({
-    species: speciesFilter as Species || undefined,
-    status:  statusFilter as PetStatus || undefined,
+  // Cursor-based pagination: cursorHistory[i] is the cursor that fetches page i+2
+  // (page 1 has no cursor). pageIndex is 0-based.
+  const [cursorHistory, setCursorHistory] = useState<string[]>([]);
+  const [pageIndex, setPageIndex] = useState(0);
+
+  useEffect(() => {
+    setPageIndex(0);
+    setCursorHistory([]);
+  }, [speciesFilter, statusFilter, debouncedSearch]);
+
+  const currentCursor =
+    pageIndex === 0 ? undefined : cursorHistory[pageIndex - 1];
+
+  const { data, isLoading, isFetching } = usePets({
+    ...(speciesFilter ? { species: speciesFilter as Species } : {}),
+    ...(statusFilter ? { status: statusFilter as PetStatus } : {}),
+    ...(debouncedSearch ? { search: debouncedSearch } : {}),
+    ...(currentCursor ? { cursor: currentCursor } : {}),
+    limit: PAGE_SIZE,
   });
 
-  const filtered = search
-    ? data?.items.filter((p) =>
-        p.name.toLowerCase().includes(search.toLowerCase()) ||
-        (p.breed ?? '').toLowerCase().includes(search.toLowerCase()) ||
-        `${p.owner?.first_name} ${p.owner?.last_name}`.toLowerCase().includes(search.toLowerCase()),
-      )
-    : data?.items;
+  const filtered = data?.items;
+
+  const goToNextPage = () => {
+    if (!data?.hasMore || !data.nextCursor) return;
+    setCursorHistory((prev) => {
+      const next = [...prev];
+      next[pageIndex] = data.nextCursor as string;
+      return next;
+    });
+    setPageIndex((p) => p + 1);
+  };
+
+  const goToPreviousPage = () => {
+    setPageIndex((p) => Math.max(0, p - 1));
+  };
 
   return (
     <div className="space-y-6">
@@ -57,10 +107,12 @@ export function PetsPage() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Patients</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">All registered pets</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            All registered pets
+          </p>
         </div>
         {canWrite && (
-          <Button onClick={() => navigate('/owners')}>
+          <Button onClick={() => navigate("/owners")}>
             <Plus className="w-4 h-4" />
             Add via owner
           </Button>
@@ -73,7 +125,7 @@ export function PetsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             className="pl-9 w-64"
-            placeholder="Search by name, breed, owner…"
+            placeholder="Search by pet name…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -86,7 +138,9 @@ export function PetsPage() {
           <SelectContent>
             <SelectItem value="">All species</SelectItem>
             {SPECIES_OPTIONS.map((s) => (
-              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+              <SelectItem key={s.value} value={s.value}>
+                {s.label}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -105,7 +159,14 @@ export function PetsPage() {
         </Select>
 
         {(speciesFilter || statusFilter) && (
-          <Button variant="ghost" size="sm" onClick={() => { setSpeciesFilter(''); setStatusFilter(''); }}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSpeciesFilter("");
+              setStatusFilter("");
+            }}
+          >
             Clear filters
           </Button>
         )}
@@ -121,25 +182,41 @@ export function PetsPage() {
               <TableHead>Species / Breed</TableHead>
               <TableHead>Age</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="w-[52px]" />
+              <TableHead className="w-13" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading &&
               Array.from({ length: 6 }).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell><div className="flex items-center gap-3"><Skeleton className="h-8 w-8 rounded-full" /><Skeleton className="h-4 w-24" /></div></TableCell>
-                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-8 w-8 rounded-full" />
+                      <Skeleton className="h-4 w-24" />
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-32" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-28" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-12" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </TableCell>
                   <TableCell />
                 </TableRow>
               ))}
 
             {!isLoading && filtered?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-16 text-muted-foreground">
+                <TableCell
+                  colSpan={6}
+                  className="text-center py-16 text-muted-foreground"
+                >
                   <PawPrint className="w-10 h-10 mx-auto mb-3 opacity-30" />
                   <p className="font-medium">No patients found</p>
                 </TableCell>
@@ -164,10 +241,13 @@ export function PetsPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {pet.owner ? `${pet.owner.first_name} ${pet.owner.last_name}` : '—'}
+                    {pet.owner
+                      ? `${pet.owner.first_name} ${pet.owner.last_name}`
+                      : "—"}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {pet.species}{pet.breed ? ` · ${pet.breed}` : ''}
+                    {pet.species}
+                    {pet.breed ? ` · ${pet.breed}` : ""}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {calcAge(pet.date_of_birth)}
@@ -185,7 +265,9 @@ export function PetsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => navigate(`/patients/${pet.id}`)}>
+                        <DropdownMenuItem
+                          onClick={() => navigate(`/patients/${pet.id}`)}
+                        >
                           <Eye className="w-4 h-4 mr-2" /> View record
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -196,6 +278,39 @@ export function PetsPage() {
           </TableBody>
         </Table>
       </Card>
+
+      {/* Pagination */}
+      {(pageIndex > 0 || (!isLoading && (filtered?.length ?? 0) > 0)) && (
+        <Pagination className="justify-end">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={goToPreviousPage}
+                aria-disabled={pageIndex === 0}
+                className={
+                  pageIndex === 0
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
+                }
+              />
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationLink isActive>{pageIndex + 1}</PaginationLink>
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationNext
+                onClick={goToNextPage}
+                aria-disabled={!data?.hasMore || isFetching}
+                className={
+                  !data?.hasMore || isFetching
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
+                }
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
     </div>
   );
 }

@@ -1,24 +1,40 @@
-import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { CreatePetSchema, type CreatePetInput } from '@pawcare/shared';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { CreatePetSchema, type CreatePetInput } from "@pawcare/shared";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
-} from '@/components/ui/dialog';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
-} from '@/components/ui/form';
-import { useCreatePet, useUpdatePet } from '@/hooks/use-pets';
-import type { Pet } from '@/types/patients';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { useCreatePet, useUpdatePet } from "@/hooks/use-pets";
+import type { Pet } from "@/types/patients";
 
 interface Props {
-  open:      boolean;
-  onClose:   () => void;
-  ownerId:   string;
+  open: boolean;
+  onClose: () => void;
+  ownerId: string;
   editPet?: Pet;
 }
 
@@ -28,40 +44,53 @@ export function PetForm({ open, onClose, ownerId, editPet }: Props) {
   const form = useForm<CreatePetInput>({
     resolver: zodResolver(CreatePetSchema),
     defaultValues: {
-      owner_id:      ownerId,
-      name:          '',
-      species:       'DOG',
-      breed:         '',
-      date_of_birth: '',
-      weight_kg:     undefined,
-      sex:           undefined,
-      color:         '',
-      insurance_id:  '',
-      notes:         '',
+      owner_id: ownerId,
+      name: "",
+      species: "DOG",
+      breed: "",
+      date_of_birth: "",
+      weight_kg: undefined,
+      sex: undefined,
+      color: "",
+      insurance_id: "",
+      notes: "",
     },
   });
 
   useEffect(() => {
     if (editPet) {
       form.reset({
-        owner_id:      ownerId,
-        name:          editPet.name,
-        species:       editPet.species,
-        breed:         editPet.breed ?? '',
-        date_of_birth: editPet.date_of_birth ? editPet.date_of_birth.slice(0, 10) : '',
-        weight_kg:     editPet.weight_kg ? Number(editPet.weight_kg) : undefined,
-        sex:           editPet.sex ?? undefined,
-        color:         editPet.color ?? '',
-        insurance_id:  editPet.insurance_id ?? '',
-        notes:         editPet.notes ?? '',
+        owner_id: ownerId,
+        name: editPet.name,
+        species: editPet.species,
+        breed: editPet.breed ?? "",
+        date_of_birth: editPet.date_of_birth
+          ? editPet.date_of_birth.slice(0, 10)
+          : "",
+        weight_kg: editPet.weight_kg ? Number(editPet.weight_kg) : undefined,
+        sex: editPet.sex ?? undefined,
+        color: editPet.color ?? "",
+        insurance_id: editPet.insurance_id ?? "",
+        notes: editPet.notes ?? "",
       });
     } else {
-      form.reset({ owner_id: ownerId, name: '', species: 'DOG', breed: '', date_of_birth: '', weight_kg: undefined, sex: undefined, color: '', insurance_id: '', notes: '' });
+      form.reset({
+        owner_id: ownerId,
+        name: "",
+        species: "DOG",
+        breed: "",
+        date_of_birth: "",
+        weight_kg: undefined,
+        sex: undefined,
+        color: "",
+        insurance_id: "",
+        notes: "",
+      });
     }
   }, [editPet, ownerId, form]);
 
   const create = useCreatePet();
-  const update = useUpdatePet(editPet?.id ?? '');
+  const update = useUpdatePet(editPet?.id ?? "");
 
   const onSubmit = async (values: CreatePetInput) => {
     try {
@@ -80,10 +109,15 @@ export function PetForm({ open, onClose, ownerId, editPet }: Props) {
   const isPending = create.isPending || update.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Edit Pet' : 'Add New Pet'}</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit Pet" : "Add New Pet"}</DialogTitle>
           <DialogDescription>
             {isEdit ? "Update the pet's profile." : "Register a new patient."}
           </DialogDescription>
@@ -97,8 +131,12 @@ export function PetForm({ open, onClose, ownerId, editPet }: Props) {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Name *</FormLabel>
-                    <FormControl><Input placeholder="Buddy" {...field} /></FormControl>
+                    <FormLabel>
+                      Name <span className="text-destructive">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="Buddy" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -108,14 +146,30 @@ export function PetForm({ open, onClose, ownerId, editPet }: Props) {
                 name="species"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Species *</FormLabel>
+                    <FormLabel>
+                      Species <span className="text-destructive">*</span>
+                    </FormLabel>
                     <Select value={field.value} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {(['DOG','CAT','BIRD','RABBIT','REPTILE','SMALL_MAMMAL','OTHER'] as const).map((s) => (
-                          <SelectItem key={s} value={s}>{s.replace('_', ' ')}</SelectItem>
+                        {(
+                          [
+                            "DOG",
+                            "CAT",
+                            "BIRD",
+                            "RABBIT",
+                            "REPTILE",
+                            "SMALL_MAMMAL",
+                            "OTHER",
+                          ] as const
+                        ).map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s.replace("_", " ")}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -132,7 +186,9 @@ export function PetForm({ open, onClose, ownerId, editPet }: Props) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Breed</FormLabel>
-                    <FormControl><Input placeholder="Labrador Retriever" {...field} /></FormControl>
+                    <FormControl>
+                      <Input placeholder="Labrador Retriever" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -143,15 +199,24 @@ export function PetForm({ open, onClose, ownerId, editPet }: Props) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Sex</FormLabel>
-                    <Select value={field.value ?? ''} onValueChange={(v) => field.onChange(v || undefined)}>
+                    <Select
+                      value={field.value ?? ""}
+                      onValueChange={(v) => field.onChange(v || undefined)}
+                    >
                       <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Unknown" /></SelectTrigger>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Unknown" />
+                        </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="M">Male (intact)</SelectItem>
                         <SelectItem value="F">Female (intact)</SelectItem>
-                        <SelectItem value="M_NEUTERED">Male (neutered)</SelectItem>
-                        <SelectItem value="F_SPAYED">Female (spayed)</SelectItem>
+                        <SelectItem value="M_NEUTERED">
+                          Male (neutered)
+                        </SelectItem>
+                        <SelectItem value="F_SPAYED">
+                          Female (spayed)
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -167,7 +232,9 @@ export function PetForm({ open, onClose, ownerId, editPet }: Props) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Date of birth</FormLabel>
-                    <FormControl><Input type="date" {...field} /></FormControl>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -184,8 +251,12 @@ export function PetForm({ open, onClose, ownerId, editPet }: Props) {
                         step="0.1"
                         min="0"
                         placeholder="4.5"
-                        value={field.value ?? ''}
-                        onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                        value={field.value ?? ""}
+                        onChange={(e) =>
+                          field.onChange(
+                            e.target.value ? Number(e.target.value) : undefined,
+                          )
+                        }
                       />
                     </FormControl>
                     <FormMessage />
@@ -200,7 +271,9 @@ export function PetForm({ open, onClose, ownerId, editPet }: Props) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Color / markings</FormLabel>
-                  <FormControl><Input placeholder="Golden brown" {...field} /></FormControl>
+                  <FormControl>
+                    <Input placeholder="Golden brown" {...field} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -213,7 +286,11 @@ export function PetForm({ open, onClose, ownerId, editPet }: Props) {
                 <FormItem>
                   <FormLabel>Notes</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Any relevant notes…" rows={2} {...field} />
+                    <Textarea
+                      placeholder="Any relevant notes…"
+                      rows={2}
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -221,11 +298,16 @@ export function PetForm({ open, onClose, ownerId, editPet }: Props) {
             />
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                disabled={isPending}
+              >
                 Cancel
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending ? 'Saving…' : isEdit ? 'Save changes' : 'Add pet'}
+                {isPending ? "Saving…" : isEdit ? "Save changes" : "Add pet"}
               </Button>
             </DialogFooter>
           </form>

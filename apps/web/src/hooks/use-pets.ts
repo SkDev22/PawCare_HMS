@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import type { Pet, PaginatedResponse } from '@/types/patients';
@@ -16,6 +16,7 @@ export function usePets(params?: {
     queryKey: ['pets', params],
     queryFn: () => api.get('/pets', { params }).then((r) => r.data),
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
 }
 
