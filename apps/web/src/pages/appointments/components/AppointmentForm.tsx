@@ -218,6 +218,12 @@ interface Props {
   editAppt?: Appointment;
   defaultDate?: string;
   defaultWalkIn?: boolean;
+  defaultPet?: {
+    id: string;
+    name: string;
+    species: string;
+    owner?: { first_name: string; last_name: string } | null;
+  };
 }
 
 export function AppointmentForm({
@@ -226,6 +232,7 @@ export function AppointmentForm({
   editAppt,
   defaultDate,
   defaultWalkIn,
+  defaultPet,
 }: Props) {
   const isEdit = !!editAppt;
   const { data: vets = [] } = useVets();
@@ -237,7 +244,7 @@ export function AppointmentForm({
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
-      pet_id: "",
+      pet_id: defaultPet?.id ?? "",
       vet_id: "",
       room_id: "",
       type: "WELLNESS_EXAM",
@@ -272,7 +279,7 @@ export function AppointmentForm({
       });
     } else {
       form.reset({
-        pet_id: "",
+        pet_id: defaultPet?.id ?? "",
         vet_id: "",
         room_id: "",
         type: "WELLNESS_EXAM",
@@ -284,7 +291,7 @@ export function AppointmentForm({
         is_walk_in: !!defaultWalkIn,
       });
     }
-  }, [editAppt, open, form, todayStr, defaultWalkIn, nowStr]);
+  }, [editAppt, open, form, todayStr, defaultWalkIn, nowStr, defaultPet]);
 
   const create = useCreateAppointment();
   const update = useUpdateAppointment(editAppt?.id ?? "");
@@ -367,6 +374,7 @@ export function AppointmentForm({
                       <PetSearch
                         value={field.value}
                         onChange={field.onChange}
+                        {...(defaultPet ? { defaultPet } : {})}
                       />
                     )}
                   </FormControl>

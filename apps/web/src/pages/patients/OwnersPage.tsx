@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Plus, Users } from "lucide-react";
 import { useOwners, useDeleteOwner } from "@/hooks/use-owners";
@@ -22,12 +22,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { OwnerForm } from "@/components/patients/OwnerForm";
 import { useDebounce } from "@/hooks/use-debounce";
 import type { Owner } from "@/types/patients";
 import { MoreHorizontal, Pencil, Trash2, Eye } from "lucide-react";
 import { useAuthStore } from "@/stores/auth.store";
 import { hasPermission } from "@/lib/permissions";
+
+const PAGE_SIZE = 20;
 
 export function OwnersPage() {
   const navigate = useNavigate();
@@ -38,10 +48,40 @@ export function OwnersPage() {
   const [editOwner, setEditOwner] = useState<Owner | undefined>();
 
   const debouncedSearch = useDebounce(search, 300);
-  const { data, isLoading } = useOwners(
-    debouncedSearch ? { search: debouncedSearch } : undefined,
-  );
+
+  // Cursor-based pagination: cursorHistory[i] is the cursor that fetches page i+2
+  // (page 1 has no cursor). pageIndex is 0-based.
+  const [cursorHistory, setCursorHistory] = useState<string[]>([]);
+  const [pageIndex, setPageIndex] = useState(0);
+
+  useEffect(() => {
+    setPageIndex(0);
+    setCursorHistory([]);
+  }, [debouncedSearch]);
+
+  const currentCursor =
+    pageIndex === 0 ? undefined : cursorHistory[pageIndex - 1];
+
+  const { data, isLoading, isFetching } = useOwners({
+    ...(debouncedSearch ? { search: debouncedSearch } : {}),
+    ...(currentCursor ? { cursor: currentCursor } : {}),
+    limit: PAGE_SIZE,
+  });
   const deleteOwner = useDeleteOwner();
+
+  const goToNextPage = () => {
+    if (!data?.hasMore || !data.nextCursor) return;
+    setCursorHistory((prev) => {
+      const next = [...prev];
+      next[pageIndex] = data.nextCursor as string;
+      return next;
+    });
+    setPageIndex((p) => p + 1);
+  };
+
+  const goToPreviousPage = () => {
+    setPageIndex((p) => Math.max(0, p - 1));
+  };
 
   const handleEdit = useCallback((owner: Owner) => {
     setEditOwner(owner);
@@ -68,9 +108,9 @@ export function OwnersPage() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Owners</h1>
-          {/* <p className="text-sm text-muted-foreground mt-0.5">
-            Manage client records and contact information
-          </p> */}
+          <p className="text-sm text-muted-foreground mt-0.5">
+            All registered Owners
+          </p>
         </div>
         {canWrite && (
           <Button onClick={() => setShowForm(true)}>
@@ -203,6 +243,39 @@ export function OwnersPage() {
           </TableBody>
         </Table>
       </Card>
+
+      {/* Pagination */}
+      {(pageIndex > 0 || (!isLoading && (data?.items.length ?? 0) > 0)) && (
+        <Pagination className="justify-end">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={goToPreviousPage}
+                aria-disabled={pageIndex === 0}
+                className={
+                  pageIndex === 0
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
+                }
+              />
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationLink isActive>{pageIndex + 1}</PaginationLink>
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationNext
+                onClick={goToNextPage}
+                aria-disabled={!data?.hasMore || isFetching}
+                className={
+                  !data?.hasMore || isFetching
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
+                }
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
 
       <OwnerForm
         open={showForm}

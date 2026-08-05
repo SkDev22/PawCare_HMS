@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
@@ -417,12 +417,38 @@ function ListView({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+interface NewAppointmentPet {
+  id: string;
+  name: string;
+  species: string;
+  owner?: { first_name: string; last_name: string } | null;
+}
+
 export function AppointmentsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [selectedDate, setSelectedDate] = useState(toDateStr(new Date()));
   const [view, setView] = useState<"calendar" | "list">("list");
   const [showForm, setShowForm] = useState(false);
+  const [prefilledPet, setPrefilledPet] = useState<
+    NewAppointmentPet | undefined
+  >(undefined);
+
+  // Arriving from patient registration with a pet to schedule immediately —
+  // open the New Appointment dialog pre-filled instead of making the user
+  // navigate here and search for the patient manually.
+  useEffect(() => {
+    const state = location.state as
+      | { newAppointmentForPet?: NewAppointmentPet }
+      | null;
+    if (state?.newAppointmentForPet) {
+      setPrefilledPet(state.newAppointmentForPet);
+      setShowForm(true);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const {
     data: appointments = [],
@@ -461,7 +487,12 @@ export function AppointmentsPage() {
               : `${totalCount} total · ${completedCount} completed · ${pendingCount} pending`}
           </p>
         </div>
-        <Button onClick={() => setShowForm(true)}>
+        <Button
+          onClick={() => {
+            setPrefilledPet(undefined);
+            setShowForm(true);
+          }}
+        >
           <Plus className="size-4" />
           New appointment
         </Button>
@@ -571,8 +602,12 @@ export function AppointmentsPage() {
 
       <AppointmentForm
         open={showForm}
-        onClose={() => setShowForm(false)}
+        onClose={() => {
+          setShowForm(false);
+          setPrefilledPet(undefined);
+        }}
         defaultDate={selectedDate}
+        {...(prefilledPet ? { defaultPet: prefilledPet } : {})}
       />
     </div>
   );

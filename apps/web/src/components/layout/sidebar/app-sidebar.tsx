@@ -42,11 +42,29 @@ const NAV_GROUPS: {
 }[] = [
   {
     title: "Main",
-    items: [{ title: "Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "DASHBOARD_READ" }],
+    items: [
+      {
+        title: "Dashboard",
+        href: "/dashboard",
+        icon: LayoutDashboard,
+        permission: "DASHBOARD_READ",
+      },
+    ],
   },
   {
     title: "Clinical",
     items: [
+      {
+        title: "Patients",
+        href: "/patients",
+        icon: PawPrint,
+        permission: "PATIENT_READ",
+        items: [
+          { title: "Register Patient", href: "/patients/register" },
+          { title: "Owners", href: "/owners" },
+          { title: "Pets", href: "/patients" },
+        ],
+      },
       {
         title: "Appointments",
         href: "/appointments",
@@ -57,33 +75,59 @@ const NAV_GROUPS: {
           { title: "Queue", href: "/appointments/queue" },
         ],
       },
+
       {
-        title: "Patients",
-        href: "/patients",
-        icon: PawPrint,
-        permission: "PATIENT_READ",
-        items: [
-          { title: "Owners", href: "/owners" },
-          { title: "Pets", href: "/patients" },
-        ],
+        title: "Medical Records",
+        href: "/emr",
+        icon: FileText,
+        permission: "MEDICAL_RECORD_READ",
       },
-      { title: "Medical Records", href: "/emr", icon: FileText, permission: "MEDICAL_RECORD_READ" },
-      { title: "Laboratory", href: "/lab", icon: FlaskConical, permission: "LAB_ORDER_WRITE" },
-      { title: "Ward", href: "/ward", icon: BedDouble, permission: "WARD_READ" },
+      {
+        title: "Laboratory",
+        href: "/lab",
+        icon: FlaskConical,
+        permission: "LAB_ORDER_WRITE",
+      },
+      {
+        title: "Ward",
+        href: "/ward",
+        icon: BedDouble,
+        permission: "WARD_READ",
+      },
     ],
   },
   {
     title: "Operations",
     items: [
-      { title: "Billing", href: "/billing", icon: Receipt, permission: "INVOICE_READ" },
-      { title: "Inventory", href: "/inventory", icon: Package, permission: "INVENTORY_READ" },
-      { title: "Reports", href: "/reports", icon: BarChart3, permission: "REPORT_READ" },
+      {
+        title: "Billing",
+        href: "/billing",
+        icon: Receipt,
+        permission: "INVOICE_READ",
+      },
+      {
+        title: "Inventory",
+        href: "/inventory",
+        icon: Package,
+        permission: "INVENTORY_READ",
+      },
+      {
+        title: "Reports",
+        href: "/reports",
+        icon: BarChart3,
+        permission: "REPORT_READ",
+      },
     ],
   },
   {
     title: "System",
     items: [
-      { title: "Staff", href: "/staff", icon: UserCog, permission: "STAFF_READ" },
+      {
+        title: "Staff",
+        href: "/staff",
+        icon: UserCog,
+        permission: "STAFF_READ",
+      },
       { title: "Settings", href: "/settings", icon: Settings },
     ],
   },
@@ -94,7 +138,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => !item.permission || hasPermission(role, item.permission)),
+    items: group.items.filter(
+      (item) => !item.permission || hasPermission(role, item.permission),
+    ),
   })).filter((group) => group.items.length > 0);
 
   return (

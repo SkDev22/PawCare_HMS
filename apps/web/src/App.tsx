@@ -11,6 +11,7 @@ import { OwnersPage } from './pages/patients/OwnersPage';
 import { OwnerDetailPage } from './pages/patients/OwnerDetailPage';
 import { PetsPage } from './pages/patients/PetsPage';
 import { PetDetailPage } from './pages/patients/PetDetailPage';
+import { RegisterPage } from './pages/patients/RegisterPage';
 import { AppointmentsPage } from './pages/appointments/AppointmentsPage';
 import { AppointmentDetailPage } from './pages/appointments/AppointmentDetailPage';
 import { QueuePage } from './pages/appointments/QueuePage';
@@ -87,6 +88,7 @@ export function App() {
           <Route path="/owners"     element={<AuthLayout permission="PATIENT_READ"><OwnersPage /></AuthLayout>} />
           <Route path="/owners/:id" element={<AuthLayout permission="PATIENT_READ"><OwnerDetailPage /></AuthLayout>} />
           <Route path="/patients"   element={<AuthLayout permission="PATIENT_READ"><PetsPage /></AuthLayout>} />
+          <Route path="/patients/register" element={<AuthLayout permission="PATIENT_WRITE"><RegisterPage /></AuthLayout>} />
           <Route path="/patients/:id" element={<AuthLayout permission="PATIENT_READ"><PetDetailPage /></AuthLayout>} />
 
           {/* Appointments */}
