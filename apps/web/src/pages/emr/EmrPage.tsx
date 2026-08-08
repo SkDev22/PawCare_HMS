@@ -76,7 +76,7 @@ export function EmrPage() {
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="cursor-pointer">
               <Plus className="h-4 w-4 mr-2" />
               New Record
             </Button>

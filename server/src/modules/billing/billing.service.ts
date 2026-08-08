@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
+import { notifyRole } from '../notifications/notifications.service';
 import type {
   CreateInvoiceInput,
   UpdateInvoiceInput,
@@ -280,6 +281,12 @@ export async function recordPayment(invoiceId: string, clinicId: string, data: R
     await tx.invoice.update({
       where: { id: invoiceId },
       data: { paid_amount: newPaidAmount, status: newStatus },
+    });
+
+    await notifyRole(tx, clinicId, ['ADMIN', 'RECEPTIONIST'], {
+      type:    'payment_recorded',
+      subject: 'Payment Recorded',
+      body:    `Payment of ${data.amount} recorded on invoice ${invoiceId.slice(0, 8).toUpperCase()}.`,
     });
 
     return payment;

@@ -10,10 +10,10 @@ export function DashboardLayout({ children }: Props) {
   return (
     <SidebarProvider defaultOpen={true}>
       <AppSidebar variant="inset" />
-      <SidebarInset>
+      <SidebarInset className="print:m-0 print:rounded-none print:shadow-none">
         <SiteHeader />
         <div className="flex flex-1 flex-col">
-          <div className="flex-1 p-6">
+          <div className="flex-1 p-6 print:p-0">
             {children}
           </div>
         </div>

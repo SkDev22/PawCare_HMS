@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
+import { notifyStaff } from '../notifications/notifications.service';
 import type {
   CreateStaffInput,
   UpdateStaffInput,
@@ -254,6 +255,13 @@ export async function upsertSchedule(
         end_time:    e.end_time,
         is_active:   e.is_active,
       })),
+    });
+
+    await notifyStaff(tx, {
+      staff_id: id,
+      type:     'schedule_changed',
+      subject:  'Schedule Updated',
+      body:     'Your weekly schedule has been updated.',
     });
 
     return tx.staffSchedule.findMany({

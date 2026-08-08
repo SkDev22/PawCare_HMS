@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
+import { notifyRole } from '../notifications/notifications.service';
 import type {
   CreateInventoryItemInput,
   UpdateInventoryItemInput,
@@ -182,6 +183,22 @@ export async function applyStockChangeTx(
     where: { id: itemId },
     data:  { quantity_on_hand: resultingQuantity },
   });
+
+  if (item.quantity_on_hand > item.reorder_threshold && resultingQuantity <= item.reorder_threshold) {
+    await notifyRole(tx, clinicId, ['ADMIN', 'NURSE'], {
+      type:    'low_stock',
+      subject: 'Low Stock Alert',
+      body:    `${item.name} is now at ${resultingQuantity} ${item.unit} (reorder threshold: ${item.reorder_threshold}).`,
+    });
+  }
+
+  if (item.is_controlled && data.type === 'dispensed') {
+    await notifyRole(tx, clinicId, ['ADMIN'], {
+      type:    'controlled_substance_dispensed',
+      subject: 'Controlled Substance Dispensed',
+      body:    `${Math.abs(data.quantity)} ${item.unit} of ${item.name} dispensed.`,
+    });
+  }
 
   return txRecord;
 }

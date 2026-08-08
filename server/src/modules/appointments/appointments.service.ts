@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
+import { notifyStaff } from '../notifications/notifications.service';
 import type {
   CreateAppointmentInput,
   UpdateAppointmentInput,
@@ -159,20 +160,31 @@ export async function createAppointment(clinicId: string, data: CreateAppointmen
     await assertNoConflict(data.vet_id, startAt, endAt);
   }
 
-  return prisma.appointment.create({
-    data: {
-      clinic_id: clinicId,
-      pet_id: data.pet_id,
-      vet_id: data.vet_id,
-      type: data.type,
-      start_at: startAt,
-      end_at: endAt,
-      is_walk_in: isWalkIn,
-      ...(data.room_id !== undefined && { room_id: data.room_id }),
-      ...(data.reason !== undefined && { reason: data.reason }),
-      ...(data.notes !== undefined && { notes: data.notes }),
-    },
-    include: appointmentIncludes,
+  return prisma.$transaction(async (tx) => {
+    const appt = await tx.appointment.create({
+      data: {
+        clinic_id: clinicId,
+        pet_id: data.pet_id,
+        vet_id: data.vet_id,
+        type: data.type,
+        start_at: startAt,
+        end_at: endAt,
+        is_walk_in: isWalkIn,
+        ...(data.room_id !== undefined && { room_id: data.room_id }),
+        ...(data.reason !== undefined && { reason: data.reason }),
+        ...(data.notes !== undefined && { notes: data.notes }),
+      },
+      include: appointmentIncludes,
+    });
+
+    await notifyStaff(tx, {
+      staff_id: data.vet_id,
+      type:     'appointment_created',
+      subject:  'New Appointment',
+      body:     `New ${appt.type} appointment with ${appt.pet.name} on ${appt.start_at.toLocaleString()}.`,
+    });
+
+    return appt;
   });
 }
 
@@ -197,19 +209,34 @@ export async function updateAppointment(
     await assertNoConflict(newVetId, newStart, newEnd, id);
   }
 
-  return prisma.appointment.update({
-    where: { id },
-    data: {
-      ...(data.vet_id !== undefined && { vet_id: data.vet_id }),
-      ...(data.room_id !== undefined && { room_id: data.room_id }),
-      ...(data.type !== undefined && { type: data.type }),
-      ...(data.start_at !== undefined && { start_at: new Date(data.start_at) }),
-      ...(data.end_at !== undefined && { end_at: new Date(data.end_at) }),
-      ...(data.reason !== undefined && { reason: data.reason }),
-      ...(data.notes !== undefined && { notes: data.notes }),
-      ...(data.is_walk_in !== undefined && { is_walk_in: data.is_walk_in }),
-    },
-    include: appointmentIncludes,
+  const isReassignment = data.vet_id !== undefined && data.vet_id !== existing.vet_id;
+
+  return prisma.$transaction(async (tx) => {
+    const appt = await tx.appointment.update({
+      where: { id },
+      data: {
+        ...(data.vet_id !== undefined && { vet_id: data.vet_id }),
+        ...(data.room_id !== undefined && { room_id: data.room_id }),
+        ...(data.type !== undefined && { type: data.type }),
+        ...(data.start_at !== undefined && { start_at: new Date(data.start_at) }),
+        ...(data.end_at !== undefined && { end_at: new Date(data.end_at) }),
+        ...(data.reason !== undefined && { reason: data.reason }),
+        ...(data.notes !== undefined && { notes: data.notes }),
+        ...(data.is_walk_in !== undefined && { is_walk_in: data.is_walk_in }),
+      },
+      include: appointmentIncludes,
+    });
+
+    if (isReassignment) {
+      await notifyStaff(tx, {
+        staff_id: appt.vet_id,
+        type:     'appointment_reassigned',
+        subject:  'Appointment Assigned to You',
+        body:     `You've been assigned a ${appt.type} appointment with ${appt.pet.name} on ${appt.start_at.toLocaleString()}.`,
+      });
+    }
+
+    return appt;
   });
 }
 
@@ -220,21 +247,34 @@ export async function updateStatus(
 ) {
   const existing = await prisma.appointment.findFirst({
     where: { id, clinic_id: clinicId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, vet_id: true, pet: { select: { name: true } } },
   });
   if (!existing) throw new AppError('NOT_FOUND', 'Appointment not found', 404);
 
-  return prisma.appointment.update({
-    where: { id },
-    data: {
-      status: data.status,
-      ...(data.status === 'CHECKED_IN' && { checked_in_at: new Date() }),
-      ...(data.status === 'CANCELLED' && {
-        cancelled_at: new Date(),
-        cancel_reason: data.cancel_reason ?? null,
-      }),
-    },
-    select: { id: true, status: true, checked_in_at: true, cancelled_at: true, cancel_reason: true },
+  return prisma.$transaction(async (tx) => {
+    const appt = await tx.appointment.update({
+      where: { id },
+      data: {
+        status: data.status,
+        ...(data.status === 'CHECKED_IN' && { checked_in_at: new Date() }),
+        ...(data.status === 'CANCELLED' && {
+          cancelled_at: new Date(),
+          cancel_reason: data.cancel_reason ?? null,
+        }),
+      },
+      select: { id: true, status: true, checked_in_at: true, cancelled_at: true, cancel_reason: true },
+    });
+
+    if (data.status === 'CHECKED_IN') {
+      await notifyStaff(tx, {
+        staff_id: existing.vet_id,
+        type:     'appointment_checked_in',
+        subject:  'Patient Checked In',
+        body:     `${existing.pet.name} has checked in and is ready to be seen.`,
+      });
+    }
+
+    return appt;
   });
 }
 

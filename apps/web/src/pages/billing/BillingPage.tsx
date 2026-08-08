@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { Plus, Receipt, Search } from 'lucide-react';
@@ -14,6 +14,14 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '../../components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '../../components/ui/pagination';
 import { Skeleton } from '../../components/ui/skeleton';
 import { useInvoices } from '../../hooks/use-billing';
 import { InvoiceForm } from './components/InvoiceForm';
@@ -60,6 +68,8 @@ function TableSkeleton() {
   );
 }
 
+const PAGE_SIZE = 20;
+
 export function BillingPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<InvoiceStatus | 'ALL'>('ALL');
@@ -67,12 +77,41 @@ export function BillingPage() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 300);
 
-  const { data, isLoading } = useInvoices({
+  // Cursor-based pagination: cursorHistory[i] is the cursor that fetches page i+2
+  // (page 1 has no cursor). pageIndex is 0-based.
+  const [cursorHistory, setCursorHistory] = useState<string[]>([]);
+  const [pageIndex, setPageIndex] = useState(0);
+
+  useEffect(() => {
+    setPageIndex(0);
+    setCursorHistory([]);
+  }, [debouncedSearch, tab]);
+
+  const currentCursor =
+    pageIndex === 0 ? undefined : cursorHistory[pageIndex - 1];
+
+  const { data, isLoading, isFetching } = useInvoices({
     ...(tab !== 'ALL' ? { status: tab } : {}),
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
+    ...(currentCursor ? { cursor: currentCursor } : {}),
+    limit: PAGE_SIZE,
   });
 
   const invoices = data?.items ?? [];
+
+  const goToNextPage = () => {
+    if (!data?.hasMore || !data.nextCursor) return;
+    setCursorHistory((prev) => {
+      const next = [...prev];
+      next[pageIndex] = data.nextCursor as string;
+      return next;
+    });
+    setPageIndex((p) => p + 1);
+  };
+
+  const goToPreviousPage = () => {
+    setPageIndex((p) => Math.max(0, p - 1));
+  };
 
   const balance = (item: (typeof invoices)[0]) =>
     parseFloat(item.total) - parseFloat(item.paid_amount);
@@ -214,6 +253,39 @@ export function BillingPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Pagination */}
+      {(pageIndex > 0 || (!isLoading && invoices.length > 0)) && (
+        <Pagination className="justify-end">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={goToPreviousPage}
+                aria-disabled={pageIndex === 0}
+                className={
+                  pageIndex === 0
+                    ? 'pointer-events-none opacity-50'
+                    : 'cursor-pointer'
+                }
+              />
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationLink isActive>{pageIndex + 1}</PaginationLink>
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationNext
+                onClick={goToNextPage}
+                aria-disabled={!data?.hasMore || isFetching}
+                className={
+                  !data?.hasMore || isFetching
+                    ? 'pointer-events-none opacity-50'
+                    : 'cursor-pointer'
+                }
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
     </div>
   );
 }

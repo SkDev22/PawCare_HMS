@@ -18,6 +18,7 @@ export function useInvoices(params?: {
   search?: string;
   date_from?: string;
   date_to?: string;
+  cursor?: string;
   limit?: number;
 }) {
   return useQuery<PaginatedInvoices>({

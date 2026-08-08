@@ -1,6 +1,9 @@
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { BellIcon } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -13,15 +16,26 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useNotifications, useUnreadCount, useMarkRead, useMarkAllRead } from '@/hooks/use-notifications';
 import { useAuthStore } from '@/stores/auth.store';
+import { connectSocket, disconnectSocket } from '@/lib/socket';
+import type { Notification } from '@/types/notifications';
 
 function notifTitle(type: string): string {
   const map: Record<string, string> = {
-    lab_result_abnormal:  'Abnormal Lab Result',
-    appointment_reminder: 'Appointment Reminder',
-    vaccine_due:          'Vaccine Due',
-    invoice_overdue:      'Invoice Overdue',
-    low_stock:            'Low Stock Alert',
-    system:               'System',
+    lab_result_abnormal:           'Abnormal Lab Result',
+    appointment_reminder:          'Appointment Reminder',
+    appointment_created:           'New Appointment',
+    appointment_reassigned:        'Appointment Assigned to You',
+    appointment_checked_in:        'Patient Checked In',
+    vaccine_due:                   'Vaccine Due',
+    invoice_overdue:               'Invoice Overdue',
+    payment_recorded:              'Payment Recorded',
+    low_stock:                     'Low Stock Alert',
+    controlled_substance_dispensed: 'Controlled Substance Dispensed',
+    ward_admission:                'Patient Admitted',
+    ward_discharge:                'Patient Discharged',
+    schedule_changed:              'Schedule Updated',
+    daily_digest:                  'Daily Summary',
+    system:                        'System',
   };
   return map[type] ?? type.replace(/_/g, ' ');
 }
@@ -29,6 +43,8 @@ function notifTitle(type: string): string {
 export function Notifications() {
   const navigate    = useNavigate();
   const accessToken = useAuthStore((s) => s.accessToken);
+  const queryClient = useQueryClient();
+  const connected    = useRef(false);
 
   const { data: countData } = useUnreadCount();
   const { data: notifData } = useNotifications({ limit: 8 });
@@ -37,6 +53,21 @@ export function Notifications() {
 
   const unreadCount   = accessToken ? (countData?.count ?? 0) : 0;
   const notifications = notifData?.items ?? [];
+
+  // Connect once on login, disconnect on logout — not on every token refresh.
+  useEffect(() => {
+    if (accessToken && !connected.current) {
+      connected.current = true;
+      const socket = connectSocket(accessToken);
+      socket.on('notification:new', (notification: Notification) => {
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        toast(notification.subject ?? notification.body);
+      });
+    } else if (!accessToken && connected.current) {
+      connected.current = false;
+      disconnectSocket();
+    }
+  }, [accessToken, queryClient]);
 
   return (
     <DropdownMenu>

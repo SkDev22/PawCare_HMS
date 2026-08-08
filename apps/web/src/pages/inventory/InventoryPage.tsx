@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { Package, Plus, Search, AlertTriangle, Clock } from "lucide-react";
@@ -20,6 +20,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "../../components/ui/dialog";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "../../components/ui/pagination";
 import {
   Form,
   FormControl,
@@ -332,6 +340,8 @@ function StockBadge({ qty, threshold }: { qty: number; threshold: number }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+const PAGE_SIZE = 10;
+
 export function InventoryPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<ItemCategory | "ALL">("ALL");
@@ -339,13 +349,42 @@ export function InventoryPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const debouncedSearch = useDebounce(search, 300);
 
-  const { data, isLoading } = useInventoryItems({
+  // Cursor-based pagination: cursorHistory[i] is the cursor that fetches page i+2
+  // (page 1 has no cursor). pageIndex is 0-based.
+  const [cursorHistory, setCursorHistory] = useState<string[]>([]);
+  const [pageIndex, setPageIndex] = useState(0);
+
+  useEffect(() => {
+    setPageIndex(0);
+    setCursorHistory([]);
+  }, [debouncedSearch, tab]);
+
+  const currentCursor =
+    pageIndex === 0 ? undefined : cursorHistory[pageIndex - 1];
+
+  const { data, isLoading, isFetching } = useInventoryItems({
     ...(tab !== "ALL" ? { category: tab } : {}),
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
+    ...(currentCursor ? { cursor: currentCursor } : {}),
+    limit: PAGE_SIZE,
   });
   const { data: alerts } = useInventoryAlerts();
 
   const items = data?.items ?? [];
+
+  const goToNextPage = () => {
+    if (!data?.hasMore || !data.nextCursor) return;
+    setCursorHistory((prev) => {
+      const next = [...prev];
+      next[pageIndex] = data.nextCursor as string;
+      return next;
+    });
+    setPageIndex((p) => p + 1);
+  };
+
+  const goToPreviousPage = () => {
+    setPageIndex((p) => Math.max(0, p - 1));
+  };
 
   const alertCount =
     (alerts?.low_stock.length ?? 0) + (alerts?.expiring_soon.length ?? 0);
@@ -421,13 +460,13 @@ export function InventoryPage() {
 
       {/* Table */}
       <Card>
-        <CardHeader className="pb-3">
+        {/* <CardHeader className="pb-3">
           <CardTitle className="text-base font-medium">
             {isLoading
               ? "Loading..."
               : `${items.length} item${items.length !== 1 ? "s" : ""}`}
           </CardTitle>
-        </CardHeader>
+        </CardHeader> */}
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-4 space-y-2">
@@ -549,6 +588,39 @@ export function InventoryPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Pagination */}
+      {(pageIndex > 0 || (!isLoading && items.length > 0)) && (
+        <Pagination className="justify-end">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={goToPreviousPage}
+                aria-disabled={pageIndex === 0}
+                className={
+                  pageIndex === 0
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
+                }
+              />
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationLink isActive>{pageIndex + 1}</PaginationLink>
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationNext
+                onClick={goToNextPage}
+                aria-disabled={!data?.hasMore || isFetching}
+                className={
+                  !data?.hasMore || isFetching
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
+                }
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
     </div>
   );
 }

@@ -712,8 +712,13 @@ model Notification {
   sent_at      DateTime?
   read_at      DateTime?
   error_msg    String?
+  // Dedup key for repeatable/scheduled jobs (e.g. "<clinicId>:<date>") — lets a
+  // job re-run safely without creating duplicate notifications for the same
+  // recipient. Nullable and unused by event-driven producers.
+  reference_id String?            @db.VarChar(150)
   created_at   DateTime           @default(now())
 
+  @@unique([staff_id, type, reference_id])
   @@index([status, scheduled_at])
   @@index([staff_id, read_at])
   @@map("notifications")

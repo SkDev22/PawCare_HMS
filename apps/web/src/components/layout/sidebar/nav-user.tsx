@@ -1,6 +1,11 @@
-import { useNavigate } from 'react-router-dom';
-import { MoreVertical, LogOutIcon, UserCircle2Icon, BellIcon } from 'lucide-react';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { useNavigate } from "react-router-dom";
+import {
+  MoreVertical,
+  LogOutIcon,
+  UserCircle2Icon,
+  BellIcon,
+} from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,15 +14,15 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from '@/components/ui/sidebar';
-import { useAuthStore } from '@/stores/auth.store';
-import { api } from '@/lib/api';
+} from "@/components/ui/sidebar";
+import { useAuthStore } from "@/stores/auth.store";
+import { api } from "@/lib/api";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
@@ -26,17 +31,17 @@ export function NavUser() {
 
   const initials = user
     ? `${user.first_name[0]}${user.last_name[0]}`.toUpperCase()
-    : '??';
+    : "??";
 
-  const fullName = user ? `${user.first_name} ${user.last_name}` : '—';
-  const roleLabel = user?.role.toLowerCase().replace('_', ' ') ?? '';
+  const fullName = user ? `${user.first_name} ${user.last_name}` : "—";
+  const roleLabel = user?.role.toLowerCase().replace("_", " ") ?? "";
 
   const handleLogout = async () => {
     try {
-      await api.post('/auth/logout');
+      await api.post("/auth/logout");
     } finally {
       clearAuth();
-      navigate('/login', { replace: true });
+      navigate("/login", { replace: true });
     }
   };
 
@@ -56,14 +61,16 @@ export function NavUser() {
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{fullName}</span>
-                <span className="text-muted-foreground truncate text-xs capitalize">{roleLabel}</span>
+                <span className="text-muted-foreground truncate text-xs capitalize">
+                  {roleLabel}
+                </span>
               </div>
               <MoreVertical className="ml-auto size-4" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-            side={isMobile ? 'bottom' : 'right'}
+            className="w-(--radix-dropdown-menu-trigger-width) min-w-60 rounded-lg p-3"
+            side={isMobile ? "bottom" : "right"}
             align="end"
             sideOffset={4}
           >
@@ -76,27 +83,35 @@ export function NavUser() {
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{fullName}</span>
-                  <span className="text-muted-foreground truncate text-xs capitalize">{roleLabel}</span>
+                  <span className="text-muted-foreground truncate text-xs capitalize">
+                    {roleLabel}
+                  </span>
                 </div>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={() => navigate('/profile')}>
-                <UserCircle2Icon />
+              <DropdownMenuItem
+                className="gap-2 py-2"
+                onClick={() => navigate("/profile")}
+              >
+                <UserCircle2Icon className="size-4 text-muted-foreground" />
                 Profile
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/notifications')}>
-                <BellIcon />
+              <DropdownMenuItem
+                className="gap-2 py-2"
+                onClick={() => navigate("/notifications")}
+              >
+                <BellIcon className="size-4 text-muted-foreground" />
                 Notifications
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
+              className="gap-2 py-2 text-destructive focus:text-destructive focus:bg-destructive/10"
               onClick={handleLogout}
             >
-              <LogOutIcon />
+              <LogOutIcon className="size-4" />
               Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>

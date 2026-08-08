@@ -1,5 +1,6 @@
 import { Prisma, KennelStatus } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
+import { notifyRole } from '../notifications/notifications.service';
 import type {
   AdmitPetInput,
   DischargePetInput,
@@ -220,6 +221,13 @@ export async function admitPet(clinicId: string, staffId: string, data: AdmitPet
       },
     });
     await tx.kennelUnit.update({ where: { id: data.kennel_id }, data: { status: 'OCCUPIED' } });
+
+    await notifyRole(tx, clinicId, ['NURSE'], {
+      type:    'ward_admission',
+      subject: 'Patient Admitted',
+      body:    `${hosp.pet.name} admitted to ${hosp.kennel.label}.`,
+    }, staffId);
+
     return hosp;
   });
 }
@@ -238,11 +246,21 @@ export async function discharge(id: string, clinicId: string, data: DischargePet
         discharged_at:  new Date(),
         ...(data.discharge_notes ? { discharge_notes: data.discharge_notes } : {}),
       },
-      include: { kennel: { select: { id: true, label: true } } },
+      include: {
+        kennel: { select: { id: true, label: true } },
+        pet:    { select: { name: true } },
+      },
     });
     // Discharge doesn't return the kennel straight to service — it needs
     // cleaning before the next patient can be admitted.
     await tx.kennelUnit.update({ where: { id: hosp.kennel_id }, data: { status: 'CLEANING' } });
+
+    await notifyRole(tx, clinicId, ['ADMIN', 'RECEPTIONIST'], {
+      type:    'ward_discharge',
+      subject: 'Patient Discharged',
+      body:    `${updated.pet.name} discharged from ${updated.kennel.label}.`,
+    });
+
     return updated;
   });
 }

@@ -55,6 +55,7 @@ import {
   useUpdateInvoiceStatus,
 } from "../../hooks/use-billing";
 import { formatCurrency } from "../../lib/currency";
+import { InvoiceReceipt } from "./components/InvoiceReceipt";
 import type {
   InvoiceStatus,
   PaymentMethod,
@@ -484,17 +485,8 @@ export function InvoiceDetailPage() {
 
   return (
     <div className="space-y-6">
-      {/* Print-only letterhead */}
-      <div className="hidden print:block mb-4">
-        <h1 className="text-xl font-bold">PawCare HMS</h1>
-        <p className="text-sm">
-          Invoice #{invoice.id.slice(0, 8).toUpperCase()} ·{" "}
-          {STATUS_LABEL[invoice.status]}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Issued {format(new Date(invoice.created_at), "MMM d, yyyy")}
-        </p>
-      </div>
+      {/* Print-only receipt */}
+      <InvoiceReceipt invoice={invoice} statusLabel={STATUS_LABEL[invoice.status]} />
 
       {/* Header */}
       <div className="flex items-center gap-3 print:hidden">
@@ -520,7 +512,7 @@ export function InvoiceDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:grid-cols-1">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:hidden">
         {/* Left — line items + payments */}
         <div className="lg:col-span-2 space-y-6">
           {/* Line items */}

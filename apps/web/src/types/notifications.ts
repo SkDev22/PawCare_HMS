@@ -13,6 +13,7 @@ export type Notification = {
   sent_at:      string | null;
   read_at:      string | null;
   error_msg:    string | null;
+  reference_id: string | null;
   created_at:   string;
 };
 

@@ -1,32 +1,70 @@
-import { useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { format } from 'date-fns';
+import { useState } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { format } from "date-fns";
 import {
-  ChevronLeft, AlertTriangle, Stethoscope, Pill, Activity,
-  Trash2, Plus, ExternalLink, Receipt, Search, X, Package, Printer,
-} from 'lucide-react';
-import { Button } from '../../components/ui/button';
-import { Badge } from '../../components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Skeleton } from '../../components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { Textarea } from '../../components/ui/textarea';
-import { Input } from '../../components/ui/input';
+  ChevronLeft,
+  AlertTriangle,
+  Stethoscope,
+  Pill,
+  Activity,
+  Trash2,
+  Plus,
+  ExternalLink,
+  Receipt,
+  Search,
+  X,
+  Package,
+  Printer,
+} from "lucide-react";
+import { Button } from "../../components/ui/button";
+import { Badge } from "../../components/ui/badge";
 import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
-} from '../../components/ui/form';
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/card";
+import { Skeleton } from "../../components/ui/skeleton";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from '../../components/ui/dialog';
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "../../components/ui/tabs";
+import { Textarea } from "../../components/ui/textarea";
+import { Input } from "../../components/ui/input";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '../../components/ui/table';
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "../../components/ui/form";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '../../components/ui/select';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "../../components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
 import {
   useMedicalRecord,
   useUpsertSoapNote,
@@ -38,20 +76,26 @@ import {
   useCharges,
   useAddCharge,
   useRemoveCharge,
-} from '../../hooks/use-emr';
-import { useInventoryItems } from '../../hooks/use-inventory';
-import { useServices } from '../../hooks/use-billing';
-import { useDebounce } from '../../hooks/use-debounce';
-import { formatCurrency } from '../../lib/currency';
-import type { MedicalRecord, Diagnosis, Prescription, Charge } from '../../types/emr';
+} from "../../hooks/use-emr";
+import { useInventoryItems } from "../../hooks/use-inventory";
+import { useServices } from "../../hooks/use-billing";
+import { useDebounce } from "../../hooks/use-debounce";
+import { formatCurrency } from "../../lib/currency";
+import { SoapNotePrint } from "./components/SoapNotePrint";
+import type {
+  MedicalRecord,
+  Diagnosis,
+  Prescription,
+  Charge,
+} from "../../types/emr";
 
 // ── SOAP Note Tab ──────────────────────────────────────────────────────────────
 
 const SoapSchema = z.object({
-  subjective:  z.string().max(5000).default(''),
-  objective:   z.string().max(5000).default(''),
-  assessment:  z.string().max(5000).default(''),
-  plan:        z.string().max(5000).default(''),
+  subjective: z.string().max(5000).default(""),
+  objective: z.string().max(5000).default(""),
+  assessment: z.string().max(5000).default(""),
+  plan: z.string().max(5000).default(""),
 });
 
 function SoapNoteTab({ record }: { record: MedicalRecord }) {
@@ -59,10 +103,10 @@ function SoapNoteTab({ record }: { record: MedicalRecord }) {
   const form = useForm<z.infer<typeof SoapSchema>>({
     resolver: zodResolver(SoapSchema),
     defaultValues: {
-      subjective:  record.soap_note?.subjective  ?? '',
-      objective:   record.soap_note?.objective   ?? '',
-      assessment:  record.soap_note?.assessment  ?? '',
-      plan:        record.soap_note?.plan        ?? '',
+      subjective: record.soap_note?.subjective ?? "",
+      objective: record.soap_note?.objective ?? "",
+      assessment: record.soap_note?.assessment ?? "",
+      plan: record.soap_note?.plan ?? "",
     },
   });
 
@@ -74,41 +118,50 @@ function SoapNoteTab({ record }: { record: MedicalRecord }) {
     <div className="space-y-4">
       {record.soap_note && (
         <div className="text-xs text-muted-foreground">
-          Last updated by Dr. {record.soap_note.vet.first_name} {record.soap_note.vet.last_name}
-          {' · '}{format(new Date(record.soap_note.updated_at), 'PPp')}
+          Last updated by Dr. {record.soap_note.vet.first_name}{" "}
+          {record.soap_note.vet.last_name}
+          {" · "}
+          {format(new Date(record.soap_note.updated_at), "PPp")}
         </div>
       )}
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          {(['subjective', 'objective', 'assessment', 'plan'] as const).map((field) => (
-            <FormField
-              key={field}
-              control={form.control}
-              name={field}
-              render={({ field: f }) => (
-                <FormItem>
-                  <FormLabel className="capitalize font-semibold">{field}</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      rows={4}
-                      className="resize-none"
-                      placeholder={
-                        field === 'subjective'  ? "Owner's report and history..." :
-                        field === 'objective'   ? 'Physical examination findings...' :
-                        field === 'assessment'  ? 'Clinical impression and diagnoses...' :
-                        'Treatment plan and follow-up...'
-                      }
-                      {...f}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          ))}
+          {(["subjective", "objective", "assessment", "plan"] as const).map(
+            (field) => (
+              <FormField
+                key={field}
+                control={form.control}
+                name={field}
+                render={({ field: f }) => (
+                  <FormItem>
+                    <FormLabel className="capitalize font-semibold">
+                      {field}
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        rows={4}
+                        className="resize-none"
+                        placeholder={
+                          field === "subjective"
+                            ? "Owner's report and history..."
+                            : field === "objective"
+                              ? "Physical examination findings..."
+                              : field === "assessment"
+                                ? "Clinical impression and diagnoses..."
+                                : "Treatment plan and follow-up..."
+                        }
+                        {...f}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ),
+          )}
           <div className="flex justify-end">
             <Button type="submit" disabled={upsert.isPending}>
-              {upsert.isPending ? 'Saving...' : 'Save SOAP Note'}
+              {upsert.isPending ? "Saving..." : "Save SOAP Note"}
             </Button>
           </div>
         </form>
@@ -120,11 +173,11 @@ function SoapNoteTab({ record }: { record: MedicalRecord }) {
 // ── Vitals Tab ─────────────────────────────────────────────────────────────────
 
 const VitalsSchema = z.object({
-  weight_kg:            z.coerce.number().positive().optional(),
-  temperature_c:        z.coerce.number().positive().optional(),
-  heart_rate_bpm:       z.coerce.number().int().positive().optional(),
-  respiratory_rate:     z.coerce.number().int().positive().optional(),
-  blood_pressure:       z.string().max(20).optional(),
+  weight_kg: z.coerce.number().positive().optional(),
+  temperature_c: z.coerce.number().positive().optional(),
+  heart_rate_bpm: z.coerce.number().int().positive().optional(),
+  respiratory_rate: z.coerce.number().int().positive().optional(),
+  blood_pressure: z.string().max(20).optional(),
   body_condition_score: z.coerce.number().int().min(1).max(9).optional(),
 });
 
@@ -132,29 +185,44 @@ function VitalsTab({ record }: { record: MedicalRecord }) {
   const upsert = useUpsertVitals(record.id);
   const v = record.vitals;
   // Fall back to the pet's registration weight until this record has its own recorded vitals.
-  const registrationWeight = record.pet.weight_kg ? parseFloat(record.pet.weight_kg) : undefined;
-  const weightFromRegistration = !v?.weight_kg && registrationWeight !== undefined;
+  const registrationWeight = record.pet.weight_kg
+    ? parseFloat(record.pet.weight_kg)
+    : undefined;
+  const weightFromRegistration =
+    !v?.weight_kg && registrationWeight !== undefined;
 
   const form = useForm<z.infer<typeof VitalsSchema>>({
     resolver: zodResolver(VitalsSchema),
     defaultValues: {
-      weight_kg:            v?.weight_kg     ? parseFloat(v.weight_kg)     : registrationWeight,
-      temperature_c:        v?.temperature_c ? parseFloat(v.temperature_c) : undefined,
-      heart_rate_bpm:       v?.heart_rate_bpm       ?? undefined,
-      respiratory_rate:     v?.respiratory_rate     ?? undefined,
-      blood_pressure:       v?.blood_pressure       ?? '',
+      weight_kg: v?.weight_kg ? parseFloat(v.weight_kg) : registrationWeight,
+      temperature_c: v?.temperature_c ? parseFloat(v.temperature_c) : undefined,
+      heart_rate_bpm: v?.heart_rate_bpm ?? undefined,
+      respiratory_rate: v?.respiratory_rate ?? undefined,
+      blood_pressure: v?.blood_pressure ?? "",
       body_condition_score: v?.body_condition_score ?? undefined,
     },
   });
 
   const onSubmit = (values: z.infer<typeof VitalsSchema>) => {
     upsert.mutate({
-      ...(values.weight_kg            !== undefined ? { weight_kg: values.weight_kg }                       : {}),
-      ...(values.temperature_c        !== undefined ? { temperature_c: values.temperature_c }               : {}),
-      ...(values.heart_rate_bpm       !== undefined ? { heart_rate_bpm: values.heart_rate_bpm }             : {}),
-      ...(values.respiratory_rate     !== undefined ? { respiratory_rate: values.respiratory_rate }         : {}),
-      ...(values.blood_pressure       ? { blood_pressure: values.blood_pressure }                           : {}),
-      ...(values.body_condition_score !== undefined ? { body_condition_score: values.body_condition_score } : {}),
+      ...(values.weight_kg !== undefined
+        ? { weight_kg: values.weight_kg }
+        : {}),
+      ...(values.temperature_c !== undefined
+        ? { temperature_c: values.temperature_c }
+        : {}),
+      ...(values.heart_rate_bpm !== undefined
+        ? { heart_rate_bpm: values.heart_rate_bpm }
+        : {}),
+      ...(values.respiratory_rate !== undefined
+        ? { respiratory_rate: values.respiratory_rate }
+        : {}),
+      ...(values.blood_pressure
+        ? { blood_pressure: values.blood_pressure }
+        : {}),
+      ...(values.body_condition_score !== undefined
+        ? { body_condition_score: values.body_condition_score }
+        : {}),
     });
   };
 
@@ -174,13 +242,20 @@ function VitalsTab({ record }: { record: MedicalRecord }) {
                     step="0.1"
                     placeholder="e.g. 4.5"
                     {...field}
-                    value={field.value ?? ''}
-                    onChange={(e) => field.onChange(e.target.value === '' ? undefined : e.target.valueAsNumber)}
+                    value={field.value ?? ""}
+                    onChange={(e) =>
+                      field.onChange(
+                        e.target.value === ""
+                          ? undefined
+                          : e.target.valueAsNumber,
+                      )
+                    }
                   />
                 </FormControl>
                 {weightFromRegistration && (
                   <p className="text-xs text-muted-foreground">
-                    Prefilled from patient registration — update if it has changed.
+                    Prefilled from patient registration — update if it has
+                    changed.
                   </p>
                 )}
                 <FormMessage />
@@ -199,8 +274,14 @@ function VitalsTab({ record }: { record: MedicalRecord }) {
                     step="0.1"
                     placeholder="e.g. 38.5"
                     {...field}
-                    value={field.value ?? ''}
-                    onChange={(e) => field.onChange(e.target.value === '' ? undefined : e.target.valueAsNumber)}
+                    value={field.value ?? ""}
+                    onChange={(e) =>
+                      field.onChange(
+                        e.target.value === ""
+                          ? undefined
+                          : e.target.valueAsNumber,
+                      )
+                    }
                   />
                 </FormControl>
                 <FormMessage />
@@ -218,8 +299,14 @@ function VitalsTab({ record }: { record: MedicalRecord }) {
                     type="number"
                     placeholder="e.g. 80"
                     {...field}
-                    value={field.value ?? ''}
-                    onChange={(e) => field.onChange(e.target.value === '' ? undefined : e.target.valueAsNumber)}
+                    value={field.value ?? ""}
+                    onChange={(e) =>
+                      field.onChange(
+                        e.target.value === ""
+                          ? undefined
+                          : e.target.valueAsNumber,
+                      )
+                    }
                   />
                 </FormControl>
                 <FormMessage />
@@ -237,8 +324,14 @@ function VitalsTab({ record }: { record: MedicalRecord }) {
                     type="number"
                     placeholder="e.g. 20"
                     {...field}
-                    value={field.value ?? ''}
-                    onChange={(e) => field.onChange(e.target.value === '' ? undefined : e.target.valueAsNumber)}
+                    value={field.value ?? ""}
+                    onChange={(e) =>
+                      field.onChange(
+                        e.target.value === ""
+                          ? undefined
+                          : e.target.valueAsNumber,
+                      )
+                    }
                   />
                 </FormControl>
                 <FormMessage />
@@ -271,8 +364,14 @@ function VitalsTab({ record }: { record: MedicalRecord }) {
                     max={9}
                     placeholder="e.g. 5"
                     {...field}
-                    value={field.value ?? ''}
-                    onChange={(e) => field.onChange(e.target.value === '' ? undefined : e.target.valueAsNumber)}
+                    value={field.value ?? ""}
+                    onChange={(e) =>
+                      field.onChange(
+                        e.target.value === ""
+                          ? undefined
+                          : e.target.valueAsNumber,
+                      )
+                    }
                   />
                 </FormControl>
                 <FormMessage />
@@ -282,12 +381,12 @@ function VitalsTab({ record }: { record: MedicalRecord }) {
         </div>
         {v && (
           <p className="text-xs text-muted-foreground">
-            Last recorded {format(new Date(v.recorded_at), 'PPp')}
+            Last recorded {format(new Date(v.recorded_at), "PPp")}
           </p>
         )}
         <div className="flex justify-end">
           <Button type="submit" disabled={upsert.isPending}>
-            {upsert.isPending ? 'Saving...' : 'Save Vitals'}
+            {upsert.isPending ? "Saving..." : "Save Vitals"}
           </Button>
         </div>
       </form>
@@ -298,10 +397,10 @@ function VitalsTab({ record }: { record: MedicalRecord }) {
 // ── Diagnoses Tab ──────────────────────────────────────────────────────────────
 
 const DiagnosisSchema = z.object({
-  name:       z.string().min(1, 'Diagnosis name is required').max(500),
-  code:       z.string().max(50).optional(),
+  name: z.string().min(1, "Diagnosis name is required").max(500),
+  code: z.string().max(50).optional(),
   is_primary: z.boolean().default(false),
-  notes:      z.string().max(1000).optional(),
+  notes: z.string().max(1000).optional(),
 });
 
 function AddDiagnosisDialog({
@@ -316,24 +415,29 @@ function AddDiagnosisDialog({
   const addDx = useAddDiagnosis(recordId);
   const form = useForm<z.infer<typeof DiagnosisSchema>>({
     resolver: zodResolver(DiagnosisSchema),
-    defaultValues: { name: '', code: '', is_primary: false, notes: '' },
+    defaultValues: { name: "", code: "", is_primary: false, notes: "" },
   });
 
   const onSubmit = (values: z.infer<typeof DiagnosisSchema>) => {
     addDx.mutate(
       {
-        name:       values.name,
+        name: values.name,
         is_primary: values.is_primary,
-        ...(values.code  ? { code:  values.code  } : {}),
+        ...(values.code ? { code: values.code } : {}),
         ...(values.notes ? { notes: values.notes } : {}),
       },
-      { onSuccess: () => { form.reset(); onOpenChange(false); } },
+      {
+        onSuccess: () => {
+          form.reset();
+          onOpenChange(false);
+        },
+      },
     );
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md md:max-w-xl p-10">
         <DialogHeader>
           <DialogTitle>Add Diagnosis</DialogTitle>
         </DialogHeader>
@@ -396,11 +500,15 @@ function AddDiagnosisDialog({
               )}
             />
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
                 Cancel
               </Button>
               <Button type="submit" disabled={addDx.isPending}>
-                {addDx.isPending ? 'Adding...' : 'Add Diagnosis'}
+                {addDx.isPending ? "Adding..." : "Add Diagnosis"}
               </Button>
             </div>
           </form>
@@ -437,16 +545,22 @@ function DiagnosesTab({ record }: { record: MedicalRecord }) {
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm">{dx.name}</span>
-                  {dx.is_primary && <Badge variant="default" className="text-xs">Primary</Badge>}
+                  {dx.is_primary && (
+                    <Badge variant="default" className="text-xs">
+                      Primary
+                    </Badge>
+                  )}
                   {dx.code && (
-                    <Badge variant="outline" className="text-xs font-mono">{dx.code}</Badge>
+                    <Badge variant="outline" className="text-xs font-mono">
+                      {dx.code}
+                    </Badge>
                   )}
                 </div>
                 {dx.notes && (
                   <p className="text-xs text-muted-foreground">{dx.notes}</p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  {format(new Date(dx.created_at), 'MMM d, yyyy')}
+                  {format(new Date(dx.created_at), "MMM d, yyyy")}
                 </p>
               </div>
               <Button
@@ -474,14 +588,14 @@ function DiagnosesTab({ record }: { record: MedicalRecord }) {
 // ── Prescriptions Tab ──────────────────────────────────────────────────────────
 
 const PrescriptionSchema = z.object({
-  drug_name:         z.string().min(1, 'Drug name is required').max(200),
-  dosage:            z.string().min(1, 'Dosage is required').max(200),
-  frequency:         z.string().min(1, 'Frequency is required').max(200),
-  duration_days:     z.coerce.number().int().positive().optional(),
-  quantity:          z.coerce.number().int().positive().optional(),
+  drug_name: z.string().min(1, "Drug name is required").max(200),
+  dosage: z.string().min(1, "Dosage is required").max(200),
+  frequency: z.string().min(1, "Frequency is required").max(200),
+  duration_days: z.coerce.number().int().positive().optional(),
+  quantity: z.coerce.number().int().positive().optional(),
   refills_remaining: z.coerce.number().int().min(0).default(0),
-  instructions:      z.string().max(1000).optional(),
-  expires_at:        z.string().optional(),
+  instructions: z.string().max(1000).optional(),
+  expires_at: z.string().optional(),
 });
 
 function AddPrescriptionDialog({
@@ -495,44 +609,76 @@ function AddPrescriptionDialog({
 }) {
   const addRx = useAddPrescription(recordId);
   const [addedCount, setAddedCount] = useState(0);
-  const [fulfillment, setFulfillment] = useState<'clinic' | 'pharmacy'>('pharmacy');
-  const [selectedItem, setSelectedItem] = useState<{ id: string; name: string; selling_price: string } | null>(null);
+  const [fulfillment, setFulfillment] = useState<"clinic" | "pharmacy">(
+    "pharmacy",
+  );
+  const [selectedItem, setSelectedItem] = useState<{
+    id: string;
+    name: string;
+    selling_price: string;
+  } | null>(null);
   const defaultValues = {
-    drug_name: '', dosage: '', frequency: '',
-    refills_remaining: 0, instructions: '', expires_at: '',
+    drug_name: "",
+    dosage: "",
+    frequency: "",
+    refills_remaining: 0,
+    instructions: "",
+    expires_at: "",
   };
   const form = useForm<z.infer<typeof PrescriptionSchema>>({
     resolver: zodResolver(PrescriptionSchema),
     defaultValues,
   });
 
-  const resetFulfillment = () => { setFulfillment('pharmacy'); setSelectedItem(null); };
-  const quantity = form.watch('quantity');
-  const canSubmit = fulfillment === 'pharmacy' || (!!selectedItem && !!quantity && quantity > 0);
+  const resetFulfillment = () => {
+    setFulfillment("pharmacy");
+    setSelectedItem(null);
+  };
+  const quantity = form.watch("quantity");
+  const canSubmit =
+    fulfillment === "pharmacy" ||
+    (!!selectedItem && !!quantity && quantity > 0);
 
   const onSubmit = (values: z.infer<typeof PrescriptionSchema>) => {
     addRx.mutate(
       {
-        drug_name:         values.drug_name,
-        dosage:            values.dosage,
-        frequency:         values.frequency,
+        drug_name: values.drug_name,
+        dosage: values.dosage,
+        frequency: values.frequency,
         refills_remaining: values.refills_remaining,
-        ...(values.duration_days !== undefined ? { duration_days: values.duration_days } : {}),
-        ...(values.quantity      !== undefined ? { quantity:      values.quantity }      : {}),
-        ...(values.instructions  ? { instructions: values.instructions }                 : {}),
-        ...(values.expires_at    ? { expires_at:   values.expires_at }                   : {}),
-        ...(fulfillment === 'clinic' && selectedItem ? { item_id: selectedItem.id } : {}),
+        ...(values.duration_days !== undefined
+          ? { duration_days: values.duration_days }
+          : {}),
+        ...(values.quantity !== undefined ? { quantity: values.quantity } : {}),
+        ...(values.instructions ? { instructions: values.instructions } : {}),
+        ...(values.expires_at ? { expires_at: values.expires_at } : {}),
+        ...(fulfillment === "clinic" && selectedItem
+          ? { item_id: selectedItem.id }
+          : {}),
       },
-      { onSuccess: () => { form.reset(defaultValues); resetFulfillment(); setAddedCount((n) => n + 1); } },
+      {
+        onSuccess: () => {
+          form.reset(defaultValues);
+          resetFulfillment();
+          setAddedCount((n) => n + 1);
+        },
+      },
     );
   };
 
   return (
     <Dialog
       open={open}
-      onOpenChange={(v) => { onOpenChange(v); if (!v) { form.reset(defaultValues); resetFulfillment(); setAddedCount(0); } }}
+      onOpenChange={(v) => {
+        onOpenChange(v);
+        if (!v) {
+          form.reset(defaultValues);
+          resetFulfillment();
+          setAddedCount(0);
+        }
+      }}
     >
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg md:max-w-2xl p-6">
         <DialogHeader>
           <DialogTitle>Add Prescription</DialogTitle>
         </DialogHeader>
@@ -589,8 +735,14 @@ function AddPrescriptionDialog({
                         type="number"
                         placeholder="e.g. 7"
                         {...field}
-                        value={field.value ?? ''}
-                        onChange={(e) => field.onChange(e.target.value === '' ? undefined : e.target.valueAsNumber)}
+                        value={field.value ?? ""}
+                        onChange={(e) =>
+                          field.onChange(
+                            e.target.value === ""
+                              ? undefined
+                              : e.target.valueAsNumber,
+                          )
+                        }
                       />
                     </FormControl>
                     <FormMessage />
@@ -608,15 +760,21 @@ function AddPrescriptionDialog({
                         type="number"
                         placeholder="e.g. 14"
                         {...field}
-                        value={field.value ?? ''}
-                        onChange={(e) => field.onChange(e.target.value === '' ? undefined : e.target.valueAsNumber)}
+                        value={field.value ?? ""}
+                        onChange={(e) =>
+                          field.onChange(
+                            e.target.value === ""
+                              ? undefined
+                              : e.target.valueAsNumber,
+                          )
+                        }
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <FormField
+              {/* <FormField
                 control={form.control}
                 name="refills_remaining"
                 render={({ field }) => (
@@ -633,8 +791,8 @@ function AddPrescriptionDialog({
                     <FormMessage />
                   </FormItem>
                 )}
-              />
-              <FormField
+              /> */}
+              {/* <FormField
                 control={form.control}
                 name="expires_at"
                 render={({ field }) => (
@@ -646,39 +804,50 @@ function AddPrescriptionDialog({
                     <FormMessage />
                   </FormItem>
                 )}
-              />
+              /> */}
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-1.5 block">Fulfilled by</label>
+              <label className="text-sm font-medium mb-1.5 block">
+                Fulfilled by
+              </label>
               <div className="flex gap-2">
                 <Button
                   type="button"
                   size="sm"
-                  variant={fulfillment === 'clinic' ? 'default' : 'outline'}
-                  onClick={() => setFulfillment('clinic')}
+                  variant={fulfillment === "clinic" ? "default" : "outline"}
+                  onClick={() => setFulfillment("clinic")}
                 >
                   Clinic stock
                 </Button>
                 <Button
                   type="button"
                   size="sm"
-                  variant={fulfillment === 'pharmacy' ? 'default' : 'outline'}
-                  onClick={() => { setFulfillment('pharmacy'); setSelectedItem(null); }}
+                  variant={fulfillment === "pharmacy" ? "default" : "outline"}
+                  onClick={() => {
+                    setFulfillment("pharmacy");
+                    setSelectedItem(null);
+                  }}
                 >
-                  Owner fills at pharmacy
+                  Pharmacy
                 </Button>
               </div>
             </div>
 
-            {fulfillment === 'clinic' && (
+            {fulfillment === "clinic" && (
               <div className="space-y-2 rounded-md border border-border p-3 bg-muted/30">
-                <label className="text-xs font-medium text-muted-foreground block">Match to inventory item</label>
+                <label className="text-xs font-medium text-muted-foreground block">
+                  Match to inventory item
+                </label>
                 {selectedItem ? (
                   <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-background text-sm">
                     <Package className="size-3.5 text-muted-foreground shrink-0" />
                     <span className="flex-1 truncate">{selectedItem.name}</span>
-                    <button type="button" onClick={() => setSelectedItem(null)} className="text-muted-foreground hover:text-foreground">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedItem(null)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
                       <X className="size-3.5" />
                     </button>
                   </div>
@@ -687,7 +856,11 @@ function AddPrescriptionDialog({
                 )}
                 {selectedItem && (
                   <p className="text-xs text-muted-foreground">
-                    Will bill {formatCurrency(Number(selectedItem.selling_price) * (quantity || 0))} and deduct {quantity || 0} from stock.
+                    Will bill{" "}
+                    {formatCurrency(
+                      Number(selectedItem.selling_price) * (quantity || 0),
+                    )}{" "}
+                    and deduct {quantity || 0} from stock.
                   </p>
                 )}
               </div>
@@ -700,7 +873,12 @@ function AddPrescriptionDialog({
                 <FormItem>
                   <FormLabel>Instructions (optional)</FormLabel>
                   <FormControl>
-                    <Textarea rows={2} className="resize-none" placeholder="Patient/owner instructions..." {...field} />
+                    <Textarea
+                      rows={2}
+                      className="resize-none"
+                      placeholder="Patient/owner instructions..."
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -711,13 +889,19 @@ function AddPrescriptionDialog({
                 <p className="text-xs text-muted-foreground">
                   {addedCount} added — keep adding or close when done.
                 </p>
-              ) : <span />}
+              ) : (
+                <span />
+              )}
               <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                  {addedCount > 0 ? 'Done' : 'Cancel'}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                >
+                  {addedCount > 0 ? "Done" : "Cancel"}
                 </Button>
                 <Button type="submit" disabled={addRx.isPending || !canSubmit}>
-                  {addRx.isPending ? 'Adding...' : 'Add Prescription'}
+                  {addRx.isPending ? "Adding..." : "Add Prescription"}
                 </Button>
               </div>
             </div>
@@ -750,10 +934,11 @@ function PrescriptionsTab({ record }: { record: MedicalRecord }) {
           <TableHeader>
             <TableRow>
               <TableHead>Drug</TableHead>
-              <TableHead>Dosage / Frequency</TableHead>
-              <TableHead>Duration</TableHead>
-              <TableHead>Refills</TableHead>
-              <TableHead>Expires</TableHead>
+              <TableHead>Dosage (mg)</TableHead>
+              <TableHead>Frequency</TableHead>
+              <TableHead>Duration (Days)</TableHead>
+              {/* <TableHead>Refills</TableHead>
+              <TableHead>Expires</TableHead> */}
               <TableHead />
             </TableRow>
           </TableHeader>
@@ -764,31 +949,39 @@ function PrescriptionsTab({ record }: { record: MedicalRecord }) {
                   <div className="font-medium text-sm">{rx.drug_name}</div>
                   <div className="flex items-center gap-1.5 mt-1">
                     {rx.charge ? (
-                      <Badge variant="success" className="text-xs">Clinic · {formatCurrency(rx.charge.total)}</Badge>
+                      <Badge variant="success" className="text-xs">
+                        Clinic · {formatCurrency(rx.charge.total)}
+                      </Badge>
                     ) : (
-                      <Badge variant="outline" className="text-xs">Pharmacy</Badge>
+                      <Badge variant="outline" className="text-xs">
+                        Pharmacy
+                      </Badge>
                     )}
                   </div>
                   {rx.instructions && (
-                    <div className="text-xs text-muted-foreground mt-1 max-w-[200px] truncate">
+                    <div className="text-xs text-muted-foreground mt-1 max-w-50 truncate">
                       {rx.instructions}
                     </div>
                   )}
                 </TableCell>
-                <TableCell className="text-sm">
-                  {rx.dosage} · {rx.frequency}
-                </TableCell>
+                <TableCell className="text-sm">{rx.dosage}</TableCell>
+                <TableCell className="text-sm">{rx.frequency}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {rx.duration_days ? `${rx.duration_days}d` : '—'}
+                  {rx.duration_days ? `${rx.duration_days}d` : "—"}
                 </TableCell>
-                <TableCell>
-                  <Badge variant={rx.refills_remaining > 0 ? 'info' : 'secondary'} className="text-xs">
+                {/* <TableCell>
+                  <Badge
+                    variant={rx.refills_remaining > 0 ? "info" : "secondary"}
+                    className="text-xs"
+                  >
                     {rx.refills_remaining} left
                   </Badge>
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {rx.expires_at ? format(new Date(rx.expires_at), 'MMM d, yyyy') : '—'}
-                </TableCell>
+                  {rx.expires_at
+                    ? format(new Date(rx.expires_at), "MMM d, yyyy")
+                    : "—"}
+                </TableCell> */}
                 <TableCell>
                   <Button
                     variant="ghost"
@@ -816,11 +1009,17 @@ function PrescriptionsTab({ record }: { record: MedicalRecord }) {
 
 // ── Charges Tab (billable drugs / equipment / services used this visit) ───────
 
-function ItemSearch({ onSelect }: { onSelect: (item: { id: string; name: string; selling_price: string }) => void }) {
-  const [query, setQuery] = useState('');
+function ItemSearch({
+  onSelect,
+}: {
+  onSelect: (item: { id: string; name: string; selling_price: string }) => void;
+}) {
+  const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const debouncedQuery = useDebounce(query, 250);
-  const { data } = useInventoryItems(debouncedQuery ? { search: debouncedQuery, limit: 8 } : undefined);
+  const { data } = useInventoryItems(
+    debouncedQuery ? { search: debouncedQuery, limit: 8 } : undefined,
+  );
   const results = (data?.items ?? []).filter((i) => i.selling_price !== null);
 
   return (
@@ -830,7 +1029,10 @@ function ItemSearch({ onSelect }: { onSelect: (item: { id: string; name: string;
         className="pl-8"
         placeholder="Search drugs, equipment, supplies…"
         value={query}
-        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+        }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
       />
@@ -838,21 +1040,33 @@ function ItemSearch({ onSelect }: { onSelect: (item: { id: string; name: string;
         <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md max-h-52 overflow-y-auto">
           {!results.length ? (
             <p className="px-3 py-4 text-center text-sm text-muted-foreground">
-              {debouncedQuery ? 'No priced items found.' : 'Type to search the inventory catalog.'}
+              {debouncedQuery
+                ? "No priced items found."
+                : "Type to search the inventory catalog."}
             </p>
           ) : (
             results.map((item) => (
               <button
                 key={item.id}
                 type="button"
-                onMouseDown={() => { onSelect({ id: item.id, name: item.name, selling_price: item.selling_price! }); setQuery(''); setOpen(false); }}
+                onMouseDown={() => {
+                  onSelect({
+                    id: item.id,
+                    name: item.name,
+                    selling_price: item.selling_price!,
+                  });
+                  setQuery("");
+                  setOpen(false);
+                }}
                 className="w-full flex items-center justify-between gap-2.5 px-3 py-2.5 text-left hover:bg-accent transition-colors"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <Package className="size-3.5 text-primary shrink-0" />
                   <span className="text-sm truncate">{item.name}</span>
                 </div>
-                <span className="text-xs text-muted-foreground shrink-0">{formatCurrency(item.selling_price!)} / {item.unit}</span>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {formatCurrency(item.selling_price!)} / {item.unit}
+                </span>
               </button>
             ))
           )}
@@ -873,31 +1087,57 @@ function AddChargeDialog({
 }) {
   const addCharge = useAddCharge(recordId);
   const { data: services = [] } = useServices();
-  const [mode, setMode] = useState<'item' | 'service'>('item');
-  const [selectedItem, setSelectedItem] = useState<{ id: string; name: string; selling_price: string } | null>(null);
-  const [serviceId, setServiceId] = useState('');
+  const [mode, setMode] = useState<"item" | "service">("item");
+  const [selectedItem, setSelectedItem] = useState<{
+    id: string;
+    name: string;
+    selling_price: string;
+  } | null>(null);
+  const [serviceId, setServiceId] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [addedCount, setAddedCount] = useState(0);
 
-  const resetSelection = () => { setSelectedItem(null); setServiceId(''); setQuantity(1); };
-  const resetAll = () => { resetSelection(); setMode('item'); setAddedCount(0); };
+  const resetSelection = () => {
+    setSelectedItem(null);
+    setServiceId("");
+    setQuantity(1);
+  };
+  const resetAll = () => {
+    resetSelection();
+    setMode("item");
+    setAddedCount(0);
+  };
 
-  const canSubmit = mode === 'item' ? !!selectedItem : !!serviceId;
+  const canSubmit = mode === "item" ? !!selectedItem : !!serviceId;
   const selectedService = services.find((s) => s.id === serviceId);
-  const unitPrice = mode === 'item' ? selectedItem?.selling_price : selectedService?.price;
+  const unitPrice =
+    mode === "item" ? selectedItem?.selling_price : selectedService?.price;
 
   const onSubmit = () => {
     addCharge.mutate(
       {
         quantity,
-        ...(mode === 'item' ? { item_id: selectedItem!.id } : { service_id: serviceId }),
+        ...(mode === "item"
+          ? { item_id: selectedItem!.id }
+          : { service_id: serviceId }),
       },
-      { onSuccess: () => { resetSelection(); setAddedCount((n) => n + 1); } },
+      {
+        onSuccess: () => {
+          resetSelection();
+          setAddedCount((n) => n + 1);
+        },
+      },
     );
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) resetAll(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        onOpenChange(v);
+        if (!v) resetAll();
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Add Charge</DialogTitle>
@@ -908,27 +1148,31 @@ function AddChargeDialog({
             <Button
               type="button"
               size="sm"
-              variant={mode === 'item' ? 'default' : 'outline'}
-              onClick={() => setMode('item')}
+              variant={mode === "item" ? "default" : "outline"}
+              onClick={() => setMode("item")}
             >
               Drug / Equipment
             </Button>
             <Button
               type="button"
               size="sm"
-              variant={mode === 'service' ? 'default' : 'outline'}
-              onClick={() => setMode('service')}
+              variant={mode === "service" ? "default" : "outline"}
+              onClick={() => setMode("service")}
             >
               Service
             </Button>
           </div>
 
-          {mode === 'item' ? (
+          {mode === "item" ? (
             selectedItem ? (
               <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-background text-sm">
                 <Package className="size-3.5 text-muted-foreground shrink-0" />
                 <span className="flex-1 truncate">{selectedItem.name}</span>
-                <button type="button" onClick={() => setSelectedItem(null)} className="text-muted-foreground hover:text-foreground">
+                <button
+                  type="button"
+                  onClick={() => setSelectedItem(null)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
                   <X className="size-3.5" />
                 </button>
               </div>
@@ -942,7 +1186,9 @@ function AddChargeDialog({
               </SelectTrigger>
               <SelectContent>
                 {services.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.name} — {formatCurrency(s.price)}</SelectItem>
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name} — {formatCurrency(s.price)}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -954,28 +1200,44 @@ function AddChargeDialog({
               type="number"
               min={1}
               value={quantity}
-              onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))}
+              onChange={(e) =>
+                setQuantity(Math.max(1, Number(e.target.value) || 1))
+              }
             />
           </div>
 
           {unitPrice && (
             <p className="text-sm text-muted-foreground">
-              Total: <span className="font-medium text-foreground">{formatCurrency(Number(unitPrice) * quantity)}</span>
+              Total:{" "}
+              <span className="font-medium text-foreground">
+                {formatCurrency(Number(unitPrice) * quantity)}
+              </span>
             </p>
           )}
 
           <div className="flex items-center justify-between gap-2">
             {addedCount > 0 ? (
               <p className="text-xs text-muted-foreground">
-                {addedCount} item{addedCount > 1 ? 's' : ''} added — keep adding or close when done.
+                {addedCount} item{addedCount > 1 ? "s" : ""} added — keep adding
+                or close when done.
               </p>
-            ) : <span />}
+            ) : (
+              <span />
+            )}
             <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                {addedCount > 0 ? 'Done' : 'Cancel'}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                {addedCount > 0 ? "Done" : "Cancel"}
               </Button>
-              <Button type="button" disabled={!canSubmit || addCharge.isPending} onClick={onSubmit}>
-                {addCharge.isPending ? 'Adding…' : 'Add Charge'}
+              <Button
+                type="button"
+                disabled={!canSubmit || addCharge.isPending}
+                onClick={onSubmit}
+              >
+                {addCharge.isPending ? "Adding…" : "Add Charge"}
               </Button>
             </div>
           </div>
@@ -996,7 +1258,8 @@ function ChargesTab({ record }: { record: MedicalRecord }) {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <p className="text-sm text-muted-foreground">
-          Drugs, equipment, and services used this visit — synced to the invoice automatically.
+          Drugs, equipment, and services used this visit — synced to the invoice
+          automatically.
         </p>
         <Button size="sm" onClick={() => setAddOpen(true)}>
           <Plus className="h-4 w-4 mr-1" />
@@ -1024,10 +1287,16 @@ function ChargesTab({ record }: { record: MedicalRecord }) {
           <TableBody>
             {charges.map((c: Charge) => (
               <TableRow key={c.id}>
-                <TableCell className="text-sm font-medium">{c.description}</TableCell>
+                <TableCell className="text-sm font-medium">
+                  {c.description}
+                </TableCell>
                 <TableCell className="text-sm">{c.quantity}</TableCell>
-                <TableCell className="text-sm">{formatCurrency(c.unit_price)}</TableCell>
-                <TableCell className="text-sm font-medium">{formatCurrency(c.total)}</TableCell>
+                <TableCell className="text-sm">
+                  {formatCurrency(c.unit_price)}
+                </TableCell>
+                <TableCell className="text-sm font-medium">
+                  {formatCurrency(c.total)}
+                </TableCell>
                 <TableCell>
                   <Button
                     variant="ghost"
@@ -1041,8 +1310,15 @@ function ChargesTab({ record }: { record: MedicalRecord }) {
               </TableRow>
             ))}
             <TableRow>
-              <TableCell colSpan={3} className="text-sm font-semibold text-right">Total</TableCell>
-              <TableCell className="text-sm font-semibold">{formatCurrency(total)}</TableCell>
+              <TableCell
+                colSpan={3}
+                className="text-sm font-semibold text-right"
+              >
+                Total
+              </TableCell>
+              <TableCell className="text-sm font-semibold">
+                {formatCurrency(total)}
+              </TableCell>
               <TableCell />
             </TableRow>
           </TableBody>
@@ -1061,13 +1337,21 @@ function ChargesTab({ record }: { record: MedicalRecord }) {
 // ── Pet Info Sidebar ───────────────────────────────────────────────────────────
 
 const SPECIES_LABEL: Record<string, string> = {
-  DOG: 'Dog', CAT: 'Cat', BIRD: 'Bird', RABBIT: 'Rabbit',
-  REPTILE: 'Reptile', SMALL_MAMMAL: 'Small Mammal', OTHER: 'Other',
+  DOG: "Dog",
+  CAT: "Cat",
+  BIRD: "Bird",
+  RABBIT: "Rabbit",
+  REPTILE: "Reptile",
+  SMALL_MAMMAL: "Small Mammal",
+  OTHER: "Other",
 };
 
-const SEVERITY_VARIANT: Record<string, 'destructive' | 'warning' | 'secondary'> = {
-  severe: 'destructive',
-  moderate: 'warning',
+const SEVERITY_VARIANT: Record<
+  string,
+  "destructive" | "warning" | "secondary"
+> = {
+  severe: "destructive",
+  moderate: "warning",
 };
 
 function PetInfoCard({ record }: { record: MedicalRecord }) {
@@ -1093,34 +1377,40 @@ function PetInfoCard({ record }: { record: MedicalRecord }) {
             </Link>
             <div className="text-muted-foreground text-xs mt-0.5">
               {SPECIES_LABEL[pet.species] ?? pet.species}
-              {pet.breed ? ` · ${pet.breed}` : ''}
+              {pet.breed ? ` · ${pet.breed}` : ""}
             </div>
             {pet.date_of_birth && (
               <div className="text-xs text-muted-foreground mt-1">
-                DOB: {format(new Date(pet.date_of_birth), 'MMM d, yyyy')}
+                DOB: {format(new Date(pet.date_of_birth), "MMM d, yyyy")}
               </div>
             )}
             {pet.sex && (
-              <div className="text-xs text-muted-foreground">Sex: {pet.sex}</div>
+              <div className="text-xs text-muted-foreground">
+                Sex: {pet.sex}
+              </div>
             )}
           </div>
 
           <div className="pt-4 sm:pt-0 sm:pl-6 sm:pr-6">
-            <p className="text-xs font-medium text-muted-foreground mb-1">Owner</p>
+            <p className="text-xs font-medium text-muted-foreground mb-1">
+              Owner
+            </p>
             <Link
               to={`/owners/${owner.id}`}
               className="font-medium hover:underline"
             >
               {owner.first_name} {owner.last_name}
             </Link>
-            <div className="text-xs text-muted-foreground mt-0.5">{owner.phone}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {owner.phone}
+            </div>
             {owner.email && (
               <div className="text-xs text-muted-foreground">{owner.email}</div>
             )}
           </div>
 
           {pet.allergies.length > 0 && (
-            <div className="pt-4 sm:pt-0 sm:pl-6 sm:flex-1 sm:min-w-[180px]">
+            <div className="pt-4 sm:pt-0 sm:pl-6 sm:flex-1 sm:min-w-45">
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-2">
                 <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
                 Allergies
@@ -1129,10 +1419,10 @@ function PetInfoCard({ record }: { record: MedicalRecord }) {
                 {pet.allergies.map((a) => (
                   <Badge
                     key={a.id}
-                    variant={SEVERITY_VARIANT[a.severity ?? ''] ?? 'secondary'}
+                    variant={SEVERITY_VARIANT[a.severity ?? ""] ?? "secondary"}
                     className="text-xs"
                   >
-                    {a.allergen} · {a.severity ?? 'unknown'}
+                    {a.allergen} · {a.severity ?? "unknown"}
                   </Badge>
                 ))}
               </div>
@@ -1155,30 +1445,36 @@ function RecordMetaCard({ record }: { record: MedicalRecord }) {
           <div>
             <span className="text-muted-foreground text-xs block">Date</span>
             <span className="text-xs font-medium">
-              {format(new Date(record.visit_date), 'PPP')}
+              {format(new Date(record.visit_date), "PPP")}
             </span>
           </div>
           <div>
-            <span className="text-muted-foreground text-xs block">Veterinarian</span>
+            <span className="text-muted-foreground text-xs block">
+              Veterinarian
+            </span>
             <span className="text-xs font-medium">
               Dr. {record.vet.first_name} {record.vet.last_name}
             </span>
           </div>
           {record.appointment && (
             <div>
-              <span className="text-muted-foreground text-xs block">Appointment</span>
+              <span className="text-muted-foreground text-xs block">
+                Appointment
+              </span>
               <Link
                 to={`/appointments/${record.appointment.id}`}
                 className="text-xs text-primary hover:underline flex items-center gap-1"
               >
-                {record.appointment.type.replace('_', ' ')}
+                {record.appointment.type.replace("_", " ")}
                 <ExternalLink className="h-3 w-3" />
               </Link>
             </div>
           )}
           {record._count.attachments > 0 && (
             <div>
-              <span className="text-muted-foreground text-xs block">Attachments</span>
+              <span className="text-muted-foreground text-xs block">
+                Attachments
+              </span>
               <span className="text-xs">{record._count.attachments}</span>
             </div>
           )}
@@ -1214,7 +1510,7 @@ export function EmrDetailPage() {
     return (
       <div className="text-center py-20">
         <p className="text-muted-foreground">Medical record not found.</p>
-        <Button variant="link" onClick={() => navigate('/emr')}>
+        <Button variant="link" onClick={() => navigate("/emr")}>
           Back to records
         </Button>
       </div>
@@ -1224,34 +1520,37 @@ export function EmrDetailPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-3 print:hidden">
         <Button
           variant="ghost"
           size="sm"
-          className="mt-0.5 print:hidden"
-          onClick={() => navigate('/emr')}
+          className="mt-0.5"
+          onClick={() => navigate("/emr")}
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-semibold">
-            {record.pet.name} — Medical Record
+            Medical Record: <span className="font-bold">{record.pet.name}</span>
           </h1>
           <p className="text-sm text-muted-foreground">
-            {format(new Date(record.visit_date), 'PPPP')} ·{' '}
-            Dr. {record.vet.first_name} {record.vet.last_name}
-            {record.vet.specialization ? ` (${record.vet.specialization})` : ''}
+            {format(new Date(record.visit_date), "PPPP")} · Dr.{" "}
+            {record.vet.first_name} {record.vet.last_name}
+            {record.vet.specialization ? ` (${record.vet.specialization})` : ""}
           </p>
         </div>
-        <Button variant="outline" size="sm" className="print:hidden" onClick={() => window.print()}>
+        <Button variant="outline" size="sm" onClick={() => window.print()}>
           <Printer className="h-4 w-4 mr-1" />
           Print
         </Button>
       </div>
 
+      {/* Print-only SOAP note */}
+      <SoapNotePrint record={record} />
+
       {/* Chief Complaint */}
       {record.chief_complaint && (
-        <Card className="border-l-4 border-l-primary">
+        <Card className="border-l-4 border-l-primary print:hidden">
           <CardContent className="pt-4 pb-3">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
               Chief Complaint
@@ -1262,7 +1561,7 @@ export function EmrDetailPage() {
       )}
 
       {/* Patient details — top row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 print:hidden">
         <div className="lg:col-span-2">
           <PetInfoCard record={record} />
         </div>
@@ -1270,8 +1569,8 @@ export function EmrDetailPage() {
       </div>
 
       {/* Medical record content — full width */}
-      <Tabs defaultValue="soap">
-        <TabsList className="w-full justify-start print:hidden">
+      <Tabs defaultValue="soap" className="print:hidden">
+        <TabsList className="w-full justify-start">
           <TabsTrigger value="soap" className="flex items-center gap-1.5">
             <FileTextIcon className="h-3.5 w-3.5" />
             SOAP Note
@@ -1284,7 +1583,10 @@ export function EmrDetailPage() {
             <Stethoscope className="h-3.5 w-3.5" />
             Diagnoses ({record.diagnoses.length})
           </TabsTrigger>
-          <TabsTrigger value="prescriptions" className="flex items-center gap-1.5">
+          <TabsTrigger
+            value="prescriptions"
+            className="flex items-center gap-1.5"
+          >
             <Pill className="h-3.5 w-3.5" />
             Rx ({record.prescriptions.length})
           </TabsTrigger>

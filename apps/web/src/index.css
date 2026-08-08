@@ -153,3 +153,44 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* ── Interactive cursor ──────────────────────────────────────────────────────
+   Tailwind's Preflight sets <button> to `cursor: default`, matching native
+   browser behavior rather than the hand cursor most users expect. Restore
+   `pointer` across all standard interactive elements site-wide instead of
+   adding `cursor-pointer` piecemeal to every button/icon-button. */
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']):not([data-disabled]),
+[role='menuitem']:not([data-disabled]),
+[role='menuitemcheckbox']:not([data-disabled]),
+[role='menuitemradio']:not([data-disabled]),
+[role='option']:not([data-disabled]),
+[role='tab']:not([data-disabled]),
+[role='switch']:not([data-disabled]),
+[role='checkbox']:not([data-disabled]),
+a[href],
+select,
+summary,
+label[for] {
+  cursor: pointer;
+}
+
+/* ── Print ────────────────────────────────────────────────────────────────
+   Hides the app chrome so printed pages show only the page content (e.g.
+   the invoice receipt), and forces background colors to print — browsers
+   strip them by default unless explicitly told to keep them. */
+@page {
+  size: A4;
+  margin: 10mm;
+}
+
+@media print {
+  [data-slot='sidebar'] {
+    display: none !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

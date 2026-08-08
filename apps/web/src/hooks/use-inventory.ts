@@ -16,6 +16,7 @@ export function useInventoryItems(params?: {
   low_stock?: boolean;
   is_active?: boolean;
   search?:    string;
+  cursor?:    string;
   limit?:     number;
 }) {
   return useQuery<PaginatedInventory>({
