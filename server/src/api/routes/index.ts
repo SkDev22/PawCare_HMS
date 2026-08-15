@@ -11,11 +11,13 @@ import { inventoryRouter } from '../../modules/inventory/inventory.routes';
 import { reportsRouter } from '../../modules/reports/reports.routes';
 import { notificationsRouter } from '../../modules/notifications/notifications.routes';
 import { dashboardRouter } from '../../modules/dashboard/dashboard.routes';
+import { searchRouter } from '../../modules/search/search.routes';
 
 export const apiRouter: IRouter = Router();
 
 apiRouter.use('/auth', authRouter);
 apiRouter.use('/dashboard', dashboardRouter);
+apiRouter.use('/search', searchRouter);
 apiRouter.use('/', patientsRouter);
 apiRouter.use('/appointments', appointmentsRouter);
 apiRouter.use('/medical-records', emrRouter);

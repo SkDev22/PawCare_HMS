@@ -12,4 +12,5 @@ export * from './schemas/inventory.schema';
 export * from './schemas/reports.schema';
 export * from './schemas/dashboard.schema';
 export * from './schemas/notifications.schema';
+export * from './schemas/search.schema';
 export * from './types/index';
