@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -14,6 +14,7 @@ import {
   CardTitle,
 } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
 import { Textarea } from "../../components/ui/textarea";
 import { Separator } from "../../components/ui/separator";
 import { Skeleton } from "../../components/ui/skeleton";
@@ -88,18 +89,20 @@ const STATUS_LABEL: Record<InvoiceStatus, string> = {
   REFUNDED: "Refunded",
 };
 
+// PAID and PARTIALLY_PAID are derived from actual payments (see Record
+// Payment) and are deliberately not offered here — they must never be
+// reachable as a manual status flip, or the badge can say "Paid" while the
+// balance due is untouched.
 const ALLOWED_TRANSITIONS: Partial<Record<InvoiceStatus, InvoiceStatus[]>> = {
   DRAFT: ["SENT", "CANCELLED"],
-  SENT: ["PAID", "PARTIALLY_PAID", "OVERDUE", "CANCELLED"],
-  PARTIALLY_PAID: ["PAID", "OVERDUE", "CANCELLED"],
-  OVERDUE: ["PAID", "CANCELLED"],
+  SENT: ["OVERDUE", "CANCELLED"],
+  PARTIALLY_PAID: ["CANCELLED"],
+  OVERDUE: ["CANCELLED"],
   PAID: ["REFUNDED"],
 };
 
 const TRANSITION_LABELS: Partial<Record<InvoiceStatus, string>> = {
   SENT: "Mark as Sent",
-  PAID: "Mark as Paid",
-  PARTIALLY_PAID: "Mark Partial",
   OVERDUE: "Mark Overdue",
   CANCELLED: "Cancel Invoice",
   REFUNDED: "Issue Refund",
@@ -292,6 +295,7 @@ function RecordPaymentDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const recordPayment = useRecordPayment(invoiceId);
+  const [cashReceived, setCashReceived] = useState("");
 
   const form = useForm<z.infer<typeof RecordPaymentSchema>>({
     resolver: zodResolver(RecordPaymentSchema),
@@ -301,6 +305,13 @@ function RecordPaymentDialog({
       notes: "",
     },
   });
+
+  const method = form.watch("method");
+  const amount = form.watch("amount");
+  const changeDue =
+    method === "cash" && cashReceived
+      ? Math.max(0, parseFloat(cashReceived) - (amount || 0))
+      : 0;
 
   function onSubmit(values: z.infer<typeof RecordPaymentSchema>) {
     recordPayment.mutate(
@@ -313,13 +324,20 @@ function RecordPaymentDialog({
         onSuccess: () => {
           onOpenChange(false);
           form.reset();
+          setCashReceived("");
         },
       },
     );
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        onOpenChange(v);
+        if (!v) setCashReceived("");
+      }}
+    >
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Record Payment</DialogTitle>
@@ -339,7 +357,8 @@ function RecordPaymentDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    Amount (LKR) <span className="text-destructive">*</span>
+                    Amount to apply (LKR){" "}
+                    <span className="text-destructive">*</span>
                   </FormLabel>
                   <FormControl>
                     <Input
@@ -385,6 +404,25 @@ function RecordPaymentDialog({
                 </FormItem>
               )}
             />
+
+            {method === "cash" && (
+              <div className="space-y-1.5">
+                <Label>Cash received (optional)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="What the owner handed over"
+                  value={cashReceived}
+                  onChange={(e) => setCashReceived(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {changeDue > 0
+                    ? `Change due: ${formatCurrency(changeDue)}`
+                    : "Only used to calculate change — doesn't affect the amount recorded."}
+                </p>
+              </div>
+            )}
 
             <FormField
               control={form.control}
@@ -486,31 +524,111 @@ export function InvoiceDetailPage() {
   return (
     <div className="space-y-6">
       {/* Print-only receipt */}
-      <InvoiceReceipt invoice={invoice} statusLabel={STATUS_LABEL[invoice.status]} />
+      <InvoiceReceipt
+        invoice={invoice}
+        statusLabel={STATUS_LABEL[invoice.status]}
+      />
+
+      <Button
+        variant="ghost"
+        size="sm"
+        className="-ml-2 print:hidden"
+        onClick={() => navigate("/billing")}
+      >
+        <ArrowLeft className="h-4 w-4 mr-1" />
+        Billing
+      </Button>
 
       {/* Header */}
-      <div className="flex items-center gap-3 print:hidden">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/billing")}>
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Billing
-        </Button>
-        <span className="text-muted-foreground">/</span>
-        <div className="flex items-center gap-2">
-          <h1 className="text-lg font-semibold font-mono">
-            #{invoice.id.slice(0, 8).toUpperCase()}
-          </h1>
-          <Badge variant={STATUS_BADGE[invoice.status]}>
-            {STATUS_LABEL[invoice.status]}
-          </Badge>
-        </div>
-        <div className="ml-auto flex items-center gap-3 text-sm text-muted-foreground">
-          Created {format(new Date(invoice.created_at), "MMM d, yyyy")}
-          <Button variant="outline" size="sm" onClick={() => window.print()}>
-            <Printer className="h-4 w-4 mr-1" />
-            Print
-          </Button>
-        </div>
-      </div>
+      <Card className="print:hidden">
+        <CardContent className="p-6 space-y-6">
+          {/* Identity row */}
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-2xl font-bold font-mono">
+                  #{invoice.id.slice(0, 8).toUpperCase()}
+                </h1>
+                <Badge variant={STATUS_BADGE[invoice.status]}>
+                  {STATUS_LABEL[invoice.status]}
+                </Badge>
+              </div>
+              <p className="text-muted-foreground mt-1">
+                <Link
+                  to={`/owners/${invoice.owner.id}`}
+                  className="text-primary hover:underline font-medium"
+                >
+                  {invoice.owner.first_name} {invoice.owner.last_name}
+                </Link>
+                {" · "}Created{" "}
+                {format(new Date(invoice.created_at), "MMM d, yyyy")}
+              </p>
+            </div>
+
+            <div className="flex gap-2 flex-wrap shrink-0">
+              {balance > 0.001 &&
+                invoice.status !== "CANCELLED" &&
+                invoice.status !== "REFUNDED" && (
+                  <Button size="sm" onClick={() => setPaymentOpen(true)}>
+                    <CreditCard className="h-4 w-4 mr-1" />
+                    Record Payment
+                  </Button>
+                )}
+              {nextStatuses.map((s) => (
+                <Button
+                  key={s}
+                  variant="outline"
+                  size="sm"
+                  disabled={updateStatus.isPending}
+                  onClick={() => updateStatus.mutate(s)}
+                >
+                  {TRANSITION_LABELS[s] ?? s}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.print()}
+              >
+                <Printer className="h-4 w-4 mr-1" />
+                Print
+              </Button>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Quick stats — the money, at a glance */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-muted/50 rounded-lg p-3 flex flex-col items-center text-center gap-1">
+              <p className="text-sm font-semibold">{formatCurrency(total)}</p>
+              <p className="text-xs text-muted-foreground">Total</p>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-3 flex flex-col items-center text-center gap-1">
+              <p className="text-sm font-semibold text-emerald-600">
+                {formatCurrency(paid)}
+              </p>
+              <p className="text-xs text-muted-foreground">Paid</p>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-3 flex flex-col items-center text-center gap-1">
+              <p
+                className={`text-sm font-semibold ${balance > 0.001 ? "text-destructive" : "text-emerald-600"}`}
+              >
+                {formatCurrency(balance)}
+              </p>
+              <p className="text-xs text-muted-foreground">Balance Due</p>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-3 flex flex-col items-center text-center gap-1">
+              <p className="text-sm font-semibold">
+                {invoice.due_date
+                  ? format(new Date(invoice.due_date), "MMM d, yyyy")
+                  : "—"}
+              </p>
+              <p className="text-xs text-muted-foreground">Due Date</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:hidden">
         {/* Left — line items + payments */}
@@ -520,7 +638,7 @@ export function InvoiceDetailPage() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Line Items</CardTitle>
-                {canEdit && (
+                {/* {canEdit && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -530,7 +648,7 @@ export function InvoiceDetailPage() {
                     <Plus className="h-4 w-4 mr-1" />
                     Add Item
                   </Button>
-                )}
+                )} */}
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -596,21 +714,7 @@ export function InvoiceDetailPage() {
           {/* Payments history */}
           <Card>
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Payments</CardTitle>
-                {balance > 0.001 &&
-                  invoice.status !== "CANCELLED" &&
-                  invoice.status !== "REFUNDED" && (
-                    <Button
-                      size="sm"
-                      className="print:hidden"
-                      onClick={() => setPaymentOpen(true)}
-                    >
-                      <CreditCard className="h-4 w-4 mr-1" />
-                      Record Payment
-                    </Button>
-                  )}
-              </div>
+              <CardTitle className="text-base">Payments</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {invoice.payments.length === 0 ? (
@@ -655,7 +759,7 @@ export function InvoiceDetailPage() {
 
         {/* Right — summary + actions + client */}
         <div className="space-y-4">
-          {/* Financial summary */}
+          {/* Financial breakdown */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Summary</CardTitle>
@@ -682,50 +786,8 @@ export function InvoiceDetailPage() {
                 <span>Total</span>
                 <span>{formatCurrency(total)}</span>
               </div>
-              <div className="flex justify-between text-emerald-600">
-                <span>Paid</span>
-                <span>{formatCurrency(paid)}</span>
-              </div>
-              <div
-                className={`flex justify-between font-bold ${balance > 0.001 ? "text-destructive" : "text-emerald-600"}`}
-              >
-                <span>Balance Due</span>
-                <span>{formatCurrency(balance)}</span>
-              </div>
-              {invoice.due_date && (
-                <p className="text-xs text-muted-foreground pt-1">
-                  Due {format(new Date(invoice.due_date), "MMM d, yyyy")}
-                </p>
-              )}
             </CardContent>
           </Card>
-
-          {/* Status actions */}
-          {nextStatuses.length > 0 && (
-            <Card className="print:hidden">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {nextStatuses.map((s) => (
-                  <Button
-                    key={s}
-                    variant={
-                      s === "CANCELLED" || s === "REFUNDED"
-                        ? "outline"
-                        : "default"
-                    }
-                    size="sm"
-                    className="w-full"
-                    disabled={updateStatus.isPending}
-                    onClick={() => updateStatus.mutate(s)}
-                  >
-                    {TRANSITION_LABELS[s] ?? s}
-                  </Button>
-                ))}
-              </CardContent>
-            </Card>
-          )}
 
           {/* Client info */}
           <Card>

@@ -17,6 +17,7 @@ import { AppointmentDetailPage } from './pages/appointments/AppointmentDetailPag
 import { QueuePage } from './pages/appointments/QueuePage';
 import { EmrPage } from './pages/emr/EmrPage';
 import { EmrDetailPage } from './pages/emr/EmrDetailPage';
+import { MedicalHistoryPage } from './pages/emr/MedicalHistoryPage';
 import { BillingPage } from './pages/billing/BillingPage';
 import { InvoiceDetailPage } from './pages/billing/InvoiceDetailPage';
 import { StaffPage } from './pages/staff/StaffPage';
@@ -28,6 +29,7 @@ import { HospitalizationDetailPage } from './pages/ward/HospitalizationDetailPag
 import { InventoryPage } from './pages/inventory/InventoryPage';
 import { InventoryDetailPage } from './pages/inventory/InventoryDetailPage';
 import { ReportsPage } from './pages/reports/ReportsPage';
+import { ReportDetailPage } from './pages/reports/ReportDetailPage';
 import { NotificationsPage } from './pages/notifications/NotificationsPage';
 import { SettingsPage } from './pages/settings/SettingsPage';
 import { ProfilePage } from './pages/profile/ProfilePage';
@@ -97,8 +99,9 @@ export function App() {
           <Route path="/appointments/:id"   element={<AuthLayout permission="APPOINTMENT_READ"><AppointmentDetailPage /></AuthLayout>} />
 
           {/* Medical Records (EMR) */}
-          <Route path="/emr"     element={<AuthLayout permission="MEDICAL_RECORD_READ"><EmrPage /></AuthLayout>} />
-          <Route path="/emr/:id" element={<AuthLayout permission="MEDICAL_RECORD_READ"><EmrDetailPage /></AuthLayout>} />
+          <Route path="/emr"         element={<AuthLayout permission="MEDICAL_RECORD_READ"><EmrPage /></AuthLayout>} />
+          <Route path="/emr/history" element={<AuthLayout permission="MEDICAL_RECORD_READ"><MedicalHistoryPage /></AuthLayout>} />
+          <Route path="/emr/:id"     element={<AuthLayout permission="MEDICAL_RECORD_READ"><EmrDetailPage /></AuthLayout>} />
 
           {/* Billing & Invoicing */}
           <Route path="/billing"     element={<AuthLayout permission="INVOICE_READ"><BillingPage /></AuthLayout>} />
@@ -121,7 +124,8 @@ export function App() {
           <Route path="/inventory/:id" element={<AuthLayout permission="INVENTORY_READ"><InventoryDetailPage /></AuthLayout>} />
 
           {/* Reports */}
-          <Route path="/reports" element={<AuthLayout permission="REPORT_READ"><ReportsPage /></AuthLayout>} />
+          <Route path="/reports"      element={<AuthLayout permission="REPORT_READ"><ReportsPage /></AuthLayout>} />
+          <Route path="/reports/:key" element={<AuthLayout permission="REPORT_READ"><ReportDetailPage /></AuthLayout>} />
 
           {/* Notifications */}
           <Route path="/notifications" element={<AuthLayout><NotificationsPage /></AuthLayout>} />

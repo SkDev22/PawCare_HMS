@@ -1,6 +1,7 @@
 import { Prisma, StaffRole } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { emitToStaff } from '../../lib/socket';
+import { NOTIFICATION_TYPES } from '@pawcare/shared';
 import type { NotificationQuery } from '@pawcare/shared';
 
 type TxClient = Prisma.TransactionClient;
@@ -47,6 +48,69 @@ export async function markAllRead(staffId: string) {
   return { updated: result.count };
 }
 
+export async function deleteReadNotifications(staffId: string) {
+  const result = await prisma.notification.deleteMany({
+    where: { staff_id: staffId, read_at: { not: null } },
+  });
+  return { deleted: result.count };
+}
+
+const RETENTION_DAYS = 90;
+
+// Keeps the table bounded without ever touching unread rows — an old unread
+// alert usually means something still hasn't been handled.
+export async function purgeOldReadNotifications(days = RETENTION_DAYS) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+
+  const result = await prisma.notification.deleteMany({
+    where: { read_at: { not: null, lt: cutoff } },
+  });
+  return { deleted: result.count };
+}
+
+// ── Preferences ────────────────────────────────────────────────────────────────
+// Opt-out model: absence of a row means enabled. Only explicit disables are
+// stored, so there's nothing to seed when a new notification type is added.
+
+export async function getPreferences(staffId: string) {
+  const overrides = await prisma.notificationPreference.findMany({
+    where:  { staff_id: staffId },
+    select: { type: true, enabled: true },
+  });
+  const overrideMap = new Map(overrides.map((o) => [o.type, o.enabled]));
+
+  return NOTIFICATION_TYPES.map((t) => ({
+    type:    t.type,
+    label:   t.label,
+    enabled: overrideMap.get(t.type) ?? true,
+  }));
+}
+
+export async function updatePreferences(
+  staffId: string,
+  preferences: { type: string; enabled: boolean }[],
+) {
+  await Promise.all(
+    preferences.map((p) =>
+      prisma.notificationPreference.upsert({
+        where:  { staff_id_type: { staff_id: staffId, type: p.type } },
+        create: { staff_id: staffId, type: p.type, enabled: p.enabled },
+        update: { enabled: p.enabled },
+      }),
+    ),
+  );
+  return getPreferences(staffId);
+}
+
+async function isEnabled(tx: TxClient | typeof prisma, staffId: string, type: string) {
+  const pref = await tx.notificationPreference.findUnique({
+    where:  { staff_id_type: { staff_id: staffId, type } },
+    select: { enabled: true },
+  });
+  return pref?.enabled ?? true;
+}
+
 // ── Producers ──────────────────────────────────────────────────────────────
 // Called from inside other modules' transactions to create notification rows
 // atomically with the business event they describe.
@@ -55,6 +119,8 @@ export async function notifyStaff(
   tx: TxClient | typeof prisma,
   params: { staff_id: string; type: string; subject?: string; body: string; reference_id?: string },
 ) {
+  if (!(await isEnabled(tx, params.staff_id, params.type))) return null;
+
   const notif = await tx.notification.create({
     data: {
       staff_id:     params.staff_id,
@@ -96,6 +162,7 @@ export async function notifyRole(
   // failing the whole batch.
   await Promise.all(
     staff.map(async (s) => {
+      if (!(await isEnabled(tx, s.id, params.type))) return;
       try {
         const notif = await tx.notification.create({
           data: {

@@ -81,10 +81,15 @@ export async function getPetHistory(id: string, clinicId: string) {
     prisma.medicalRecord.findMany({
       where: { pet_id: id },
       include: {
-        soap_note:   true,
-        vitals:      true,
-        diagnoses:   true,
-        lab_results: true,
+        vet: {
+          select: { id: true, first_name: true, last_name: true, specialization: true },
+        },
+        soap_note:    true,
+        vitals:       true,
+        diagnoses:    true,
+        lab_results:  true,
+        prescriptions: { orderBy: { created_at: 'desc' } },
+        attachments:  { where: { deleted_at: null }, orderBy: { uploaded_at: 'desc' } },
       },
       orderBy: { visit_date: 'desc' },
     }),
@@ -152,6 +157,21 @@ export async function updatePet(id: string, clinicId: string, data: UpdatePetInp
       ...(data.notes        !== undefined && { notes: data.notes }),
       ...(data.status       !== undefined && { status: data.status }),
     },
+  });
+}
+
+export async function archivePet(id: string, clinicId: string) {
+  const pet = await prisma.pet.findFirst({
+    where: { id, deleted_at: null, owner: { clinic_id: clinicId } },
+  });
+
+  if (!pet) {
+    throw new AppError('NOT_FOUND', 'Pet not found', 404);
+  }
+
+  await prisma.pet.update({
+    where: { id },
+    data: { deleted_at: new Date() },
   });
 }
 

@@ -4,10 +4,12 @@ import { logger } from '../lib/logger';
 import { SCHEDULED_JOBS_QUEUE, scheduledJobsQueue } from '../lib/queue';
 import { runInvoiceOverdueAlert } from './invoice-overdue.job';
 import { runDailyDigest } from './daily-digest.job';
+import { runNotificationRetention } from './notification-retention.job';
 
 const JOB_NAMES = {
   INVOICE_OVERDUE_ALERT: 'invoice-overdue-alert',
   DAILY_DIGEST:          'daily-digest',
+  NOTIFICATION_RETENTION: 'notification-retention',
 } as const;
 
 // Daily, fixed UTC time — no per-clinic timezone awareness yet.
@@ -24,6 +26,8 @@ export function initWorker(): Worker {
           return runInvoiceOverdueAlert();
         case JOB_NAMES.DAILY_DIGEST:
           return runDailyDigest();
+        case JOB_NAMES.NOTIFICATION_RETENTION:
+          return runNotificationRetention();
         default:
           logger.warn('Unknown scheduled job received', { name: job.name });
       }
@@ -51,6 +55,11 @@ export async function registerRepeatableJobs(): Promise<void> {
     JOB_NAMES.DAILY_DIGEST,
     {},
     { repeat: { pattern: DAILY_CRON }, jobId: JOB_NAMES.DAILY_DIGEST },
+  );
+  await scheduledJobsQueue.add(
+    JOB_NAMES.NOTIFICATION_RETENTION,
+    {},
+    { repeat: { pattern: DAILY_CRON }, jobId: JOB_NAMES.NOTIFICATION_RETENTION },
   );
   logger.info('Repeatable scheduled jobs registered');
 }

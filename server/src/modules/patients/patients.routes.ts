@@ -140,10 +140,22 @@ patientsRouter.put(
   },
 );
 
+patientsRouter.delete(
+  '/pets/:id',
+  authenticate,
+  authorize('PATIENT_DELETE'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await petsService.archivePet(req.params.id, authed(req).user.clinic_id);
+      res.status(204).send();
+    } catch (err) { next(err); }
+  },
+);
+
 patientsRouter.get(
   '/pets/:id/history',
   authenticate,
-  authorize('PATIENT_READ'),
+  authorize('MEDICAL_RECORD_READ'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const history = await petsService.getPetHistory(req.params.id, authed(req).user.clinic_id);

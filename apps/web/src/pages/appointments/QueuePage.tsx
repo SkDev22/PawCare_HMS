@@ -45,9 +45,17 @@ function QueueRow({ appt }: { appt: Appointment }) {
   return (
     <Card>
       <CardContent className="flex flex-wrap items-center gap-4 py-4">
-        <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 shrink-0">
-          <PawPrint className="size-4 text-primary" />
-        </div>
+        {appt.daily_number != null ? (
+          <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 shrink-0">
+            <span className="text-sm font-semibold text-primary">
+              {String(appt.daily_number).padStart(2, "0")}
+            </span>
+          </div>
+        ) : (
+          <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 shrink-0">
+            <PawPrint className="size-4 text-primary" />
+          </div>
+        )}
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">

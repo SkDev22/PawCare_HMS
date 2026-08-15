@@ -238,9 +238,6 @@ export function AppointmentForm({
   const { data: vets = [] } = useVets();
   const { data: rooms = [] } = useRooms();
 
-  const todayStr = defaultDate ?? new Date().toISOString().slice(0, 10);
-  const nowStr = new Date().toTimeString().slice(0, 5);
-
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
@@ -248,8 +245,8 @@ export function AppointmentForm({
       vet_id: "",
       room_id: "",
       type: "WELLNESS_EXAM",
-      date: todayStr,
-      start_time: defaultWalkIn ? nowStr : "09:00",
+      date: defaultDate ?? new Date().toISOString().slice(0, 10),
+      start_time: defaultWalkIn ? new Date().toTimeString().slice(0, 5) : "09:00",
       duration_minutes: "30",
       reason: "",
       notes: "",
@@ -258,6 +255,13 @@ export function AppointmentForm({
   });
 
   useEffect(() => {
+    // Only reset when the dialog opens (or the appointment being edited
+    // changes) — never on every render. Computing "today"/"now" fresh here
+    // (rather than depending on values computed at render time) means a
+    // minute ticking over while the form is open can no longer be mistaken
+    // for a real prop change and wipe out fields the user already filled in.
+    if (!open) return;
+
     if (editAppt) {
       const start = new Date(editAppt.start_at);
       const end = new Date(editAppt.end_at);
@@ -283,15 +287,16 @@ export function AppointmentForm({
         vet_id: "",
         room_id: "",
         type: "WELLNESS_EXAM",
-        date: todayStr,
-        start_time: defaultWalkIn ? nowStr : "09:00",
+        date: defaultDate ?? new Date().toISOString().slice(0, 10),
+        start_time: defaultWalkIn ? new Date().toTimeString().slice(0, 5) : "09:00",
         duration_minutes: "30",
         reason: "",
         notes: "",
         is_walk_in: !!defaultWalkIn,
       });
     }
-  }, [editAppt, open, form, todayStr, defaultWalkIn, nowStr, defaultPet]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately scoped to the dialog-open transition; see comment above
+  }, [open, editAppt?.id]);
 
   const create = useCreateAppointment();
   const update = useUpdateAppointment(editAppt?.id ?? "");

@@ -8,7 +8,12 @@ import {
   MapPin,
   AlertCircle,
   Pencil,
+  PawPrint,
+  MessageCircle,
+  ShieldCheck,
+  Calendar,
 } from "lucide-react";
+import { format } from "date-fns";
 import { useOwner } from "@/hooks/use-owners";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -63,8 +68,8 @@ export function OwnerDetailPage() {
       </Button>
 
       {/* Header card */}
-      <div>
-        <CardContent>
+      <Card>
+        <CardContent className="p-6">
           {isLoading ? (
             <div className="flex gap-4">
               <Skeleton className="h-16 w-16 rounded-full" />
@@ -74,65 +79,110 @@ export function OwnerDetailPage() {
               </div>
             </div>
           ) : (
-            <div className="flex items-start gap-4 max-w-3xl">
-              <Avatar className="h-16 w-16 text-xl">
-                <AvatarFallback className="bg-primary/10 text-primary">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
+            <div className="space-y-6">
+              {/* Identity row */}
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div className="flex items-start gap-4 min-w-0">
+                  <Avatar className="h-16 w-16 text-xl shrink-0">
+                    <AvatarFallback className="bg-primary/10 text-primary">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h1 className="text-2xl font-bold">
-                    {owner?.first_name} {owner?.last_name}
-                  </h1>
-                  {owner?.portal_enabled && (
-                    <Badge variant="info">Portal access</Badge>
-                  )}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <h1 className="text-2xl font-bold">
+                        {owner?.first_name} {owner?.last_name}
+                      </h1>
+                      {owner?.portal_enabled && (
+                        <Badge variant="info">Portal access</Badge>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-4 mt-2 text-sm text-muted-foreground">
+                      {owner?.phone && (
+                        <span className="flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5" />
+                          {owner.phone}
+                        </span>
+                      )}
+                      {owner?.email && (
+                        <span className="flex items-center gap-1.5">
+                          <Mail className="w-3.5 h-3.5" />
+                          {owner.email}
+                        </span>
+                      )}
+                      {owner?.address && (
+                        <span className="flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5" />
+                          {owner.address}
+                        </span>
+                      )}
+                    </div>
+
+                    {owner?.emergency_contact && (
+                      <p className="text-sm font-semibold mt-2">
+                        Emergency contact: {owner.emergency_contact}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex flex-wrap gap-4 mt-2 text-sm text-muted-foreground">
-                  {owner?.phone && (
-                    <span className="flex items-center gap-1.5">
-                      <Phone className="w-3.5 h-3.5" />
-                      {owner.phone}
-                    </span>
-                  )}
-                  {owner?.email && (
-                    <span className="flex items-center gap-1.5">
-                      <Mail className="w-3.5 h-3.5" />
-                      {owner.email}
-                    </span>
-                  )}
-                  {owner?.address && (
-                    <span className="flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5" />
-                      {owner.address}
-                    </span>
-                  )}
-                </div>
-
-                {owner?.emergency_contact && (
-                  <p className="text-sm text-muted-foreground font-bold mt-2">
-                    Emergency: {owner.emergency_contact}
-                  </p>
+                {canWrite && (
+                  <div className="flex gap-2 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditOpen(true)}
+                    >
+                      <Pencil className="w-4 h-4" />
+                      Edit
+                    </Button>
+                  </div>
                 )}
               </div>
 
-              {canWrite && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditOpen(true)}
-                >
-                  <Pencil className="w-4 h-4" />
-                  Edit
-                </Button>
-              )}
+              <Separator />
+
+              {/* Quick stats — fills the row on wide screens */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-muted/50 rounded-lg p-3 flex flex-col items-center text-center gap-1">
+                  <PawPrint className="w-4 h-4 text-muted-foreground" />
+                  <p className="text-sm font-semibold">
+                    {owner?.pets?.length ?? owner?._count?.pets ?? 0}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Pets</p>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3 flex flex-col items-center text-center gap-1">
+                  <MessageCircle className="w-4 h-4 text-muted-foreground" />
+                  <p className="text-sm font-semibold capitalize">
+                    {owner?.preferred_contact ?? "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Preferred contact
+                  </p>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3 flex flex-col items-center text-center gap-1">
+                  <ShieldCheck className="w-4 h-4 text-muted-foreground" />
+                  <p className="text-sm font-semibold">
+                    {owner?.portal_enabled ? "Enabled" : "Disabled"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Portal access</p>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3 flex flex-col items-center text-center gap-1">
+                  <Calendar className="w-4 h-4 text-muted-foreground" />
+                  <p className="text-sm font-semibold">
+                    {owner?.created_at
+                      ? format(new Date(owner.created_at), "dd MMM yyyy")
+                      : "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Registered</p>
+                </div>
+              </div>
             </div>
           )}
         </CardContent>
-      </div>
+      </Card>
 
       {/* Pets section */}
       <Card>

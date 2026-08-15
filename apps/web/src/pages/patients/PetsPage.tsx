@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Plus, PawPrint, MoreHorizontal, Eye } from "lucide-react";
+import { Search, Plus, PawPrint, MoreHorizontal, Eye, Activity } from "lucide-react";
 import { usePets } from "@/hooks/use-pets";
 import { useDebounce } from "@/hooks/use-debounce";
 import { Button } from "@/components/ui/button";
@@ -39,9 +39,10 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { speciesIcon, speciesBadgeVariant, calcAge } from "@/lib/patient-utils";
-import type { Species, PetStatus } from "@/types/patients";
+import type { Pet, Species, PetStatus } from "@/types/patients";
 import { useAuthStore } from "@/stores/auth.store";
 import { hasPermission } from "@/lib/permissions";
+import { ChangeStatusDialog } from "@/components/patients/ChangeStatusDialog";
 
 const PAGE_SIZE = 20;
 
@@ -62,6 +63,7 @@ export function PetsPage() {
   const [speciesFilter, setSpeciesFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [search, setSearch] = useState("");
+  const [statusPet, setStatusPet] = useState<Pet | null>(null);
   const debouncedSearch = useDebounce(search, 300);
 
   // Cursor-based pagination: cursorHistory[i] is the cursor that fetches page i+2
@@ -270,6 +272,11 @@ export function PetsPage() {
                         >
                           <Eye className="w-4 h-4 mr-2" /> View record
                         </DropdownMenuItem>
+                        {canWrite && (
+                          <DropdownMenuItem onClick={() => setStatusPet(pet)}>
+                            <Activity className="w-4 h-4 mr-2" /> Change status
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -311,6 +318,8 @@ export function PetsPage() {
           </PaginationContent>
         </Pagination>
       )}
+
+      <ChangeStatusDialog pet={statusPet} onClose={() => setStatusPet(null)} />
     </div>
   );
 }

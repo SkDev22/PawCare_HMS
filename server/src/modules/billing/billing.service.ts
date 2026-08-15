@@ -298,11 +298,14 @@ export async function recordPayment(invoiceId: string, clinicId: string, data: R
 export async function updateStatus(id: string, clinicId: string, status: InvoiceStatusType) {
   const invoice = await assertInvoice(id, clinicId);
 
+  // PAID and PARTIALLY_PAID are derived from actual payments (see recordPayment)
+  // and must never be reachable as a manual transition — otherwise the status
+  // can claim money was received when paid_amount never moved.
   const allowed: Partial<Record<string, string[]>> = {
     DRAFT:          ['SENT', 'CANCELLED'],
-    SENT:           ['PAID', 'PARTIALLY_PAID', 'OVERDUE', 'CANCELLED'],
-    PARTIALLY_PAID: ['PAID', 'CANCELLED'],
-    OVERDUE:        ['PAID', 'PARTIALLY_PAID', 'CANCELLED'],
+    SENT:           ['OVERDUE', 'CANCELLED'],
+    PARTIALLY_PAID: ['CANCELLED'],
+    OVERDUE:        ['CANCELLED'],
     PAID:           ['REFUNDED'],
   };
 

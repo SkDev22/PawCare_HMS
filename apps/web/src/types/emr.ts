@@ -174,3 +174,37 @@ export type PaginatedMedicalRecords = {
   nextCursor: string | null;
   hasMore: boolean;
 };
+
+// ── Per-patient history (used by the Medical History page) ────────────────────
+
+export type RecordAttachment = {
+  id: string;
+  file_name: string;
+  file_type: string;
+  mime_type: string;
+  size_bytes: number;
+  uploaded_at: string;
+};
+
+export type PetHistoryRecord = {
+  id: string;
+  pet_id: string;
+  appointment_id: string | null;
+  vet_id: string;
+  visit_date: string;
+  chief_complaint: string | null;
+  created_at: string;
+  updated_at: string;
+  vet: { id: string; first_name: string; last_name: string; specialization: string | null };
+  soap_note: SoapNote | null;
+  vitals: Vitals | null;
+  diagnoses: Diagnosis[];
+  lab_results: LabResult[];
+  prescriptions: Prescription[];
+  attachments: RecordAttachment[];
+};
+
+export type PetHistoryResponse = {
+  records: PetHistoryRecord[];
+  weightTrend: { weight_kg: string | null; recorded_at: string }[];
+};

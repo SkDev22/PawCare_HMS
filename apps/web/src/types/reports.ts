@@ -55,3 +55,134 @@ export type OutstandingBalancesReport = {
   buckets:          AgingBuckets;
   totalOutstanding: number;
 };
+
+// ── Expiring Items ───────────────────────────────────────────────────────────
+
+export type ExpiringItem = {
+  id:               string;
+  name:             string;
+  category:         string;
+  sku:              string | null;
+  unit:             string;
+  quantity_on_hand: number;
+  expiry_date:      string | null;
+  location:         string | null;
+  isExpired:        boolean;
+};
+
+export type ExpiringItemsReport = {
+  items:        ExpiringItem[];
+  expiredCount: number;
+};
+
+// ── Stock Levels ───────────────────────────────────────────────────────────────
+
+export type StockLevelItem = {
+  id:                string;
+  name:              string;
+  category:          string;
+  sku:               string | null;
+  unit:              string;
+  quantity_on_hand:  number;
+  reorder_threshold: number;
+  unit_cost:         string;
+  location:          string | null;
+  isLow:             boolean;
+  stockValue:        number;
+};
+
+export type StockLevelsReport = {
+  items:           StockLevelItem[];
+  lowStockCount:   number;
+  totalStockValue: number;
+};
+
+// ── Vaccinations Due ────────────────────────────────────────────────────────────
+
+export type VaccinationDueItem = {
+  id:              string;
+  vaccine_name:    string;
+  next_due_at:     string;
+  administered_at: string;
+  isOverdue:       boolean;
+  pet: {
+    id:      string;
+    name:    string;
+    species: string;
+    owner:   { id: string; first_name: string; last_name: string; phone: string };
+  };
+};
+
+export type VaccinationsDueReport = {
+  items:        VaccinationDueItem[];
+  overdueCount: number;
+};
+
+// ── Service / Item Sales ────────────────────────────────────────────────────────
+
+export type ServiceSaleItem = {
+  key:      string;
+  name:     string;
+  category: string;
+  type:     'service' | 'item' | 'other';
+  quantity: number;
+  revenue:  number;
+};
+
+export type ServiceSalesReport = {
+  items:        ServiceSaleItem[];
+  totalRevenue: number;
+};
+
+// ── Medical Records Summary ─────────────────────────────────────────────────────
+
+export type DiagnosisFrequency = { name: string; count: number };
+
+export type MedicalRecordsSummaryReport = {
+  totalRecords:          number;
+  totalPrescriptions:    number;
+  totalLabResults:       number;
+  primaryDiagnosisCount: number;
+  diagnoses:             DiagnosisFrequency[];
+};
+
+// ── Doctor Performance ───────────────────────────────────────────────────────────
+
+export type DoctorPerformanceRow = {
+  id:                     string;
+  name:                   string;
+  appointmentsCompleted:  number;
+  medicalRecords:         number;
+  revenue:                number;
+};
+
+export type DoctorPerformanceReport = {
+  doctors: DoctorPerformanceRow[];
+};
+
+// ── Patient / Owner Demographics ─────────────────────────────────────────────────
+
+export type SpeciesCount = { species: string; count: number };
+
+export type DemographicsReport = {
+  totalOwners:           number;
+  newOwners:             number;
+  totalPets:              number;
+  newPets:                number;
+  portalEnabledCount:    number;
+  species:               SpeciesCount[];
+  uniquePatientsSeen:    number;
+  newPatientsSeen:       number;
+  returningPatientsSeen: number;
+};
+
+// ── Tax / Financial Summary ──────────────────────────────────────────────────────
+
+export type TaxSummaryReport = {
+  invoiceCount: number;
+  subtotal:     number;
+  tax:          number;
+  discount:     number;
+  total:        number;
+  collected:    number;
+};

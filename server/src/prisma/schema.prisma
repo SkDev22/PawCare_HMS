@@ -226,6 +226,7 @@ model Appointment {
   reason        String?
   notes         String?
   is_walk_in    Boolean           @default(false)
+  daily_number  Int?
   checked_in_at DateTime?
   cancelled_at  DateTime?
   cancel_reason String?
@@ -241,6 +242,21 @@ model Appointment {
   @@index([clinic_id, start_at])
   @@index([vet_id, start_at])
   @@map("appointments")
+}
+
+// Per-clinic, per-day sequence used to assign a short human-readable
+// "appointment #" (resets to 1 each day, keyed by the appointment's
+// scheduled date — not the date it was booked). Assigned atomically via
+// upsert-with-increment so concurrent bookings never collide.
+model DailyCounter {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clinic_id  String   @db.Uuid
+  date       DateTime @db.Date
+  counter    Int      @default(0)
+  updated_at DateTime @updatedAt
+
+  @@unique([clinic_id, date])
+  @@map("daily_counters")
 }
 
 model Room {
@@ -722,4 +738,17 @@ model Notification {
   @@index([status, scheduled_at])
   @@index([staff_id, read_at])
   @@map("notifications")
+}
+
+// Opt-out preferences: the absence of a row means enabled (the default).
+// A row with enabled=false means this staff member turned that notification
+// type off. Producers (notifyStaff/notifyRole) check this before creating.
+model NotificationPreference {
+  id       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  staff_id String  @db.Uuid
+  type     String
+  enabled  Boolean @default(true)
+
+  @@unique([staff_id, type])
+  @@map("notification_preferences")
 }

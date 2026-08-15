@@ -7,9 +7,12 @@ import {
   Plus,
   Weight,
   Calendar,
+  Activity,
+  Archive,
+  History,
 } from "lucide-react";
 import { format } from "date-fns";
-import { usePet, useAddAllergy } from "@/hooks/use-pets";
+import { usePet, useAddAllergy, useArchivePet } from "@/hooks/use-pets";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PetForm } from "@/components/patients/PetForm";
+import { ChangeStatusDialog } from "@/components/patients/ChangeStatusDialog";
 import {
   speciesIcon,
   speciesBadgeVariant,
@@ -48,9 +52,13 @@ export function PetDetailPage() {
   const navigate = useNavigate();
   const role = useAuthStore((s) => s.user?.role);
   const canWrite = hasPermission(role, "PATIENT_WRITE");
+  const canDelete = hasPermission(role, "PATIENT_DELETE");
+  const canViewHistory = hasPermission(role, "MEDICAL_RECORD_READ");
   const { data: pet, isLoading, error } = usePet(id);
 
   const [editOpen, setEditOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [allergyOpen, setAllergyOpen] = useState(false);
   const [allergen, setAllergen] = useState("");
   const [reaction, setReaction] = useState("");
@@ -59,6 +67,7 @@ export function PetDetailPage() {
   );
 
   const addAllergy = useAddAllergy(id ?? "");
+  const archivePet = useArchivePet();
 
   const handleAddAllergy = async () => {
     if (!allergen.trim()) return;
@@ -102,8 +111,8 @@ export function PetDetailPage() {
       </Button>
 
       {/* Header */}
-      <div>
-        <CardContent>
+      <Card>
+        <CardContent className="p-6">
           {isLoading ? (
             <div className="flex gap-4">
               <Skeleton className="h-16 w-16 rounded-full" />
@@ -113,72 +122,130 @@ export function PetDetailPage() {
               </div>
             </div>
           ) : (
-            <div className="flex items-start gap-4 max-w-lg">
-              <Avatar className="h-16 w-16 text-3xl">
-                <AvatarFallback className="bg-accent text-2xl">
-                  {speciesIcon(pet!.species)}
-                </AvatarFallback>
-              </Avatar>
+            <div className="space-y-6">
+              {/* Identity row */}
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div className="flex items-start gap-4 min-w-0">
+                  <Avatar className="h-16 w-16 text-3xl shrink-0">
+                    <AvatarFallback className="bg-accent text-2xl">
+                      {speciesIcon(pet!.species)}
+                    </AvatarFallback>
+                  </Avatar>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h1 className="text-2xl font-bold">{pet?.name}</h1>
-                  <Badge variant={speciesBadgeVariant(pet!.status)}>
-                    {pet?.status}
-                  </Badge>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <h1 className="text-2xl font-bold">{pet?.name}</h1>
+                      <Badge variant={speciesBadgeVariant(pet!.status)}>
+                        {pet?.status}
+                      </Badge>
+                    </div>
+
+                    <p className="text-muted-foreground mt-1">
+                      {pet?.species}
+                      {pet?.breed ? ` · ${pet.breed}` : ""}
+                      {pet?.sex ? ` · ${formatSex(pet.sex)}` : ""}
+                      {pet?.color ? ` · ${pet.color}` : ""}
+                    </p>
+
+                    {pet?.owner && (
+                      <p className="text-sm mt-2">
+                        Owner:{" "}
+                        <Link
+                          to={`/owners/${pet.owner.id}`}
+                          className="text-primary hover:underline"
+                        >
+                          {pet.owner.first_name} {pet.owner.last_name}
+                        </Link>
+                        {pet.owner.phone ? ` · ${pet.owner.phone}` : ""}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                <p className="text-muted-foreground mt-1">
-                  {pet?.species}
-                  {pet?.breed ? ` · ${pet.breed}` : ""}
-                  {pet?.sex ? ` · ${formatSex(pet.sex)}` : ""}
-                  {pet?.color ? ` · ${pet.color}` : ""}
-                </p>
-
-                <div className="flex flex-wrap gap-4 mt-3 text-sm font-bold text-muted-foreground">
-                  {pet?.date_of_birth && (
-                    <span className="flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {calcAge(pet.date_of_birth)} old · born{" "}
-                      {format(new Date(pet.date_of_birth), "dd MMM yyyy")}
-                    </span>
-                  )}
-                  {pet?.weight_kg && (
-                    <span className="flex items-center gap-1.5">
-                      <Weight className="w-3.5 h-3.5" />
-                      {Number(pet.weight_kg).toFixed(1)} kg
-                    </span>
-                  )}
-                </div>
-
-                {pet?.owner && (
-                  <p className="text-sm mt-2">
-                    Owner:{" "}
-                    <Link
-                      to={`/owners/${pet.owner.id}`}
-                      className="text-primary hover:underline"
+                <div className="flex gap-2 shrink-0">
+                  {canViewHistory && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        navigate("/emr/history", { state: { presetPet: pet! } })
+                      }
                     >
-                      {pet.owner.first_name} {pet.owner.last_name}
-                    </Link>
-                    {pet.owner.phone ? ` · ${pet.owner.phone}` : ""}
-                  </p>
-                )}
+                      <History className="w-4 h-4" />
+                      Medical History
+                    </Button>
+                  )}
+                  {canWrite && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setStatusOpen(true)}
+                      >
+                        <Activity className="w-4 h-4" />
+                        Change status
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditOpen(true)}
+                      >
+                        <Pencil className="w-4 h-4" />
+                        Edit
+                      </Button>
+                      {canDelete && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setArchiveOpen(true)}
+                        >
+                          <Archive className="w-4 h-4" />
+                          Archive
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
 
-              {canWrite && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditOpen(true)}
-                >
-                  <Pencil className="w-4 h-4" />
-                  Edit
-                </Button>
-              )}
+              <Separator />
+
+              {/* Quick stats — fills the row on wide screens */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-muted/50 rounded-lg p-3 flex flex-col items-center text-center gap-1">
+                  <Calendar className="w-4 h-4 text-muted-foreground" />
+                  <p className="text-sm font-semibold">
+                    {pet?.date_of_birth ? calcAge(pet.date_of_birth) : "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Age</p>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3 flex flex-col items-center text-center gap-1">
+                  <Weight className="w-4 h-4 text-muted-foreground" />
+                  <p className="text-sm font-semibold">
+                    {pet?.weight_kg ? `${Number(pet.weight_kg).toFixed(1)} kg` : "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Weight</p>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3 flex flex-col items-center text-center gap-1">
+                  <p className="text-sm font-semibold">
+                    {pet?.insurance_id ?? "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Insurance ID</p>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3 flex flex-col items-center text-center gap-1">
+                  <p className="text-sm font-semibold">
+                    {pet?.created_at
+                      ? format(new Date(pet.created_at), "dd MMM yyyy")
+                      : "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Registered</p>
+                </div>
+              </div>
             </div>
           )}
         </CardContent>
-      </div>
+      </Card>
 
       {/* Tabs */}
       <Tabs defaultValue="overview">
@@ -208,25 +275,9 @@ export function PetDetailPage() {
                   <Skeleton className="h-4 w-3/4" />
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Insurance ID</span>
-                    <p className="mt-0.5 font-medium">
-                      {pet?.insurance_id ?? "—"}
-                    </p>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-muted-foreground">Notes</span>
-                    <p className="mt-0.5">{pet?.notes ?? "—"}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Registered</span>
-                    <p className="mt-0.5">
-                      {pet?.created_at
-                        ? format(new Date(pet.created_at), "dd MMM yyyy")
-                        : "—"}
-                    </p>
-                  </div>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Notes</span>
+                  <p className="mt-0.5">{pet?.notes ?? "—"}</p>
                 </div>
               )}
             </CardContent>
@@ -427,6 +478,43 @@ export function PetDetailPage() {
           ownerId={pet.owner_id}
           editPet={pet}
         />
+      )}
+
+      <ChangeStatusDialog
+        pet={statusOpen ? (pet ?? null) : null}
+        onClose={() => setStatusOpen(false)}
+      />
+
+      {/* Archive confirmation dialog */}
+      {pet && (
+        <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Archive {pet.name}?</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              {pet.name} will be removed from patient lists and search. Their
+              medical records, invoices, and history are preserved and nothing
+              is permanently deleted. This cannot be undone from the UI.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setArchiveOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={archivePet.isPending}
+                onClick={() =>
+                  archivePet.mutate(pet.id, {
+                    onSuccess: () => navigate("/patients"),
+                  })
+                }
+              >
+                {archivePet.isPending ? "Archiving..." : "Archive"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

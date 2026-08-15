@@ -18,6 +18,7 @@ import {
   X,
   Package,
   Printer,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
@@ -98,7 +99,13 @@ const SoapSchema = z.object({
   plan: z.string().max(5000).default(""),
 });
 
-function SoapNoteTab({ record }: { record: MedicalRecord }) {
+function SoapNoteTab({
+  record,
+  onSaved,
+}: {
+  record: MedicalRecord;
+  onSaved: () => void;
+}) {
   const upsert = useUpsertSoapNote(record.id);
   const form = useForm<z.infer<typeof SoapSchema>>({
     resolver: zodResolver(SoapSchema),
@@ -111,7 +118,7 @@ function SoapNoteTab({ record }: { record: MedicalRecord }) {
   });
 
   const onSubmit = (values: z.infer<typeof SoapSchema>) => {
-    upsert.mutate(values);
+    upsert.mutate(values, { onSuccess: onSaved });
   };
 
   return (
@@ -181,7 +188,13 @@ const VitalsSchema = z.object({
   body_condition_score: z.coerce.number().int().min(1).max(9).optional(),
 });
 
-function VitalsTab({ record }: { record: MedicalRecord }) {
+function VitalsTab({
+  record,
+  onSaved,
+}: {
+  record: MedicalRecord;
+  onSaved: () => void;
+}) {
   const upsert = useUpsertVitals(record.id);
   const v = record.vitals;
   // Fall back to the pet's registration weight until this record has its own recorded vitals.
@@ -204,26 +217,29 @@ function VitalsTab({ record }: { record: MedicalRecord }) {
   });
 
   const onSubmit = (values: z.infer<typeof VitalsSchema>) => {
-    upsert.mutate({
-      ...(values.weight_kg !== undefined
-        ? { weight_kg: values.weight_kg }
-        : {}),
-      ...(values.temperature_c !== undefined
-        ? { temperature_c: values.temperature_c }
-        : {}),
-      ...(values.heart_rate_bpm !== undefined
-        ? { heart_rate_bpm: values.heart_rate_bpm }
-        : {}),
-      ...(values.respiratory_rate !== undefined
-        ? { respiratory_rate: values.respiratory_rate }
-        : {}),
-      ...(values.blood_pressure
-        ? { blood_pressure: values.blood_pressure }
-        : {}),
-      ...(values.body_condition_score !== undefined
-        ? { body_condition_score: values.body_condition_score }
-        : {}),
-    });
+    upsert.mutate(
+      {
+        ...(values.weight_kg !== undefined
+          ? { weight_kg: values.weight_kg }
+          : {}),
+        ...(values.temperature_c !== undefined
+          ? { temperature_c: values.temperature_c }
+          : {}),
+        ...(values.heart_rate_bpm !== undefined
+          ? { heart_rate_bpm: values.heart_rate_bpm }
+          : {}),
+        ...(values.respiratory_rate !== undefined
+          ? { respiratory_rate: values.respiratory_rate }
+          : {}),
+        ...(values.blood_pressure
+          ? { blood_pressure: values.blood_pressure }
+          : {}),
+        ...(values.body_condition_score !== undefined
+          ? { body_condition_score: values.body_condition_score }
+          : {}),
+      },
+      { onSuccess: onSaved },
+    );
   };
 
   return (
@@ -518,7 +534,13 @@ function AddDiagnosisDialog({
   );
 }
 
-function DiagnosesTab({ record }: { record: MedicalRecord }) {
+function DiagnosesTab({
+  record,
+  onContinue,
+}: {
+  record: MedicalRecord;
+  onContinue: () => void;
+}) {
   const [addOpen, setAddOpen] = useState(false);
   const removeDx = useRemoveDiagnosis(record.id);
 
@@ -581,6 +603,13 @@ function DiagnosesTab({ record }: { record: MedicalRecord }) {
         open={addOpen}
         onOpenChange={setAddOpen}
       />
+
+      <div className="flex justify-end pt-2 print:hidden">
+        <Button variant="outline" size="sm" onClick={onContinue}>
+          Continue to Prescriptions
+          <ArrowRight className="h-3.5 w-3.5 ml-1" />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -912,7 +941,13 @@ function AddPrescriptionDialog({
   );
 }
 
-function PrescriptionsTab({ record }: { record: MedicalRecord }) {
+function PrescriptionsTab({
+  record,
+  onContinue,
+}: {
+  record: MedicalRecord;
+  onContinue: () => void;
+}) {
   const [addOpen, setAddOpen] = useState(false);
   const deactivate = useDeactivatePrescription(record.id);
 
@@ -1003,6 +1038,13 @@ function PrescriptionsTab({ record }: { record: MedicalRecord }) {
         open={addOpen}
         onOpenChange={setAddOpen}
       />
+
+      <div className="flex justify-end pt-2 print:hidden">
+        <Button variant="outline" size="sm" onClick={onContinue}>
+          Continue to Charges
+          <ArrowRight className="h-3.5 w-3.5 ml-1" />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -1499,10 +1541,19 @@ function DetailSkeleton() {
   );
 }
 
+const TAB_ORDER = ["soap", "vitals", "diagnoses", "prescriptions", "charges"] as const;
+type EmrTab = (typeof TAB_ORDER)[number];
+
 export function EmrDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: record, isLoading } = useMedicalRecord(id);
+  const [activeTab, setActiveTab] = useState<EmrTab>("soap");
+
+  const goToNextTab = (current: EmrTab) => {
+    const idx = TAB_ORDER.indexOf(current);
+    if (idx >= 0 && idx < TAB_ORDER.length - 1) setActiveTab(TAB_ORDER[idx + 1]);
+  };
 
   if (isLoading) return <DetailSkeleton />;
 
@@ -1569,7 +1620,11 @@ export function EmrDetailPage() {
       </div>
 
       {/* Medical record content — full width */}
-      <Tabs defaultValue="soap" className="print:hidden">
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as EmrTab)}
+        className="print:hidden"
+      >
         <TabsList className="w-full justify-start">
           <TabsTrigger value="soap" className="flex items-center gap-1.5">
             <FileTextIcon className="h-3.5 w-3.5" />
@@ -1600,7 +1655,7 @@ export function EmrDetailPage() {
           <TabsContent value="soap">
             <Card>
               <CardContent className="pt-5">
-                <SoapNoteTab record={record} />
+                <SoapNoteTab record={record} onSaved={() => goToNextTab("soap")} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -1608,7 +1663,7 @@ export function EmrDetailPage() {
           <TabsContent value="vitals">
             <Card>
               <CardContent className="pt-5">
-                <VitalsTab record={record} />
+                <VitalsTab record={record} onSaved={() => goToNextTab("vitals")} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -1616,7 +1671,10 @@ export function EmrDetailPage() {
           <TabsContent value="diagnoses">
             <Card>
               <CardContent className="pt-5">
-                <DiagnosesTab record={record} />
+                <DiagnosesTab
+                  record={record}
+                  onContinue={() => goToNextTab("diagnoses")}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -1624,7 +1682,10 @@ export function EmrDetailPage() {
           <TabsContent value="prescriptions">
             <Card>
               <CardContent className="pt-5">
-                <PrescriptionsTab record={record} />
+                <PrescriptionsTab
+                  record={record}
+                  onContinue={() => goToNextTab("prescriptions")}
+                />
               </CardContent>
             </Card>
           </TabsContent>

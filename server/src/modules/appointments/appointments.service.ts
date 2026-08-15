@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { notifyStaff } from '../notifications/notifications.service';
@@ -15,6 +16,33 @@ function dayBounds(dateStr: string) {
   const start = new Date(`${dateStr}T00:00:00.000Z`);
   const end = new Date(`${dateStr}T23:59:59.999Z`);
   return { start, end };
+}
+
+function truncateToDate(d: Date): Date {
+  return new Date(`${d.toISOString().slice(0, 10)}T00:00:00.000Z`);
+}
+
+function isSameDate(a: Date, b: Date): boolean {
+  return truncateToDate(a).getTime() === truncateToDate(b).getTime();
+}
+
+/**
+ * Assigns the next "appointment #" for a clinic's day (resets daily, keyed
+ * by the appointment's scheduled date). The upsert's increment is a single
+ * atomic UPDATE in Postgres, so concurrent bookings can never collide.
+ */
+async function nextDailyNumber(
+  tx: Prisma.TransactionClient,
+  clinicId: string,
+  forDate: Date,
+): Promise<number> {
+  const date = truncateToDate(forDate);
+  const counter = await tx.dailyCounter.upsert({
+    where: { clinic_id_date: { clinic_id: clinicId, date } },
+    create: { clinic_id: clinicId, date, counter: 1 },
+    update: { counter: { increment: 1 } },
+  });
+  return counter.counter;
 }
 
 async function assertNoConflict(
@@ -80,7 +108,7 @@ export async function listAppointments(clinicId: string, query: AppointmentQuery
       ...(pet_id ? { pet_id } : {}),
     },
     include: appointmentIncludes,
-    orderBy: { start_at: 'asc' },
+    orderBy: { start_at: 'desc' },
     take: limit + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
   });
@@ -100,7 +128,7 @@ export async function getCalendarView(clinicId: string, date: string) {
       start_at: { gte: start, lte: end },
     },
     include: appointmentIncludes,
-    orderBy: { start_at: 'asc' },
+    orderBy: { start_at: 'desc' },
   });
 }
 
@@ -161,6 +189,8 @@ export async function createAppointment(clinicId: string, data: CreateAppointmen
   }
 
   return prisma.$transaction(async (tx) => {
+    const dailyNumber = await nextDailyNumber(tx, clinicId, startAt);
+
     const appt = await tx.appointment.create({
       data: {
         clinic_id: clinicId,
@@ -170,6 +200,7 @@ export async function createAppointment(clinicId: string, data: CreateAppointmen
         start_at: startAt,
         end_at: endAt,
         is_walk_in: isWalkIn,
+        daily_number: dailyNumber,
         ...(data.room_id !== undefined && { room_id: data.room_id }),
         ...(data.reason !== undefined && { reason: data.reason }),
         ...(data.notes !== undefined && { notes: data.notes }),
@@ -202,16 +233,26 @@ export async function updateAppointment(
     throw new AppError('BAD_REQUEST', 'Cannot update a completed or cancelled appointment', 400);
   }
 
+  let newStart = existing.start_at;
   if (data.vet_id || data.start_at || data.end_at) {
     const newVetId = data.vet_id ?? existing.vet_id;
-    const newStart = data.start_at ? new Date(data.start_at) : existing.start_at;
+    newStart = data.start_at ? new Date(data.start_at) : existing.start_at;
     const newEnd = data.end_at ? new Date(data.end_at) : existing.end_at;
     await assertNoConflict(newVetId, newStart, newEnd, id);
   }
 
   const isReassignment = data.vet_id !== undefined && data.vet_id !== existing.vet_id;
 
+  // Rescheduling to a different day means a new day's queue — assign a
+  // fresh daily number for that date rather than keeping the old one.
+  const dateChanged =
+    data.start_at !== undefined && !isSameDate(newStart, existing.start_at);
+
   return prisma.$transaction(async (tx) => {
+    const dailyNumber = dateChanged
+      ? await nextDailyNumber(tx, clinicId, newStart)
+      : undefined;
+
     const appt = await tx.appointment.update({
       where: { id },
       data: {
@@ -223,6 +264,7 @@ export async function updateAppointment(
         ...(data.reason !== undefined && { reason: data.reason }),
         ...(data.notes !== undefined && { notes: data.notes }),
         ...(data.is_walk_in !== undefined && { is_walk_in: data.is_walk_in }),
+        ...(dailyNumber !== undefined && { daily_number: dailyNumber }),
       },
       include: appointmentIncludes,
     });

@@ -26,3 +26,9 @@ export type PaginatedNotifications = {
 export type UnreadCount = {
   count: number;
 };
+
+export type NotificationPreference = {
+  type:    string;
+  label:   string;
+  enabled: boolean;
+};

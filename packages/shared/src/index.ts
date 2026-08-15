@@ -1,4 +1,5 @@
 export * from './constants/permissions';
+export * from './constants/notification-types';
 export * from './schemas/auth.schema';
 export * from './schemas/patients.schema';
 export * from './schemas/appointments.schema';

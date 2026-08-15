@@ -10,3 +10,14 @@ export const NotificationQuerySchema = z.object({
 });
 
 export type NotificationQuery = z.infer<typeof NotificationQuerySchema>;
+
+export const UpdateNotificationPreferencesSchema = z.object({
+  preferences: z.array(
+    z.object({
+      type:    z.string().min(1),
+      enabled: z.boolean(),
+    }),
+  ).min(1),
+});
+
+export type UpdateNotificationPreferencesInput = z.infer<typeof UpdateNotificationPreferencesSchema>;

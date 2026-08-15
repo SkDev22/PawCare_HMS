@@ -6,3 +6,9 @@ export const ReportRangeSchema = z.object({
 });
 
 export type ReportRange = z.infer<typeof ReportRangeSchema>;
+
+export const ReportDaysSchema = z.object({
+  days: z.coerce.number().int().positive().max(365).default(30),
+});
+
+export type ReportDays = z.infer<typeof ReportDaysSchema>;

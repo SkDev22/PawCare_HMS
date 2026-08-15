@@ -5,6 +5,7 @@ export const PERMISSIONS = {
   // Patient records
   PATIENT_READ:         ['ADMIN', 'VETERINARIAN', 'NURSE', 'RECEPTIONIST', 'LAB_TECHNICIAN'] as const,
   PATIENT_WRITE:        ['ADMIN', 'VETERINARIAN', 'RECEPTIONIST'] as const,
+  PATIENT_DELETE:       ['ADMIN'] as const,
   MEDICAL_RECORD_READ:  ['ADMIN', 'VETERINARIAN', 'NURSE'] as const,
   MEDICAL_RECORD_WRITE: ['ADMIN', 'VETERINARIAN'] as const,
   SOAP_NOTE_WRITE:      ['ADMIN', 'VETERINARIAN'] as const,

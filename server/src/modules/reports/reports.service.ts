@@ -174,3 +174,313 @@ export async function getOutstandingBalances(clinicId: string) {
   const totalOutstanding = items.reduce((sum, i) => sum + i.balance, 0);
   return { items, buckets, totalOutstanding };
 }
+
+// ── Expiring Items ───────────────────────────────────────────────────────────
+
+export async function getExpiringItems(clinicId: string, days: number) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() + days);
+
+  const items = await prisma.inventoryItem.findMany({
+    where: {
+      clinic_id:   clinicId,
+      is_active:   true,
+      expiry_date: { not: null, lte: cutoff },
+    },
+    select: {
+      id: true, name: true, category: true, sku: true, unit: true,
+      quantity_on_hand: true, expiry_date: true, location: true,
+    },
+    orderBy: { expiry_date: 'asc' },
+  });
+
+  const now = new Date();
+  const rows = items.map((i) => ({
+    ...i,
+    isExpired: i.expiry_date ? i.expiry_date < now : false,
+  }));
+
+  return { items: rows, expiredCount: rows.filter((r) => r.isExpired).length };
+}
+
+// ── Stock Levels ───────────────────────────────────────────────────────────────
+
+export async function getStockLevels(clinicId: string) {
+  const items = await prisma.inventoryItem.findMany({
+    where: { clinic_id: clinicId, is_active: true },
+    select: {
+      id: true, name: true, category: true, sku: true, unit: true,
+      quantity_on_hand: true, reorder_threshold: true, unit_cost: true, location: true,
+    },
+    orderBy: { name: 'asc' },
+  });
+
+  const rows = items.map((i) => ({
+    ...i,
+    isLow:      i.quantity_on_hand <= i.reorder_threshold,
+    stockValue: Number(i.unit_cost) * i.quantity_on_hand,
+  }));
+
+  return {
+    items:           rows,
+    lowStockCount:   rows.filter((r) => r.isLow).length,
+    totalStockValue: rows.reduce((sum, r) => sum + r.stockValue, 0),
+  };
+}
+
+// ── Vaccinations Due ────────────────────────────────────────────────────────────
+
+export async function getVaccinationsDue(clinicId: string, days: number) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() + days);
+
+  const vaccinations = await prisma.vaccination.findMany({
+    where: {
+      pet: { deleted_at: null, owner: { clinic_id: clinicId, deleted_at: null } },
+    },
+    select: {
+      id: true, vaccine_name: true, next_due_at: true, administered_at: true,
+      pet: {
+        select: {
+          id: true, name: true, species: true,
+          owner: { select: { id: true, first_name: true, last_name: true, phone: true } },
+        },
+      },
+    },
+    orderBy: { administered_at: 'desc' },
+  });
+
+  // Later doses supersede earlier ones — only the most recent record per
+  // pet+vaccine reflects the pet's real due status.
+  const latest = new Map<string, (typeof vaccinations)[number]>();
+  for (const v of vaccinations) {
+    const key = `${v.pet.id}:${v.vaccine_name}`;
+    if (!latest.has(key)) latest.set(key, v);
+  }
+
+  const now = new Date();
+  const items = [...latest.values()]
+    .filter((v): v is typeof v & { next_due_at: Date } => v.next_due_at !== null && v.next_due_at <= cutoff)
+    .map((v) => ({ ...v, isOverdue: v.next_due_at < now }))
+    .sort((a, b) => a.next_due_at.getTime() - b.next_due_at.getTime());
+
+  return { items, overdueCount: items.filter((i) => i.isOverdue).length };
+}
+
+// ── Service / Item Sales ────────────────────────────────────────────────────────
+
+export async function getServiceSales(clinicId: string, startDate: string, endDate: string) {
+  const start = new Date(startDate);
+  const end   = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
+
+  const lineItems = await prisma.invoiceLineItem.findMany({
+    where: {
+      invoice: {
+        clinic_id:  clinicId,
+        status:     { not: 'CANCELLED' },
+        created_at: { gte: start, lte: end },
+      },
+    },
+    select: {
+      description: true,
+      quantity:    true,
+      total:       true,
+      service: { select: { id: true, name: true, category: true } },
+      item:    { select: { id: true, name: true, category: true } },
+    },
+  });
+
+  const byKey = new Map<
+    string,
+    { key: string; name: string; category: string; type: 'service' | 'item' | 'other'; quantity: number; revenue: number }
+  >();
+
+  for (const li of lineItems) {
+    const key = li.service ? `service:${li.service.id}` : li.item ? `item:${li.item.id}` : `other:${li.description}`;
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.quantity += li.quantity;
+      existing.revenue  += Number(li.total);
+    } else {
+      byKey.set(key, {
+        key,
+        name:     li.service?.name ?? li.item?.name ?? li.description,
+        category: li.service?.category ?? li.item?.category ?? 'Other',
+        type:     li.service ? 'service' : li.item ? 'item' : 'other',
+        quantity: li.quantity,
+        revenue:  Number(li.total),
+      });
+    }
+  }
+
+  const items = [...byKey.values()].sort((a, b) => b.revenue - a.revenue);
+  return { items, totalRevenue: items.reduce((sum, i) => sum + i.revenue, 0) };
+}
+
+// ── Medical Records Summary ─────────────────────────────────────────────────────
+
+export async function getMedicalRecordsSummary(clinicId: string, startDate: string, endDate: string) {
+  const start = new Date(startDate);
+  const end   = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
+
+  const records = await prisma.medicalRecord.findMany({
+    where: {
+      visit_date: { gte: start, lte: end },
+      pet: { owner: { clinic_id: clinicId } },
+    },
+    select: {
+      id: true,
+      diagnoses: { select: { name: true, is_primary: true } },
+      _count:    { select: { prescriptions: true, lab_results: true } },
+    },
+  });
+
+  const byDiagnosis = new Map<string, number>();
+  let primaryDiagnosisCount = 0;
+  for (const r of records) {
+    for (const dx of r.diagnoses) {
+      byDiagnosis.set(dx.name, (byDiagnosis.get(dx.name) ?? 0) + 1);
+      if (dx.is_primary) primaryDiagnosisCount++;
+    }
+  }
+
+  const diagnoses = [...byDiagnosis.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+
+  return {
+    totalRecords:         records.length,
+    totalPrescriptions:   records.reduce((sum, r) => sum + r._count.prescriptions, 0),
+    totalLabResults:      records.reduce((sum, r) => sum + r._count.lab_results, 0),
+    primaryDiagnosisCount,
+    diagnoses,
+  };
+}
+
+// ── Doctor Performance ───────────────────────────────────────────────────────────
+
+export async function getDoctorPerformance(clinicId: string, startDate: string, endDate: string) {
+  const start = new Date(startDate);
+  const end   = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
+
+  const vets = await prisma.staffUser.findMany({
+    where: { clinic_id: clinicId, role: 'VETERINARIAN', deleted_at: null },
+    select: { id: true, first_name: true, last_name: true },
+  });
+
+  const doctors = await Promise.all(
+    vets.map(async (vet) => {
+      const [appointmentsCompleted, medicalRecords, charges] = await Promise.all([
+        prisma.appointment.count({
+          where: { vet_id: vet.id, status: 'COMPLETED', start_at: { gte: start, lte: end } },
+        }),
+        prisma.medicalRecord.count({
+          where: { vet_id: vet.id, visit_date: { gte: start, lte: end } },
+        }),
+        prisma.medicalRecordCharge.findMany({
+          where: { medical_record: { vet_id: vet.id, visit_date: { gte: start, lte: end } } },
+          select: { total: true },
+        }),
+      ]);
+
+      return {
+        id:   vet.id,
+        name: `${vet.first_name} ${vet.last_name}`,
+        appointmentsCompleted,
+        medicalRecords,
+        revenue: charges.reduce((sum, c) => sum + Number(c.total), 0),
+      };
+    }),
+  );
+
+  doctors.sort((a, b) => b.revenue - a.revenue);
+  return { doctors };
+}
+
+// ── Patient / Owner Demographics ─────────────────────────────────────────────────
+
+export async function getDemographics(clinicId: string, startDate: string, endDate: string) {
+  const start = new Date(startDate);
+  const end   = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
+
+  const [totalOwners, newOwners, totalPets, newPets, speciesGroups, portalEnabledCount, appointmentsInRange] =
+    await Promise.all([
+      prisma.owner.count({ where: { clinic_id: clinicId, deleted_at: null } }),
+      prisma.owner.count({
+        where: { clinic_id: clinicId, deleted_at: null, created_at: { gte: start, lte: end } },
+      }),
+      prisma.pet.count({ where: { deleted_at: null, owner: { clinic_id: clinicId, deleted_at: null } } }),
+      prisma.pet.count({
+        where: {
+          deleted_at: null,
+          owner:      { clinic_id: clinicId, deleted_at: null },
+          created_at: { gte: start, lte: end },
+        },
+      }),
+      prisma.pet.groupBy({
+        by:    ['species'],
+        where: { deleted_at: null, owner: { clinic_id: clinicId, deleted_at: null } },
+        _count: { _all: true },
+      }),
+      prisma.owner.count({
+        where: { clinic_id: clinicId, deleted_at: null, portal_enabled: true },
+      }),
+      prisma.appointment.findMany({
+        where:    { clinic_id: clinicId, start_at: { gte: start, lte: end } },
+        select:   { pet_id: true, pet: { select: { created_at: true } } },
+        distinct: ['pet_id'],
+      }),
+    ]);
+
+  const newPatientsSeen = appointmentsInRange.filter(
+    (a) => a.pet.created_at >= start && a.pet.created_at <= end,
+  ).length;
+
+  const species = speciesGroups
+    .map((g) => ({ species: g.species, count: g._count._all }))
+    .sort((a, b) => b.count - a.count);
+
+  return {
+    totalOwners, newOwners, totalPets, newPets, portalEnabledCount, species,
+    uniquePatientsSeen:    appointmentsInRange.length,
+    newPatientsSeen,
+    returningPatientsSeen: appointmentsInRange.length - newPatientsSeen,
+  };
+}
+
+// ── Tax / Financial Summary ──────────────────────────────────────────────────────
+
+export async function getTaxSummary(clinicId: string, startDate: string, endDate: string) {
+  const start = new Date(startDate);
+  const end   = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
+
+  const invoices = await prisma.invoice.findMany({
+    where: {
+      clinic_id:  clinicId,
+      status:     { not: 'CANCELLED' },
+      created_at: { gte: start, lte: end },
+    },
+    select: {
+      subtotal: true, tax_amount: true, discount_amount: true, total: true, paid_amount: true,
+    },
+  });
+
+  const totals = invoices.reduce(
+    (acc, inv) => {
+      acc.subtotal  += Number(inv.subtotal);
+      acc.tax       += Number(inv.tax_amount);
+      acc.discount  += Number(inv.discount_amount);
+      acc.total     += Number(inv.total);
+      acc.collected += Number(inv.paid_amount);
+      return acc;
+    },
+    { subtotal: 0, tax: 0, discount: 0, total: 0, collected: 0 },
+  );
+
+  return { invoiceCount: invoices.length, ...totals };
+}

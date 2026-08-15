@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import type { Pet, PaginatedResponse } from '@/types/patients';
+import type { PetHistoryResponse } from '@/types/emr';
 import type { CreatePetInput, UpdatePetInput, CreateAllergyInput } from '@pawcare/shared';
 
 export function usePets(params?: {
@@ -54,6 +55,28 @@ export function useUpdatePet(id: string) {
     onError: (err: { response?: { data?: { error?: { message?: string } } } }) => {
       toast.error(err?.response?.data?.error?.message ?? 'Failed to update pet');
     },
+  });
+}
+
+export function useArchivePet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/pets/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pets'] });
+      toast.success('Pet archived');
+    },
+    onError: (err: { response?: { data?: { error?: { message?: string } } } }) => {
+      toast.error(err?.response?.data?.error?.message ?? 'Failed to archive pet');
+    },
+  });
+}
+
+export function usePetHistory(petId: string | undefined) {
+  return useQuery<PetHistoryResponse>({
+    queryKey: ['pets', petId, 'history'],
+    queryFn: () => api.get(`/pets/${petId}/history`).then((r) => r.data),
+    enabled: !!petId,
   });
 }
 

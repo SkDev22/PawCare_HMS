@@ -6,20 +6,31 @@ import {
   CalendarDays,
   Plus,
   List,
+  ListTodo,
   Clock,
   PawPrint,
   AlertCircle,
   UserCheck,
 } from "lucide-react";
+import { format } from "date-fns";
 import {
   useCalendarView,
+  useAppointments,
   useUpdateAppointmentStatus,
+  useVets,
 } from "@/hooks/use-appointments";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -28,6 +39,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { AppointmentForm } from "./components/AppointmentForm";
 import type {
   Appointment,
@@ -308,14 +327,29 @@ function CalendarGrid({
 interface ListRowProps {
   appt: Appointment;
   onClickAppt: (id: string) => void;
+  showDate?: boolean;
 }
 
-function ListRow({ appt, onClickAppt }: ListRowProps) {
+function ListRow({ appt, onClickAppt, showDate }: ListRowProps) {
   const updateStatus = useUpdateAppointmentStatus(appt.id);
   const canCheckIn = appt.status === "SCHEDULED" || appt.status === "CONFIRMED";
 
   return (
     <TableRow className="cursor-pointer" onClick={() => onClickAppt(appt.id)}>
+      <TableCell className="whitespace-nowrap">
+        {appt.daily_number != null ? (
+          <Badge variant="outline" className="font-mono">
+            #{String(appt.daily_number).padStart(2, "0")}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground text-xs">—</span>
+        )}
+      </TableCell>
+      {showDate && (
+        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+          {format(new Date(appt.start_at), "MMM d, yyyy")}
+        </TableCell>
+      )}
       <TableCell className="font-mono text-sm tabular-nums whitespace-nowrap">
         <div className="flex items-center gap-1.5 text-muted-foreground">
           <Clock className="size-3.5" />
@@ -374,17 +408,24 @@ function ListRow({ appt, onClickAppt }: ListRowProps) {
 function ListView({
   appointments,
   onClickAppt,
+  showDate,
+  emptyMessage,
 }: {
   appointments: Appointment[];
   onClickAppt: (id: string) => void;
+  showDate?: boolean;
+  emptyMessage?: { title: string; hint: string };
 }) {
   if (!appointments.length) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
         <CalendarDays className="size-12 mb-3 opacity-30" />
-        <p className="font-medium">No appointments this day</p>
+        <p className="font-medium">
+          {emptyMessage?.title ?? "No appointments this day"}
+        </p>
         <p className="text-sm mt-1">
-          Schedule a new appointment or navigate to another date.
+          {emptyMessage?.hint ??
+            "Schedule a new appointment or navigate to another date."}
         </p>
       </div>
     );
@@ -395,6 +436,8 @@ function ListView({
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead>#</TableHead>
+            {showDate && <TableHead>Date</TableHead>}
             <TableHead>Time</TableHead>
             <TableHead>Patient</TableHead>
             <TableHead>Owner</TableHead>
@@ -407,11 +450,170 @@ function ListView({
         </TableHeader>
         <TableBody>
           {appointments.map((appt) => (
-            <ListRow key={appt.id} appt={appt} onClickAppt={onClickAppt} />
+            <ListRow
+              key={appt.id}
+              appt={appt}
+              onClickAppt={onClickAppt}
+              {...(showDate ? { showDate } : {})}
+            />
           ))}
         </TableBody>
       </Table>
     </Card>
+  );
+}
+
+// ─── All appointments (cross-date, filterable) ───────────────────────────────
+
+const STATUS_FILTER_OPTIONS: { label: string; value: AppointmentStatus }[] = [
+  { label: "Scheduled", value: "SCHEDULED" },
+  { label: "Confirmed", value: "CONFIRMED" },
+  { label: "Checked in", value: "CHECKED_IN" },
+  { label: "In progress", value: "IN_PROGRESS" },
+  { label: "Completed", value: "COMPLETED" },
+  { label: "Cancelled", value: "CANCELLED" },
+  { label: "No show", value: "NO_SHOW" },
+];
+
+const ALL_PAGE_SIZE = 20;
+
+function AllAppointmentsView({
+  onClickAppt,
+}: {
+  onClickAppt: (id: string) => void;
+}) {
+  const { data: vets = [] } = useVets();
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [vetFilter, setVetFilter] = useState<string>("");
+  const [cursorHistory, setCursorHistory] = useState<string[]>([]);
+  const [pageIndex, setPageIndex] = useState(0);
+
+  useEffect(() => {
+    setPageIndex(0);
+    setCursorHistory([]);
+  }, [statusFilter, vetFilter]);
+
+  const currentCursor =
+    pageIndex === 0 ? undefined : cursorHistory[pageIndex - 1];
+
+  const { data, isLoading } = useAppointments({
+    ...(statusFilter ? { status: statusFilter } : {}),
+    ...(vetFilter ? { vet_id: vetFilter } : {}),
+    ...(currentCursor ? { cursor: currentCursor } : {}),
+    limit: ALL_PAGE_SIZE,
+  });
+
+  const items = data?.items ?? [];
+
+  const goToNextPage = () => {
+    if (!data?.hasMore || !data.nextCursor) return;
+    setCursorHistory((prev) => {
+      const next = [...prev];
+      next[pageIndex] = data.nextCursor as string;
+      return next;
+    });
+    setPageIndex((p) => p + 1);
+  };
+
+  const goToPreviousPage = () => setPageIndex((p) => Math.max(0, p - 1));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="All statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All statuses</SelectItem>
+            {STATUS_FILTER_OPTIONS.map((s) => (
+              <SelectItem key={s.value} value={s.value}>
+                {s.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={vetFilter} onValueChange={setVetFilter}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="All veterinarians" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All veterinarians</SelectItem>
+            {vets.map((v) => (
+              <SelectItem key={v.id} value={v.id}>
+                Dr. {v.first_name} {v.last_name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {(statusFilter || vetFilter) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setStatusFilter("");
+              setVetFilter("");
+            }}
+          >
+            Clear filters
+          </Button>
+        )}
+      </div>
+
+      {isLoading && (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full rounded-md" />
+          ))}
+        </div>
+      )}
+
+      {!isLoading && (
+        <ListView
+          appointments={items}
+          onClickAppt={onClickAppt}
+          showDate
+          emptyMessage={{
+            title: "No appointments found",
+            hint: "Try adjusting the filters above, or schedule a new appointment.",
+          }}
+        />
+      )}
+
+      {(pageIndex > 0 || (!isLoading && items.length > 0)) && (
+        <Pagination className="justify-end">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={goToPreviousPage}
+                aria-disabled={pageIndex === 0}
+                className={
+                  pageIndex === 0
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
+                }
+              />
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationLink isActive>{pageIndex + 1}</PaginationLink>
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationNext
+                onClick={goToNextPage}
+                aria-disabled={!data?.hasMore}
+                className={
+                  !data?.hasMore
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
+                }
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
+    </div>
   );
 }
 
@@ -429,7 +631,7 @@ export function AppointmentsPage() {
   const location = useLocation();
 
   const [selectedDate, setSelectedDate] = useState(toDateStr(new Date()));
-  const [view, setView] = useState<"calendar" | "list">("list");
+  const [view, setView] = useState<"calendar" | "list" | "all">("list");
   const [showForm, setShowForm] = useState(false);
   const [prefilledPet, setPrefilledPet] = useState<
     NewAppointmentPet | undefined
@@ -439,9 +641,9 @@ export function AppointmentsPage() {
   // open the New Appointment dialog pre-filled instead of making the user
   // navigate here and search for the patient manually.
   useEffect(() => {
-    const state = location.state as
-      | { newAppointmentForPet?: NewAppointmentPet }
-      | null;
+    const state = location.state as {
+      newAppointmentForPet?: NewAppointmentPet;
+    } | null;
     if (state?.newAppointmentForPet) {
       setPrefilledPet(state.newAppointmentForPet);
       setShowForm(true);
@@ -482,9 +684,11 @@ export function AppointmentsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Appointments</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {isLoading
-              ? "Loading…"
-              : `${totalCount} total · ${completedCount} completed · ${pendingCount} pending`}
+            {view === "all"
+              ? "Browse and filter every appointment across all dates."
+              : isLoading
+                ? "Loading…"
+                : `${totalCount} total · ${completedCount} completed · ${pendingCount} pending`}
           </p>
         </div>
         <Button
@@ -500,105 +704,126 @@ export function AppointmentsPage() {
 
       {/* Date navigator + view toggle */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => navigateDate(-1)}
-          >
-            <ChevronLeft className="size-4" />
-          </Button>
+        {view === "all" ? (
+          <p className="text-sm text-muted-foreground">
+            {/* Showing appointments from every date, soonest first. */}
+          </p>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => navigateDate(-1)}
+            >
+              <ChevronLeft className="size-4" />
+            </Button>
 
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-background min-w-[220px] justify-center">
-            <CalendarDays className="size-4 text-muted-foreground" />
-            <span className="text-sm font-medium">
-              {formatDate(selectedDate)}
-            </span>
-            {isToday && (
-              <Badge variant="secondary" className="text-xs py-0 px-1.5">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-background min-w-55 justify-center">
+              <CalendarDays className="size-4 text-muted-foreground" />
+              <span className="text-sm font-medium">
+                {formatDate(selectedDate)}
+              </span>
+              {isToday && (
+                <Badge variant="secondary" className="text-xs py-0 px-1.5">
+                  Today
+                </Badge>
+              )}
+            </div>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => navigateDate(1)}
+            >
+              <ChevronRight className="size-4" />
+            </Button>
+
+            {!isToday && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedDate(toDateStr(new Date()))}
+              >
                 Today
-              </Badge>
+              </Button>
             )}
           </div>
-
-          <Button variant="outline" size="icon" onClick={() => navigateDate(1)}>
-            <ChevronRight className="size-4" />
-          </Button>
-
-          {!isToday && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSelectedDate(toDateStr(new Date()))}
-            >
-              Today
-            </Button>
-          )}
-        </div>
+        )}
 
         <Tabs
           value={view}
-          onValueChange={(v) => setView(v as "calendar" | "list")}
+          onValueChange={(v) => setView(v as "calendar" | "list" | "all")}
         >
           <TabsList>
             <TabsTrigger value="list" className="gap-1.5">
-              <List className="size-3.5" /> List
+              <List className="size-3.5" /> Day
             </TabsTrigger>
             <TabsTrigger value="calendar" className="gap-1.5">
               <CalendarDays className="size-3.5" /> Calendar
+            </TabsTrigger>
+            <TabsTrigger value="all" className="gap-1.5">
+              <ListTodo className="size-3.5" /> All appointments
             </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
-      {/* Error state */}
-      {isError && (
-        <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          <AlertCircle className="size-4 shrink-0" />
-          Failed to load appointments. Please refresh.
-        </div>
+      {view === "all" ? (
+        <AllAppointmentsView
+          onClickAppt={(id) => navigate(`/appointments/${id}`)}
+        />
+      ) : (
+        <>
+          {/* Error state */}
+          {isError && (
+            <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <AlertCircle className="size-4 shrink-0" />
+              Failed to load appointments. Please refresh.
+            </div>
+          )}
+
+          {/* Loading skeleton */}
+          {isLoading && (
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full rounded-md" />
+              ))}
+            </div>
+          )}
+
+          {/* Content */}
+          {!isLoading &&
+            !isError &&
+            (view === "calendar" ? (
+              <div className="rounded-lg border border-border bg-card overflow-hidden">
+                <CalendarGrid
+                  appointments={appointments}
+                  onClickAppt={(id) => navigate(`/appointments/${id}`)}
+                  selectedDate={selectedDate}
+                />
+              </div>
+            ) : (
+              <ListView
+                appointments={appointments}
+                onClickAppt={(id) => navigate(`/appointments/${id}`)}
+              />
+            ))}
+
+          {/* Empty state (calendar) */}
+          {!isLoading &&
+            !isError &&
+            view === "calendar" &&
+            appointments.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                <CalendarDays className="size-12 mb-3 opacity-30" />
+                <p className="font-medium">No appointments this day</p>
+                <p className="text-sm mt-1">
+                  Schedule a new appointment to get started.
+                </p>
+              </div>
+            )}
+        </>
       )}
-
-      {/* Loading skeleton */}
-      {isLoading && (
-        <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full rounded-md" />
-          ))}
-        </div>
-      )}
-
-      {/* Content */}
-      {!isLoading &&
-        !isError &&
-        (view === "calendar" ? (
-          <div className="rounded-lg border border-border bg-card overflow-hidden">
-            <CalendarGrid
-              appointments={appointments}
-              onClickAppt={(id) => navigate(`/appointments/${id}`)}
-              selectedDate={selectedDate}
-            />
-          </div>
-        ) : (
-          <ListView
-            appointments={appointments}
-            onClickAppt={(id) => navigate(`/appointments/${id}`)}
-          />
-        ))}
-
-      {/* Empty state (calendar) */}
-      {!isLoading &&
-        !isError &&
-        view === "calendar" &&
-        appointments.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-            <CalendarDays className="size-12 mb-3 opacity-30" />
-            <p className="font-medium">No appointments this day</p>
-            <p className="text-sm mt-1">
-              Schedule a new appointment to get started.
-            </p>
-          </div>
-        )}
 
       <AppointmentForm
         open={showForm}

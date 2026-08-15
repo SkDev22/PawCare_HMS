@@ -5,6 +5,14 @@ import type {
   AppointmentsReport,
   InventoryUsageReport,
   OutstandingBalancesReport,
+  ExpiringItemsReport,
+  StockLevelsReport,
+  VaccinationsDueReport,
+  ServiceSalesReport,
+  MedicalRecordsSummaryReport,
+  DoctorPerformanceReport,
+  DemographicsReport,
+  TaxSummaryReport,
 } from '../types/reports';
 
 function rangeParams(startDate: string, endDate: string) {
@@ -43,5 +51,75 @@ export function useOutstandingBalances() {
     queryKey: ['reports', 'outstanding-balances'],
     queryFn:  () => api.get('/reports/outstanding-balances').then((r) => r.data),
     staleTime: 60_000,
+  });
+}
+
+export function useExpiringItemsReport(days: number) {
+  return useQuery<ExpiringItemsReport>({
+    queryKey: ['reports', 'expiring-items', days],
+    queryFn:  () => api.get('/reports/expiring-items', { params: { days } }).then((r) => r.data),
+    staleTime: 60_000,
+  });
+}
+
+export function useStockLevelsReport() {
+  return useQuery<StockLevelsReport>({
+    queryKey: ['reports', 'stock-levels'],
+    queryFn:  () => api.get('/reports/stock-levels').then((r) => r.data),
+    staleTime: 60_000,
+  });
+}
+
+export function useVaccinationsDueReport(days: number) {
+  return useQuery<VaccinationsDueReport>({
+    queryKey: ['reports', 'vaccinations-due', days],
+    queryFn:  () => api.get('/reports/vaccinations-due', { params: { days } }).then((r) => r.data),
+    staleTime: 60_000,
+  });
+}
+
+export function useServiceSalesReport(startDate: string, endDate: string, enabled = true) {
+  return useQuery<ServiceSalesReport>({
+    queryKey: ['reports', 'service-sales', startDate, endDate],
+    queryFn:  () => api.get('/reports/service-sales', { params: rangeParams(startDate, endDate) }).then((r) => r.data),
+    enabled:  enabled && !!startDate && !!endDate,
+    staleTime: 120_000,
+  });
+}
+
+export function useMedicalRecordsSummaryReport(startDate: string, endDate: string, enabled = true) {
+  return useQuery<MedicalRecordsSummaryReport>({
+    queryKey: ['reports', 'medical-records-summary', startDate, endDate],
+    queryFn:  () =>
+      api.get('/reports/medical-records-summary', { params: rangeParams(startDate, endDate) }).then((r) => r.data),
+    enabled:  enabled && !!startDate && !!endDate,
+    staleTime: 120_000,
+  });
+}
+
+export function useDoctorPerformanceReport(startDate: string, endDate: string, enabled = true) {
+  return useQuery<DoctorPerformanceReport>({
+    queryKey: ['reports', 'doctor-performance', startDate, endDate],
+    queryFn:  () => api.get('/reports/doctor-performance', { params: rangeParams(startDate, endDate) }).then((r) => r.data),
+    enabled:  enabled && !!startDate && !!endDate,
+    staleTime: 120_000,
+  });
+}
+
+export function useDemographicsReport(startDate: string, endDate: string, enabled = true) {
+  return useQuery<DemographicsReport>({
+    queryKey: ['reports', 'demographics', startDate, endDate],
+    queryFn:  () => api.get('/reports/demographics', { params: rangeParams(startDate, endDate) }).then((r) => r.data),
+    enabled:  enabled && !!startDate && !!endDate,
+    staleTime: 120_000,
+  });
+}
+
+export function useTaxSummaryReport(startDate: string, endDate: string, enabled = true) {
+  return useQuery<TaxSummaryReport>({
+    queryKey: ['reports', 'tax-summary', startDate, endDate],
+    queryFn:  () => api.get('/reports/tax-summary', { params: rangeParams(startDate, endDate) }).then((r) => r.data),
+    enabled:  enabled && !!startDate && !!endDate,
+    staleTime: 120_000,
   });
 }

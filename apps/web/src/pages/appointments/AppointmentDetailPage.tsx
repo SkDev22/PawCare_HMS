@@ -322,6 +322,11 @@ export function AppointmentDetailPage() {
             </h1>
             <Badge variant={STATUS_VARIANT[appt.status]}>{STATUS_LABEL[appt.status]}</Badge>
             {appt.is_walk_in && <Badge variant="outline">Walk-in</Badge>}
+            {appt.daily_number != null && (
+              <Badge variant="secondary" className="font-mono">
+                #{String(appt.daily_number).padStart(2, '0')}
+              </Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground mt-1">
             {formatDateLong(appt.start_at)} · {formatTime(appt.start_at)}–{formatTime(appt.end_at)} ({durationLabel(appt.start_at, appt.end_at)})

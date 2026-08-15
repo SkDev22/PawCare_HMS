@@ -77,10 +77,14 @@ const NAV_GROUPS: {
       },
 
       {
-        title: "Medical Records",
+        title: "Records",
         href: "/emr",
         icon: FileText,
         permission: "MEDICAL_RECORD_READ",
+        items: [
+          { title: "Medical Records", href: "/emr" },
+          { title: "Medical History", href: "/emr/history" },
+        ],
       },
       {
         title: "Laboratory",
