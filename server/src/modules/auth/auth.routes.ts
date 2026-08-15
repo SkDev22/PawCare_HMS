@@ -1,9 +1,9 @@
 import { Router, IRouter, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { validate } from '../../middleware/validate';
-import { authenticate } from '../../middleware/authenticate';
+import { authenticate, AuthenticatedRequest } from '../../middleware/authenticate';
 import { asyncHandler } from '../../lib/async-handler';
-import { LoginSchema } from '@pawcare/shared';
+import { LoginSchema, ChangePasswordSchema, type ChangePasswordInput } from '@pawcare/shared';
 import * as authService from './auth.service';
 
 const REFRESH_COOKIE = 'refresh_token';
@@ -58,6 +58,23 @@ authRouter.post(
 
     const { accessToken } = await authService.refresh(rawToken);
     res.status(200).json({ accessToken });
+  }),
+);
+
+authRouter.post(
+  '/change-password',
+  authenticate,
+  validate(ChangePasswordSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { currentPassword, newPassword } = req.body as ChangePasswordInput;
+    const { id } = (req as AuthenticatedRequest).user;
+
+    await authService.changePassword(id, currentPassword, newPassword);
+
+    // Password change revoked every refresh token, including this session's —
+    // clear the now-invalid cookie so the client doesn't keep sending it.
+    res.clearCookie(REFRESH_COOKIE);
+    res.status(204).end();
   }),
 );
 

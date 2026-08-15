@@ -1,8 +1,8 @@
-import { UserCircle2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthStore } from '@/stores/auth.store';
+import { ChangePasswordForm } from './components/ChangePasswordForm';
 
 export function ProfilePage() {
   const user = useAuthStore((s) => s.user);
@@ -40,9 +40,11 @@ export function ProfilePage() {
       </Card>
 
       <Card>
-        <CardContent className="flex items-center gap-3 p-4 text-sm text-muted-foreground">
-          <UserCircle2 className="h-5 w-5 shrink-0" />
-          Editing your profile, password, and avatar is coming soon.
+        <CardHeader>
+          <CardTitle className="text-base">Change Password</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ChangePasswordForm />
         </CardContent>
       </Card>
     </div>

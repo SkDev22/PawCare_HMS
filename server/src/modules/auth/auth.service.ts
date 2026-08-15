@@ -107,3 +107,30 @@ export async function revokeAllTokens(staffId: string): Promise<void> {
     data: { revoked_at: new Date() },
   });
 }
+
+export async function changePassword(
+  staffId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const staff = await prisma.staffUser.findUnique({ where: { id: staffId } });
+
+  if (!staff) {
+    throw new AppError('NOT_FOUND', 'Staff account not found', 404);
+  }
+
+  const valid = await bcrypt.compare(currentPassword, staff.password_hash);
+  if (!valid) {
+    throw new AppError('INVALID_CREDENTIALS', 'Current password is incorrect', 401);
+  }
+
+  const password_hash = await bcrypt.hash(newPassword, 12);
+
+  await prisma.staffUser.update({
+    where: { id: staffId },
+    data: { password_hash },
+  });
+
+  // All sessions (this one included) must re-authenticate with the new password
+  await revokeAllTokens(staffId);
+}
