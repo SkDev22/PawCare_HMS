@@ -10,6 +10,7 @@
     "test": "jest --testPathPattern='\\.unit\\.test\\.ts$' --passWithNoTests",
     "test:integration": "jest --passWithNoTests",
     "db:migrate": "dotenv -e ../.env -- prisma migrate dev",
+    "db:migrate:deploy": "dotenv -e ../.env -- prisma migrate deploy",
     "db:generate": "dotenv -e ../.env -- prisma generate",
     "db:seed": "dotenv -e ../.env -- ts-node -r tsconfig-paths/register src/prisma/seed.ts",
     "db:studio": "dotenv -e ../.env -- prisma studio"
