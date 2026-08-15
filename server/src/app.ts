@@ -1,3 +1,4 @@
+import path from 'path';
 import express, { Express } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -38,6 +39,18 @@ app.use('/api/v1', apiRouter);
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Serve the built web frontend from the same origin/process in production
+// (pilot deployment has no separate static host). tsconfig's rootDir mirrors
+// the monorepo layout into dist, so __dirname here is
+// <repo>/server/dist/server/src — four levels up reaches the repo root.
+if (env.NODE_ENV === 'production') {
+  const webDist = path.join(__dirname, '../../../../apps/web/dist');
+  app.use(express.static(webDist));
+  app.get(/^(?!\/api|\/socket\.io|\/health).*/, (_req, res) => {
+    res.sendFile(path.join(webDist, 'index.html'));
+  });
+}
 
 // Global error handler — must be last
 app.use(errorHandler);

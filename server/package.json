@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "dotenv -e ../.env -- ts-node-dev -r tsconfig-paths/register --respawn --transpile-only src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "node dist/server/src/server.js",
     "type-check": "tsc --noEmit",
     "test": "jest --testPathPattern='\\.unit\\.test\\.ts$' --passWithNoTests",
     "test:integration": "jest --passWithNoTests",
