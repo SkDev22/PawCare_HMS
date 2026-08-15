@@ -1,0 +1,12 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "RAILPACK",
+    "buildCommand": "corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm install --frozen-lockfile && pnpm --filter @pawcare/shared build && pnpm --filter server exec prisma generate && pnpm --filter @pawcare/web build && pnpm --filter server build"
+  },
+  "deploy": {
+    "preDeployCommand": ["pnpm --filter server exec prisma migrate deploy"],
+    "startCommand": "node server/dist/server/src/server.js",
+    "healthcheckPath": "/health"
+  }
+}
