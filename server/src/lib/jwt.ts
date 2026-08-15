@@ -20,14 +20,26 @@ let _publicKey: Buffer | undefined;
 
 function getPrivateKey(): Buffer {
   if (!_privateKey) {
-    _privateKey = fs.readFileSync(path.resolve(process.cwd(), env.JWT_PRIVATE_KEY_PATH));
+    if (env.JWT_PRIVATE_KEY) {
+      _privateKey = Buffer.from(env.JWT_PRIVATE_KEY);
+    } else if (env.JWT_PRIVATE_KEY_PATH) {
+      _privateKey = fs.readFileSync(path.resolve(process.cwd(), env.JWT_PRIVATE_KEY_PATH));
+    } else {
+      throw new Error('Set either JWT_PRIVATE_KEY or JWT_PRIVATE_KEY_PATH');
+    }
   }
   return _privateKey;
 }
 
 function getPublicKey(): Buffer {
   if (!_publicKey) {
-    _publicKey = fs.readFileSync(path.resolve(process.cwd(), env.JWT_PUBLIC_KEY_PATH));
+    if (env.JWT_PUBLIC_KEY) {
+      _publicKey = Buffer.from(env.JWT_PUBLIC_KEY);
+    } else if (env.JWT_PUBLIC_KEY_PATH) {
+      _publicKey = fs.readFileSync(path.resolve(process.cwd(), env.JWT_PUBLIC_KEY_PATH));
+    } else {
+      throw new Error('Set either JWT_PUBLIC_KEY or JWT_PUBLIC_KEY_PATH');
+    }
   }
   return _publicKey;
 }

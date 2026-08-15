@@ -11,8 +11,14 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().default('redis://localhost:6379'),
 
-  JWT_PRIVATE_KEY_PATH: z.string().min(1),
-  JWT_PUBLIC_KEY_PATH: z.string().min(1),
+  // Either the _PATH variants (read from disk — used locally and anywhere
+  // that supports mounted secret files) or the raw PEM content in
+  // JWT_PRIVATE_KEY/JWT_PUBLIC_KEY (used on hosts, like Railway, with no
+  // file-mount feature) must be provided. Checked in server/src/lib/jwt.ts.
+  JWT_PRIVATE_KEY_PATH: z.string().optional(),
+  JWT_PUBLIC_KEY_PATH: z.string().optional(),
+  JWT_PRIVATE_KEY: z.string().optional(),
+  JWT_PUBLIC_KEY: z.string().optional(),
   JWT_ACCESS_TOKEN_EXPIRY: z.string().default('15m'),
   JWT_REFRESH_TOKEN_EXPIRY: z.string().default('30d'),
 
