@@ -39,17 +39,17 @@
   --color-input:  hsl(var(--input));
   --color-ring:   hsl(var(--ring));
 
-  /* Brand palette (indigo) */
-  --color-brand-50:  #eef2ff;
-  --color-brand-100: #e0e7ff;
-  --color-brand-200: #c7d2fe;
-  --color-brand-300: #a5b4fc;
-  --color-brand-400: #818cf8;
-  --color-brand-500: #6366f1;
-  --color-brand-600: #4f46e5;
-  --color-brand-700: #4338ca;
-  --color-brand-800: #3730a3;
-  --color-brand-900: #312e81;
+  /* Brand palette (green) */
+  --color-brand-50:  #f0fdf4;
+  --color-brand-100: #dcfce7;
+  --color-brand-200: #bbf7d0;
+  --color-brand-300: #86efac;
+  --color-brand-400: #4ade80;
+  --color-brand-500: #22c55e;
+  --color-brand-600: #16a34a;
+  --color-brand-700: #15803d;
+  --color-brand-800: #166534;
+  --color-brand-900: #14532d;
 
   /* Border radius */
   --radius-sm: calc(var(--radius) - 4px);
@@ -78,7 +78,7 @@
   --card-foreground: 222.2 84% 4.9%;
   --popover: 0 0% 100%;
   --popover-foreground: 222.2 84% 4.9%;
-  --primary: 239 84% 57%;
+  --primary: 142 76% 36%;
   --primary-foreground: 210 40% 98%;
   --secondary: 210 40% 96.1%;
   --secondary-foreground: 222.2 47.4% 11.2%;
@@ -90,19 +90,19 @@
   --destructive-foreground: 210 40% 98%;
   --border: 214.3 31.8% 91.4%;
   --input: 214.3 31.8% 91.4%;
-  --ring: 239 84% 57%;
+  --ring: 142 76% 36%;
   --radius: 0.5rem;
   --header-height: 3.5rem;
 
   /* Sidebar HSL values */
   --sidebar:                    0 0% 98%;
   --sidebar-foreground:         240 5.3% 26.1%;
-  --sidebar-primary:            239 84% 57%;
+  --sidebar-primary:            142 76% 36%;
   --sidebar-primary-foreground: 210 40% 98%;
-  --sidebar-accent:             239 100% 97%;
-  --sidebar-accent-foreground:  239 84% 30%;
+  --sidebar-accent:             138 76% 97%;
+  --sidebar-accent-foreground:  143 64% 24%;
   --sidebar-border:             214.3 31.8% 91.4%;
-  --sidebar-ring:               239 84% 57%;
+  --sidebar-ring:               142 76% 36%;
 }
 
 /* ── Dark theme ──────────────────────────────────────────────────────────── */
@@ -113,7 +113,7 @@
   --card-foreground: 210 40% 98%;
   --popover: 222.2 84% 4.9%;
   --popover-foreground: 210 40% 98%;
-  --primary: 239 84% 67%;
+  --primary: 142 71% 45%;
   --primary-foreground: 222.2 47.4% 11.2%;
   --secondary: 217.2 32.6% 17.5%;
   --secondary-foreground: 210 40% 98%;
@@ -125,17 +125,17 @@
   --destructive-foreground: 210 40% 98%;
   --border: 217.2 32.6% 17.5%;
   --input: 217.2 32.6% 17.5%;
-  --ring: 239 84% 67%;
+  --ring: 142 71% 45%;
 
   /* Sidebar dark HSL values */
   --sidebar:                    222.2 84% 4.9%;
   --sidebar-foreground:         210 40% 98%;
-  --sidebar-primary:            239 84% 67%;
+  --sidebar-primary:            142 71% 45%;
   --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent:             217.2 32.6% 17.5%;
   --sidebar-accent-foreground:  210 40% 98%;
   --sidebar-border:             217.2 32.6% 17.5%;
-  --sidebar-ring:               239 84% 67%;
+  --sidebar-ring:               142 71% 45%;
 }
 
 /* ── Base resets ─────────────────────────────────────────────────────────── */

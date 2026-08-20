@@ -57,13 +57,13 @@ const STATUS_CONFIG: Record<
 };
 
 const SPECIES_COLORS: Record<string, string> = {
-  DOG: "#6366f1",
-  CAT: "#8b5cf6",
-  BIRD: "#a78bfa",
-  RABBIT: "#c4b5fd",
-  REPTILE: "#ddd6fe",
-  SMALL_MAMMAL: "#e9d5ff",
-  OTHER: "#f3e8ff",
+  DOG: "#16a34a",
+  CAT: "#22c55e",
+  BIRD: "#4ade80",
+  RABBIT: "#86efac",
+  REPTILE: "#bbf7d0",
+  SMALL_MAMMAL: "#dcfce7",
+  OTHER: "#f0fdf4",
 };
 
 const SPECIES_LABELS: Record<string, string> = {
@@ -267,8 +267,8 @@ export function DashboardPage() {
                       x2="0"
                       y2="1"
                     >
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#16a34a" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#16a34a" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid
@@ -293,7 +293,7 @@ export function DashboardPage() {
                   <Area
                     type="monotone"
                     dataKey="visits"
-                    stroke="#6366f1"
+                    stroke="#16a34a"
                     strokeWidth={2}
                     fill="url(#visitGradient)"
                   />
