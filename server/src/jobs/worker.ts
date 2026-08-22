@@ -32,11 +32,21 @@ export function initWorker(): Worker {
           logger.warn('Unknown scheduled job received', { name: job.name });
       }
     },
-    { connection: redis },
+    // Only 3 daily jobs run through this worker, so there's no need to poll
+    // for stalled jobs every 30s (the BullMQ default) — that's pure Redis
+    // command overhead on a low-volume queue.
+    { connection: redis, stalledInterval: 5 * 60 * 1000 },
   );
 
   worker.on('failed', (job, err) => {
     logger.error('Scheduled job failed', { name: job?.name, err });
+  });
+
+  // BullMQ's internal maintenance tasks (e.g. the periodic stalled-job check)
+  // emit 'error' on transient Redis failures. Without a listener here,
+  // Node treats it as an unhandled EventEmitter error and crashes the process.
+  worker.on('error', (err) => {
+    logger.error('Scheduled job worker error', { err });
   });
 
   logger.info('Scheduled job worker initialized');
