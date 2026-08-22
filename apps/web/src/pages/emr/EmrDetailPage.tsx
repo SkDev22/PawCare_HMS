@@ -93,10 +93,7 @@ import type {
 // ── SOAP Note Tab ──────────────────────────────────────────────────────────────
 
 const SoapSchema = z.object({
-  subjective: z.string().max(5000).default(""),
-  objective: z.string().max(5000).default(""),
-  assessment: z.string().max(5000).default(""),
-  plan: z.string().max(5000).default(""),
+  note: z.string().max(20000).default(""),
 });
 
 function SoapNoteTab({
@@ -110,10 +107,7 @@ function SoapNoteTab({
   const form = useForm<z.infer<typeof SoapSchema>>({
     resolver: zodResolver(SoapSchema),
     defaultValues: {
-      subjective: record.soap_note?.subjective ?? "",
-      objective: record.soap_note?.objective ?? "",
-      assessment: record.soap_note?.assessment ?? "",
-      plan: record.soap_note?.plan ?? "",
+      note: record.soap_note?.note ?? "",
     },
   });
 
@@ -133,39 +127,23 @@ function SoapNoteTab({
       )}
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          {(["subjective", "objective", "assessment", "plan"] as const).map(
-            (field) => (
-              <FormField
-                key={field}
-                control={form.control}
-                name={field}
-                render={({ field: f }) => (
-                  <FormItem>
-                    <FormLabel className="capitalize font-semibold">
-                      {field}
-                    </FormLabel>
-                    <FormControl>
-                      <Textarea
-                        rows={4}
-                        className="resize-none"
-                        placeholder={
-                          field === "subjective"
-                            ? "Owner's report and history..."
-                            : field === "objective"
-                              ? "Physical examination findings..."
-                              : field === "assessment"
-                                ? "Clinical impression and diagnoses..."
-                                : "Treatment plan and follow-up..."
-                        }
-                        {...f}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            ),
-          )}
+          <FormField
+            control={form.control}
+            name="note"
+            render={({ field: f }) => (
+              <FormItem>
+                <FormLabel className="font-semibold">SOAP Note</FormLabel>
+                <FormControl>
+                  <Textarea
+                    rows={16}
+                    placeholder="Subjective, objective, assessment, and plan..."
+                    {...f}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
           <div className="flex justify-end">
             <Button type="submit" disabled={upsert.isPending}>
               {upsert.isPending ? "Saving..." : "Save SOAP Note"}

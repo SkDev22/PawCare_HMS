@@ -13,6 +13,7 @@
     "db:migrate:deploy": "dotenv -e ../.env -- prisma migrate deploy",
     "db:generate": "dotenv -e ../.env -- prisma generate",
     "db:seed": "dotenv -e ../.env -- ts-node -r tsconfig-paths/register src/prisma/seed.ts",
+    "db:reset": "dotenv -e ../.env -- prisma migrate reset --force",
     "db:studio": "dotenv -e ../.env -- prisma studio"
   },
   "prisma": {

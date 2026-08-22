@@ -98,29 +98,13 @@ function HistoryRecordCard({
           <CardContent className="pt-4 space-y-5">
             {/* SOAP note */}
             {record.soap_note && (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
                   SOAP Note
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                  {(
-                    [
-                      ["Subjective", record.soap_note.subjective],
-                      ["Objective", record.soap_note.objective],
-                      ["Assessment", record.soap_note.assessment],
-                      ["Plan", record.soap_note.plan],
-                    ] as const
-                  ).map(([label, value]) => (
-                    <div key={label}>
-                      <p className="text-xs font-medium text-muted-foreground">
-                        {label}
-                      </p>
-                      <p className="mt-0.5 whitespace-pre-wrap">
-                        {value || "—"}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+                <p className="text-sm whitespace-pre-wrap">
+                  {record.soap_note.note || "—"}
+                </p>
               </div>
             )}
 

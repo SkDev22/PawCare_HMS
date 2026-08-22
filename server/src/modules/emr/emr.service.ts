@@ -218,17 +218,11 @@ export async function upsertSoapNote(
     where: { medical_record_id: recordId },
     create: {
       medical_record_id: recordId,
-      vet_id:    vetId,
-      subjective: data.subjective ?? null,
-      objective:  data.objective  ?? null,
-      assessment: data.assessment ?? null,
-      plan:       data.plan       ?? null,
+      vet_id: vetId,
+      note: data.note ?? null,
     },
     update: {
-      ...(data.subjective !== undefined ? { subjective: data.subjective } : {}),
-      ...(data.objective  !== undefined ? { objective:  data.objective  } : {}),
-      ...(data.assessment !== undefined ? { assessment: data.assessment } : {}),
-      ...(data.plan       !== undefined ? { plan:       data.plan       } : {}),
+      ...(data.note !== undefined ? { note: data.note } : {}),
     },
     include: {
       vet: { select: { id: true, first_name: true, last_name: true } },

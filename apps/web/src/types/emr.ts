@@ -9,10 +9,7 @@ export type SoapNote = {
   medical_record_id: string;
   vet_id: string;
   vet: SoapNoteVet;
-  subjective: string | null;
-  objective: string | null;
-  assessment: string | null;
-  plan: string | null;
+  note: string | null;
   created_at: string;
   updated_at: string;
 };

@@ -308,10 +308,7 @@ model SoapNote {
   id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   medical_record_id String   @unique @db.Uuid
   vet_id            String   @db.Uuid
-  subjective        String?
-  objective         String?
-  assessment        String?
-  plan              String?
+  note              String?
   created_at        DateTime @default(now())
   updated_at        DateTime @updatedAt
 

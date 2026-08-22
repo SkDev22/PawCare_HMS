@@ -24,10 +24,7 @@ export const MedicalRecordQuerySchema = z.object({
 });
 
 export const UpsertSoapNoteSchema = z.object({
-  subjective: z.string().max(5000).optional(),
-  objective: z.string().max(5000).optional(),
-  assessment: z.string().max(5000).optional(),
-  plan: z.string().max(5000).optional(),
+  note: z.string().max(20000).optional(),
 });
 
 export const UpsertVitalsSchema = z.object({

@@ -73,12 +73,8 @@ export function useUpdateMedicalRecord(id: string) {
 export function useUpsertSoapNote(recordId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: {
-      subjective?: string;
-      objective?: string;
-      assessment?: string;
-      plan?: string;
-    }) => api.put(`/medical-records/${recordId}/soap`, data).then((r) => r.data as SoapNote),
+    mutationFn: (data: { note?: string }) =>
+      api.put(`/medical-records/${recordId}/soap`, data).then((r) => r.data as SoapNote),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['medical-records', recordId] });
       toast.success('SOAP note saved');

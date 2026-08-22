@@ -304,7 +304,7 @@ async function main() {
       petId: string; ownerId: string; vetId: string; type: string; daysAgo: number; reason: string;
       chiefComplaint: string;
       vitals: { weight_kg: number; temperature_c: number; heart_rate_bpm: number; respiratory_rate: number; body_condition_score: number };
-      soap: { subjective: string; objective: string; assessment: string; plan: string };
+      soap: { note: string };
       diagnosis?: { code?: string; name: string };
     }) {
       const start = daysFromNow(-params.daysAgo, 10, 0);
@@ -392,10 +392,7 @@ async function main() {
       chiefComplaint: 'Annual wellness check',
       vitals: { weight_kg: 4.2, temperature_c: 38.5, heart_rate_bpm: 180, respiratory_rate: 30, body_condition_score: 5 },
       soap: {
-        subjective: 'Owner reports normal appetite and activity, no concerns.',
-        objective: 'Alert, well-hydrated, coat in good condition. Heart and lungs clear on auscultation.',
-        assessment: 'Healthy adult cat, no abnormalities noted.',
-        plan: 'Continue current diet, annual booster administered today, recheck in 12 months.',
+        note: 'Owner reports normal appetite and activity, no concerns. Alert, well-hydrated, coat in good condition. Heart and lungs clear on auscultation. Healthy adult cat, no abnormalities noted. Continue current diet, annual booster administered today, recheck in 12 months.',
       },
     });
     await chargeAndInvoice({
@@ -418,10 +415,7 @@ async function main() {
       chiefComplaint: 'Annual booster vaccination',
       vitals: { weight_kg: 3.8, temperature_c: 38.3, heart_rate_bpm: 170, respiratory_rate: 28, body_condition_score: 5 },
       soap: {
-        subjective: 'No concerns reported by owner.',
-        objective: 'Healthy, active, normal exam findings.',
-        assessment: 'Healthy, vaccination administered without complication.',
-        plan: 'Next booster due in 12 months.',
+        note: 'No concerns reported by owner. Healthy, active, normal exam findings. Healthy, vaccination administered without complication. Next booster due in 12 months.',
       },
     });
     await chargeAndInvoice({
@@ -440,10 +434,7 @@ async function main() {
       chiefComplaint: 'General wellness check for rabbit',
       vitals: { weight_kg: 1.8, temperature_c: 38.9, heart_rate_bpm: 200, respiratory_rate: 40, body_condition_score: 5 },
       soap: {
-        subjective: 'Eating well, normal droppings, no concerns.',
-        objective: 'Alert, teeth in good condition, no nasal discharge.',
-        assessment: 'Healthy rabbit.',
-        plan: 'Routine care, recheck in 6 months.',
+        note: 'Eating well, normal droppings, no concerns. Alert, teeth in good condition, no nasal discharge. Healthy rabbit. Routine care, recheck in 6 months.',
       },
     });
     await chargeAndInvoice({
@@ -460,10 +451,7 @@ async function main() {
       chiefComplaint: 'Limping on right hind leg, suspected ligament injury',
       vitals: { weight_kg: 28, temperature_c: 39.1, heart_rate_bpm: 110, respiratory_rate: 24, body_condition_score: 6 },
       soap: {
-        subjective: 'Owner noticed limping after play at the park two days ago, worsening.',
-        objective: 'Pain on palpation of right stifle, positive cranial drawer sign, mild joint effusion.',
-        assessment: 'Cranial cruciate ligament rupture, right hind limb.',
-        plan: 'TPLO surgery performed same day. Post-op pain management and hospitalization for recovery monitoring.',
+        note: 'Owner noticed limping after play at the park two days ago, worsening. Pain on palpation of right stifle, positive cranial drawer sign, mild joint effusion. Cranial cruciate ligament rupture, right hind limb. TPLO surgery performed same day. Post-op pain management and hospitalization for recovery monitoring.',
       },
       diagnosis: { code: 'VeNom-1234', name: 'Cranial Cruciate Ligament Rupture (right hind)' },
     });

@@ -155,11 +155,8 @@ export function SoapNotePrint({ record }: Props) {
         </div>
       )}
 
-      {/* SOAP sections */}
-      <SoapSection label="Subjective" content={soap_note?.subjective} />
-      <SoapSection label="Objective" content={soap_note?.objective} />
-      <SoapSection label="Assessment" content={soap_note?.assessment} />
-      <SoapSection label="Plan" content={soap_note?.plan} />
+      {/* SOAP note */}
+      <SoapSection label="SOAP Note" content={soap_note?.note} />
 
       {/* Diagnoses */}
       {diagnoses.length > 0 && (
