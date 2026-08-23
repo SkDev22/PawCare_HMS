@@ -40,7 +40,15 @@ function CommandDialog({
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
-      <DialogContent className="overflow-hidden p-0">
+      <DialogContent
+        className="overflow-hidden p-0"
+        // This is a quick search/nav palette, not a data-entry form — unlike
+        // other dialogs in the app, there's nothing to lose by dismissing it
+        // on an outside click, so restore Radix's default close-on-outside
+        // behavior (the base Dialog blocks it by default to protect forms).
+        onPointerDownOutside={() => {}}
+        onInteractOutside={() => {}}
+      >
         <Command
           {...(shouldFilter !== undefined ? { shouldFilter } : {})}
           className="[&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group]]:px-2 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5"

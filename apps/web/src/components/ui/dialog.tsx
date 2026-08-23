@@ -32,6 +32,14 @@ const DialogContent = React.forwardRef<
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <DialogPrimitive.Content
         ref={ref}
+        // Prevent accidental data loss: a stray click outside the dialog
+        // (e.g. missing the intended target) must not discard an in-progress
+        // form. The explicit close button and Cancel actions remain the way
+        // out. Callers can still opt back in by passing their own
+        // onPointerDownOutside/onInteractOutside prop, which wins over this
+        // default since `props` is spread after.
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
         className={cn(
           "relative grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg",
           className,
