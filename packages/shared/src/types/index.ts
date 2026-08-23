@@ -13,6 +13,9 @@ export interface AuthUser {
   role: StaffRole;
   clinic_id: string;
   avatar_url?: string;
+  phone?: string;
+  specialization?: string;
+  license_number?: string;
 }
 
 export interface ApiErrorDetail {

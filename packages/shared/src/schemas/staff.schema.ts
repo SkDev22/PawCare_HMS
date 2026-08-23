@@ -35,6 +35,17 @@ export const UpdateStaffSchema = z.object({
   is_active:      z.boolean().optional(),
 });
 
+// Self-service subset of UpdateStaffSchema — no role, email, is_active, or
+// avatar_url. Those either require admin privileges (role/is_active) or are
+// out of scope for this feature (email, avatar).
+export const UpdateOwnProfileSchema = z.object({
+  first_name:     z.string().min(1).max(100).optional(),
+  last_name:      z.string().min(1).max(100).optional(),
+  specialization: z.string().max(200).optional(),
+  license_number: z.string().max(100).optional(),
+  phone:          z.string().max(30).optional(),
+});
+
 export const StaffQuerySchema = z.object({
   role:      StaffRoleEnum.optional(),
   search:    z.string().max(100).optional(),
@@ -75,6 +86,7 @@ export const UpsertScheduleSchema = z.object({
 export type StaffRoleType        = z.infer<typeof StaffRoleEnum>;
 export type CreateStaffInput     = z.infer<typeof CreateStaffSchema>;
 export type UpdateStaffInput     = z.infer<typeof UpdateStaffSchema>;
+export type UpdateOwnProfileInput = z.infer<typeof UpdateOwnProfileSchema>;
 export type StaffQueryInput      = z.infer<typeof StaffQuerySchema>;
 export type ScheduleEntryInput   = z.infer<typeof ScheduleEntrySchema>;
 export type UpsertScheduleInput  = z.infer<typeof UpsertScheduleSchema>;

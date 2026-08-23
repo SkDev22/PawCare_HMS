@@ -656,18 +656,22 @@ export function WardPage() {
   const [selectedKennel, setSelectedKennel] = useState<KennelUnit | null>(null);
   const [activeOnly, setActiveOnly] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"ALL" | KennelStatus>("ALL");
+  const [wardFilter, setWardFilter] = useState<"ALL" | string>("ALL");
 
   const { data: kennels, isLoading: kennelsLoading } = useKennels();
+  const { data: rooms } = useRooms();
   const { data: hospsData, isLoading: hospsLoading } = useHospitalizations({
     active_only: activeOnly,
   });
   const updateKennelStatus = useUpdateKennelStatus();
 
+  const wardRooms = (rooms ?? []).filter((r) => r.type === "ward");
   const allKennels = kennels ?? [];
-  const filteredKennels =
-    statusFilter === "ALL"
-      ? allKennels
-      : allKennels.filter((k) => k.status === statusFilter);
+  const filteredKennels = allKennels.filter((k) => {
+    if (statusFilter !== "ALL" && k.status !== statusFilter) return false;
+    if (wardFilter !== "ALL" && k.room.id !== wardFilter) return false;
+    return true;
+  });
 
   const occupied = allKennels.filter((k) => k.status === "OCCUPIED").length;
   const available = allKennels.filter((k) => k.status === "AVAILABLE").length;
@@ -767,21 +771,36 @@ export function WardPage() {
           </TabsList>
         </Tabs>
         {tab === "kennels" && (
-          <Select
-            value={statusFilter}
-            onValueChange={(v) => setStatusFilter(v as "ALL" | KennelStatus)}
-          >
-            <SelectTrigger className="w-44">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Statuses</SelectItem>
-              <SelectItem value="AVAILABLE">Available</SelectItem>
-              <SelectItem value="OCCUPIED">Occupied</SelectItem>
-              <SelectItem value="CLEANING">Cleaning</SelectItem>
-              <SelectItem value="OUT_OF_SERVICE">Out of Service</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Select value={wardFilter} onValueChange={setWardFilter}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="All Wards" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Wards</SelectItem>
+                {wardRooms.map((r) => (
+                  <SelectItem key={r.id} value={r.id}>
+                    {r.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => setStatusFilter(v as "ALL" | KennelStatus)}
+            >
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Statuses</SelectItem>
+                <SelectItem value="AVAILABLE">Available</SelectItem>
+                <SelectItem value="OCCUPIED">Occupied</SelectItem>
+                <SelectItem value="CLEANING">Cleaning</SelectItem>
+                <SelectItem value="OUT_OF_SERVICE">Out of Service</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         )}
       </div>
 
@@ -806,7 +825,7 @@ export function WardPage() {
             <BedDouble className="h-12 w-12 text-muted-foreground mb-3" />
             <p className="text-sm font-medium">No kennels match this filter</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Try a different status filter.
+              Try a different ward or status filter.
             </p>
           </div>
         ) : (

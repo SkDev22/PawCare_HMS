@@ -5,6 +5,7 @@ import { notifyStaff } from '../notifications/notifications.service';
 import type {
   CreateStaffInput,
   UpdateStaffInput,
+  UpdateOwnProfileInput,
   StaffQueryInput,
   UpsertScheduleInput,
 } from '@pawcare/shared';
@@ -192,6 +193,30 @@ export async function updateStaff(id: string, clinicId: string, data: UpdateStaf
   });
 
   return updated;
+}
+
+// Self-service profile update — any authenticated staff member calling this
+// on their own id, restricted to non-privileged fields (no role, email,
+// is_active, or avatar_url). No last-admin guards apply since those fields
+// aren't editable here.
+export async function updateOwnProfile(id: string, data: UpdateOwnProfileInput) {
+  const existing = await prisma.staffUser.findFirst({
+    where: { id, deleted_at: null },
+    select: { id: true },
+  });
+  if (!existing) throw new AppError('NOT_FOUND', 'Staff account not found', 404);
+
+  return prisma.staffUser.update({
+    where: { id },
+    data: {
+      ...(data.first_name     !== undefined ? { first_name:     data.first_name }     : {}),
+      ...(data.last_name      !== undefined ? { last_name:      data.last_name }      : {}),
+      ...(data.specialization !== undefined ? { specialization: data.specialization } : {}),
+      ...(data.license_number !== undefined ? { license_number: data.license_number } : {}),
+      ...(data.phone          !== undefined ? { phone:          data.phone }          : {}),
+    },
+    select: SAFE_FIELDS,
+  });
 }
 
 export async function deactivateStaff(id: string, clinicId: string) {

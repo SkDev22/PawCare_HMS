@@ -10,6 +10,7 @@ interface AuthState {
   isBootstrapping: boolean;
   setAuth: (user: AuthUser, token: string) => void;
   setAccessToken: (token: string) => void;
+  updateUser: (patch: Partial<AuthUser>) => void;
   clearAuth: () => void;
   finishBootstrap: () => void;
   isAuthenticated: () => boolean;
@@ -23,6 +24,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setAuth: (user, accessToken) => set({ user, accessToken }),
 
   setAccessToken: (accessToken) => set({ accessToken }),
+
+  updateUser: (patch) => set((state) => (state.user ? { user: { ...state.user, ...patch } } : state)),
 
   clearAuth: () => set({ user: null, accessToken: null }),
 

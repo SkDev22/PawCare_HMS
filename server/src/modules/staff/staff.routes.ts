@@ -5,6 +5,7 @@ import { validate } from '../../middleware/validate';
 import {
   CreateStaffSchema,
   UpdateStaffSchema,
+  UpdateOwnProfileSchema,
   StaffQuerySchema,
   UpsertScheduleSchema,
 } from '@pawcare/shared';
@@ -44,6 +45,21 @@ staffRouter.post(
     try {
       const staff = await svc.createStaff(authed(req).user.clinic_id, req.body);
       res.status(201).json(staff);
+    } catch (err) { next(err); }
+  },
+);
+
+// ── Self-service profile ──────────────────────────────────────────────────────
+// Registered before the /:id routes below so "me" is never captured as an id.
+
+staffRouter.put(
+  '/me',
+  authenticate,
+  validate({ body: UpdateOwnProfileSchema }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const staff = await svc.updateOwnProfile(authed(req).user.id, req.body);
+      res.json(staff);
     } catch (err) { next(err); }
   },
 );

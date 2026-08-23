@@ -1,52 +1,84 @@
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuthStore } from '@/stores/auth.store';
+import { UserRound, KeyRound, Laptop2 } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChangePasswordForm } from './components/ChangePasswordForm';
+import { ProfileInfoForm } from './components/ProfileInfoForm';
+import { ProfileSummaryCard } from './components/ProfileSummaryCard';
+import { SessionsCard } from './components/SessionsCard';
 
 export function ProfilePage() {
-  const user = useAuthStore((s) => s.user);
-
-  const initials = user
-    ? `${user.first_name[0]}${user.last_name[0]}`.toUpperCase()
-    : '??';
-  const roleLabel = user?.role.toLowerCase().replace('_', ' ') ?? '';
-
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">My Profile</h1>
-        <p className="text-sm text-muted-foreground">Your account details</p>
+        <h1 className="text-2xl font-bold tracking-tight">My Profile</h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Manage your account details and security
+        </p>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-4 space-y-0">
-          <Avatar className="h-16 w-16">
-            <AvatarFallback className="bg-brand-100 text-brand-700 text-lg font-semibold">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <CardTitle>{user ? `${user.first_name} ${user.last_name}` : '—'}</CardTitle>
-            <Badge variant="secondary" className="capitalize mt-1">{roleLabel}</Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <div className="flex items-center justify-between border-t pt-3">
-            <span className="text-muted-foreground">Email</span>
-            <span className="font-medium">{user?.email ?? '—'}</span>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-1">
+          <ProfileSummaryCard />
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Change Password</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ChangePasswordForm />
-        </CardContent>
-      </Card>
+        <div className="lg:col-span-2">
+          <Tabs defaultValue="profile">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="profile" className="gap-1.5">
+                <UserRound className="size-4" />
+                Profile
+              </TabsTrigger>
+              <TabsTrigger value="security" className="gap-1.5">
+                <KeyRound className="size-4" />
+                Security
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="profile" className="mt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <UserRound className="size-4 text-brand-600" />
+                    Personal information
+                  </CardTitle>
+                  <CardDescription>Update your name and contact details</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ProfileInfoForm />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="security" className="mt-4 space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <KeyRound className="size-4 text-brand-600" />
+                    Change password
+                  </CardTitle>
+                  <CardDescription>Choose a strong password you don't reuse elsewhere</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChangePasswordForm />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Laptop2 className="size-4 text-brand-600" />
+                    Active sessions
+                  </CardTitle>
+                  <CardDescription>Manage where you're signed in</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <SessionsCard />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
     </div>
   );
 }

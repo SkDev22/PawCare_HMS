@@ -67,6 +67,9 @@ export async function login(email: string, password: string) {
       role: staff.role,
       clinic_id: staff.clinic_id,
       ...(staff.avatar_url ? { avatar_url: staff.avatar_url } : {}),
+      ...(staff.phone ? { phone: staff.phone } : {}),
+      ...(staff.specialization ? { specialization: staff.specialization } : {}),
+      ...(staff.license_number ? { license_number: staff.license_number } : {}),
     },
   };
 }
@@ -84,6 +87,9 @@ export async function refresh(rawRefreshToken: string) {
           role: true,
           clinic_id: true,
           avatar_url: true,
+          phone: true,
+          specialization: true,
+          license_number: true,
           is_active: true,
           deleted_at: true,
         },
@@ -115,6 +121,9 @@ export async function refresh(rawRefreshToken: string) {
       role: stored.staff.role,
       clinic_id: stored.staff.clinic_id,
       ...(stored.staff.avatar_url ? { avatar_url: stored.staff.avatar_url } : {}),
+      ...(stored.staff.phone ? { phone: stored.staff.phone } : {}),
+      ...(stored.staff.specialization ? { specialization: stored.staff.specialization } : {}),
+      ...(stored.staff.license_number ? { license_number: stored.staff.license_number } : {}),
     },
   };
 }
@@ -131,6 +140,20 @@ export async function revokeAllTokens(staffId: string): Promise<void> {
     where: { staff_id: staffId, revoked_at: null },
     data: { revoked_at: new Date() },
   });
+}
+
+// Revokes every active session except the one presenting `currentRawToken`,
+// so a "sign out of all other devices" action doesn't also log the caller out.
+export async function revokeOtherTokens(staffId: string, currentRawToken: string): Promise<number> {
+  const result = await prisma.refreshToken.updateMany({
+    where: {
+      staff_id: staffId,
+      revoked_at: null,
+      token_hash: { not: hashToken(currentRawToken) },
+    },
+    data: { revoked_at: new Date() },
+  });
+  return result.count;
 }
 
 export async function changePassword(

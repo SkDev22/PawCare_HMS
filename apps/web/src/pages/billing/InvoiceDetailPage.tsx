@@ -94,7 +94,7 @@ const STATUS_LABEL: Record<InvoiceStatus, string> = {
 // reachable as a manual status flip, or the badge can say "Paid" while the
 // balance due is untouched.
 const ALLOWED_TRANSITIONS: Partial<Record<InvoiceStatus, InvoiceStatus[]>> = {
-  DRAFT: ["SENT", "CANCELLED"],
+  DRAFT: ["CANCELLED"],
   SENT: ["OVERDUE", "CANCELLED"],
   PARTIALLY_PAID: ["CANCELLED"],
   OVERDUE: ["CANCELLED"],
@@ -102,7 +102,6 @@ const ALLOWED_TRANSITIONS: Partial<Record<InvoiceStatus, InvoiceStatus[]>> = {
 };
 
 const TRANSITION_LABELS: Partial<Record<InvoiceStatus, string>> = {
-  SENT: "Mark as Sent",
   OVERDUE: "Mark Overdue",
   CANCELLED: "Cancel Invoice",
   REFUNDED: "Issue Refund",

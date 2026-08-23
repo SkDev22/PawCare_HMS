@@ -62,6 +62,25 @@ authRouter.post(
 );
 
 authRouter.post(
+  '/sessions/revoke-others',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    const rawToken = req.cookies[REFRESH_COOKIE] as string | undefined;
+
+    if (!rawToken) {
+      res.status(401).json({
+        error: { code: 'NO_TOKEN', message: 'Refresh token not found' },
+      });
+      return;
+    }
+
+    const { id } = (req as AuthenticatedRequest).user;
+    const revokedCount = await authService.revokeOtherTokens(id, rawToken);
+    res.status(200).json({ revokedCount });
+  }),
+);
+
+authRouter.post(
   '/change-password',
   authenticate,
   validate(ChangePasswordSchema),
