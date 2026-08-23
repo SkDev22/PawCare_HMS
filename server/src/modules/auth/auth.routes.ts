@@ -56,8 +56,8 @@ authRouter.post(
       return;
     }
 
-    const { accessToken } = await authService.refresh(rawToken);
-    res.status(200).json({ accessToken });
+    const { accessToken, staff } = await authService.refresh(rawToken);
+    res.status(200).json({ accessToken, staff });
   }),
 );
 

@@ -1,8 +1,11 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { PermissionKey } from '@pawcare/shared';
+import { Loader2 } from 'lucide-react';
+import type { PermissionKey, AuthUser } from '@pawcare/shared';
 import { useAuthStore } from './stores/auth.store';
 import { hasPermission } from './lib/permissions';
+import { api } from './lib/api';
 import { ForbiddenPage } from './components/ForbiddenPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { DashboardLayout } from './components/layout/DashboardLayout';
@@ -53,6 +56,14 @@ function RequireGuest({ children }: { children: React.ReactNode }) {
   return accessToken ? <Navigate to="/dashboard" replace /> : <>{children}</>;
 }
 
+function FullScreenLoader() {
+  return (
+    <div className="flex h-screen w-screen items-center justify-center">
+      <Loader2 className="size-6 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
+
 function AuthLayout({
   children,
   permission,
@@ -70,7 +81,45 @@ function AuthLayout({
   );
 }
 
+// Silently restores the session from the HttpOnly refresh cookie on first
+// load (page refresh, direct URL entry, etc.) before route guards decide
+// whether to bounce to /login — otherwise every reload looks logged-out
+// since the access token only ever lived in memory.
+function useAuthBootstrap() {
+  const setAuth = useAuthStore((s) => s.setAuth);
+  const finishBootstrap = useAuthStore((s) => s.finishBootstrap);
+  const isBootstrapping = useAuthStore((s) => s.isBootstrapping);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    api
+      .post<{ accessToken: string; staff: AuthUser }>('/auth/refresh')
+      .then((res) => {
+        if (cancelled) return;
+        setAuth(res.data.staff, res.data.accessToken);
+      })
+      .catch(() => {
+        // No valid refresh cookie — user simply isn't logged in.
+      })
+      .finally(() => {
+        if (!cancelled) finishBootstrap();
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return isBootstrapping;
+}
+
 export function App() {
+  const isBootstrapping = useAuthBootstrap();
+
+  if (isBootstrapping) return <FullScreenLoader />;
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>

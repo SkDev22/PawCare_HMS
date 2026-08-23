@@ -124,6 +124,7 @@ describe('Auth — POST /api/v1/auth/refresh', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.accessToken).toBeDefined();
+    expect(res.body.staff).toMatchObject({ email: 'vet-refresh@test.pawcare' });
   });
 
   it('returns 401 without cookie', async () => {

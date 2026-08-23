@@ -74,7 +74,21 @@ export async function login(email: string, password: string) {
 export async function refresh(rawRefreshToken: string) {
   const stored = await prisma.refreshToken.findUnique({
     where: { token_hash: hashToken(rawRefreshToken) },
-    include: { staff: { select: { id: true, clinic_id: true, role: true, is_active: true, deleted_at: true } } },
+    include: {
+      staff: {
+        select: {
+          id: true,
+          email: true,
+          first_name: true,
+          last_name: true,
+          role: true,
+          clinic_id: true,
+          avatar_url: true,
+          is_active: true,
+          deleted_at: true,
+        },
+      },
+    },
   });
 
   if (!stored || stored.revoked_at !== null || stored.expires_at < new Date()) {
@@ -91,7 +105,18 @@ export async function refresh(rawRefreshToken: string) {
     role: stored.staff.role,
   });
 
-  return { accessToken };
+  return {
+    accessToken,
+    staff: {
+      id: stored.staff.id,
+      email: stored.staff.email,
+      first_name: stored.staff.first_name,
+      last_name: stored.staff.last_name,
+      role: stored.staff.role,
+      clinic_id: stored.staff.clinic_id,
+      ...(stored.staff.avatar_url ? { avatar_url: stored.staff.avatar_url } : {}),
+    },
+  };
 }
 
 export async function logout(rawRefreshToken: string): Promise<void> {

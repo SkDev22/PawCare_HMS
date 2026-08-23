@@ -30,7 +30,13 @@ api.interceptors.response.use(
   async (error) => {
     const original = error.config as typeof error.config & { _retry?: boolean };
 
-    if (error.response?.status !== 401 || original._retry) {
+    // The refresh call itself must never trigger another refresh attempt —
+    // doing so recurses into the queueing logic below and deadlocks forever.
+    if (
+      error.response?.status !== 401 ||
+      original._retry ||
+      original.url?.includes('/auth/refresh')
+    ) {
       return Promise.reject(error);
     }
 

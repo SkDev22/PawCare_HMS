@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Link } from "react-router-dom";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -153,7 +154,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <a href="/dashboard">
+              <Link to="/dashboard">
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-brand-600 text-white shrink-0">
                   <PawPrint className="size-4" />
                 </div>
@@ -163,7 +164,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     Hospital Management
                   </span>
                 </div>
-              </a>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
