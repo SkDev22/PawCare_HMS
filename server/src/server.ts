@@ -2,27 +2,9 @@
 import { app } from './app';
 import { env } from './config/env';
 import { prisma } from './lib/prisma';
-import { redis } from './lib/redis';
 import { logger } from './lib/logger';
 import { initSocket } from './lib/socket';
-import { initWorker, registerRepeatableJobs, closeWorker } from './jobs/worker';
-
-// BullMQ's Queue (constructed at import time in ./lib/queue, pulled in
-// transitively via ./jobs/worker below) eagerly starts connecting the shared
-// `redis` instance as soon as it's constructed — before this function runs.
-// So `redis.status` may already be 'connecting' by the time we get here;
-// calling `.connect()` again throws ("already connecting/connected").
-async function ensureRedisReady() {
-  if (redis.status === 'ready') return;
-  if (redis.status === 'wait') {
-    await redis.connect();
-    return;
-  }
-  await new Promise<void>((resolve, reject) => {
-    redis.once('ready', () => resolve());
-    redis.once('error', reject);
-  });
-}
+import { initScheduledJobs, stopScheduledJobs } from './jobs/worker';
 
 async function start() {
   try {
@@ -30,13 +12,9 @@ async function start() {
     await prisma.$connect();
     logger.info('Database connected');
 
-    // Verify Redis connection
-    await ensureRedisReady();
-
     const httpServer = http.createServer(app);
     initSocket(httpServer);
-    initWorker();
-    await registerRepeatableJobs();
+    initScheduledJobs();
 
     const server = httpServer.listen(env.PORT, () => {
       logger.info(`PawCare HMS server running`, {
@@ -50,9 +28,8 @@ async function start() {
     const shutdown = async (signal: string) => {
       logger.info(`${signal} received â€” shutting down gracefully`);
       server.close(async () => {
-        await closeWorker();
+        stopScheduledJobs();
         await prisma.$disconnect();
-        redis.disconnect();
         logger.info('Server shut down');
         process.exit(0);
       });

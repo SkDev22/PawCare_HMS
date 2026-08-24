@@ -9,7 +9,6 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3001),
 
   DATABASE_URL: z.string().min(1),
-  REDIS_URL: z.string().default('redis://localhost:6379'),
 
   // Either the _PATH variants (read from disk — used locally and anywhere
   // that supports mounted secret files) or the raw PEM content in

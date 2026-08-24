@@ -74,7 +74,7 @@ This file is the authoritative guide for Claude Code when developing this projec
 | Zod | 3.x | Input validation |
 | Multer | 1.x | File upload handling |
 | Sharp | 0.33.x | Image processing |
-| Bull / BullMQ | 5.x | Background job queues |
+| node-cron | 3.x | In-process scheduled jobs (daily digests, overdue alerts) |
 | Winston | 3.x | Structured logging |
 | Helmet | 7.x | HTTP security headers |
 | express-rate-limit | 7.x | Rate limiting |
@@ -83,7 +83,6 @@ This file is the authoritative guide for Claude Code when developing this projec
 | Tool | Version | Purpose |
 |------|---------|---------|
 | PostgreSQL | 16.x | Primary relational database |
-| Redis | 7.x | Session cache, job queues, rate limiting |
 | AWS S3 (or Cloudflare R2) | — | File storage (X-rays, documents, photos) |
 | Prisma | 5.x | Schema migrations and query builder |
 
@@ -1098,7 +1097,7 @@ PATCH  /api/hospitalizations/:id/discharge  — discharge pet
 
 **Responsibilities:** Queue and dispatch appointment reminders, vaccine due dates, invoice alerts, and system messages.
 
-**Implementation:** Use BullMQ queues backed by Redis.
+**Implementation:** Daily/recurring checks run as in-process `node-cron` jobs (see `server/src/jobs/`); event-triggered notifications (low stock, abnormal lab result, etc.) are created synchronously in the same request/transaction that causes them.
 
 **Queue jobs:**
 ```
@@ -1153,7 +1152,7 @@ GET    /api/reports/patients                 — new vs returning, by species
 GET    /api/reports/outstanding-balances     — aging report (30/60/90+ days)
 ```
 
-All report endpoints accept `start_date` and `end_date` query params. Heavy reports run as background jobs and results stored temporarily in Redis with a 5-minute TTL.
+All report endpoints accept `start_date` and `end_date` query params. Reports currently run synchronously on request — no caching layer is implemented.
 
 ---
 
@@ -1200,9 +1199,6 @@ API_BASE_URL=http://localhost:3001
 # Database
 DATABASE_URL=postgresql://pawcare:password@localhost:5432/pawcare_dev
 
-# Redis
-REDIS_URL=redis://localhost:6379
-
 # JWT — RS256 keys (generate with: openssl genrsa -out private.pem 2048)
 JWT_PRIVATE_KEY_PATH=./keys/private.pem
 JWT_PUBLIC_KEY_PATH=./keys/public.pem
@@ -1246,8 +1242,8 @@ git clone <repo>
 cd pawcare-hms
 pnpm install
 
-# Start dependencies (Postgres + Redis)
-docker-compose up -d postgres redis
+# Start dependencies (Postgres)
+docker-compose up -d postgres
 
 # Run migrations
 pnpm --filter server prisma migrate dev
@@ -1333,7 +1329,7 @@ pnpm test:coverage     # with coverage report
 6. **Validate all inputs with Zod.** Import schemas from `packages/shared/src/schemas/` or create new ones there.
 7. **Write the service layer, not just the route.** Route handlers should be thin — call a service function that does the real work.
 8. **Any file upload must go through S3.** Do not store binary files on disk in production.
-9. **All background work goes into BullMQ jobs.** Do not do slow work inline in a request handler.
+9. **Recurring/scheduled work goes into a `node-cron` job in `server/src/jobs/`.** Do not do slow work inline in a request handler.
 10. **Write tests alongside the feature.** Minimum: one integration test for each new endpoint.
 
 ### When creating a new module, follow this checklist:
