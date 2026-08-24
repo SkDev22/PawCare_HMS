@@ -1,6 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Building2, Package, Plus, Search, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Building2,
+  Package,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { Textarea } from "../../../components/ui/textarea";
@@ -139,9 +146,14 @@ function SupplierPicker({
 }) {
   const [open, setOpen] = useState(false);
   const debouncedName = useDebounce(name, 250);
-  const { data: suppliers } = useSuppliers({ ...(debouncedName ? { search: debouncedName } : {}), limit: 8 });
+  const { data: suppliers } = useSuppliers({
+    ...(debouncedName ? { search: debouncedName } : {}),
+    limit: 8,
+  });
   const results = suppliers ?? [];
-  const hasExactMatch = results.some((s) => s.name.toLowerCase() === name.trim().toLowerCase());
+  const hasExactMatch = results.some(
+    (s) => s.name.toLowerCase() === name.trim().toLowerCase(),
+  );
 
   return (
     <div className="relative">
@@ -320,7 +332,7 @@ export function GrnFormPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left font-medium text-muted-foreground px-4 py-2 min-w-[220px]">
+                  <th className="text-left font-medium text-muted-foreground px-4 py-2 min-w-55">
                     Item
                   </th>
                   <th className="text-left font-medium text-muted-foreground px-3 py-2">

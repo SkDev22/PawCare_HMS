@@ -678,7 +678,7 @@ export function InventoryDetailPage() {
                   </p>
                 </div>
               ) : (
-                <div className="divide-y max-h-[480px] overflow-y-auto">
+                <div className="divide-y max-h-120 overflow-y-auto">
                   {item.transactions.map((tx) => {
                     const Icon = TX_ICONS[tx.type] ?? MinusCircle;
                     const color = TX_COLORS[tx.type] ?? "";
