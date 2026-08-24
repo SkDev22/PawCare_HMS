@@ -7,8 +7,9 @@ import type {
   PaginatedInventory,
   PaginatedTransactions,
   InventoryAlerts,
+  StockBatch,
   ItemCategory,
-  TransactionType,
+  LogTransactionType,
 } from '../types/inventory';
 
 export function useInventoryItems(params?: {
@@ -50,22 +51,27 @@ export function useInventoryTransactions(itemId: string | undefined, limit = 20)
   });
 }
 
+export function useItemBatches(itemId: string | undefined) {
+  return useQuery<StockBatch[]>({
+    queryKey: ['inventory-batches', itemId],
+    queryFn:  () => api.get(`/inventory/${itemId}/batches`).then((r) => r.data),
+    enabled:  !!itemId,
+  });
+}
+
 export function useCreateInventoryItem() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: {
-      name:              string;
-      category:          ItemCategory;
-      unit:              string;
-      unit_cost:         number;
+      name:               string;
+      category:           ItemCategory;
+      unit:               string;
       reorder_threshold?: number;
-      sku?:              string;
-      selling_price?:    number;
-      supplier_name?:    string;
-      supplier_sku?:     string;
-      expiry_date?:      string;
-      location?:         string;
-      is_controlled?:    boolean;
+      sku?:               string;
+      supplier_name?:     string;
+      supplier_sku?:      string;
+      location?:          string;
+      is_controlled?:     boolean;
     }) => api.post('/inventory', data).then((r) => r.data as InventoryItem),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['inventory'] });
@@ -84,13 +90,10 @@ export function useUpdateInventoryItem(id: string) {
       name:              string;
       category:          ItemCategory;
       unit:              string;
-      unit_cost:         number;
       reorder_threshold: number;
       sku:               string;
-      selling_price:     number;
       supplier_name:     string;
       supplier_sku:      string;
-      expiry_date:       string;
       location:          string;
       is_controlled:     boolean;
       is_active:         boolean;
@@ -99,7 +102,23 @@ export function useUpdateInventoryItem(id: string) {
       qc.invalidateQueries({ queryKey: ['inventory'] });
       toast.success('Item updated');
     },
-    onError: () => toast.error('Failed to update item'),
+    onError: (err: { response?: { data?: { error?: { message?: string } } } }) => {
+      toast.error(err?.response?.data?.error?.message ?? 'Failed to update item');
+    },
+  });
+}
+
+export function useDeleteInventoryItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/inventory/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['inventory'] });
+      toast.success('Item deleted');
+    },
+    onError: (err: { response?: { data?: { error?: { message?: string } } } }) => {
+      toast.error(err?.response?.data?.error?.message ?? 'Failed to delete item');
+    },
   });
 }
 
@@ -107,16 +126,20 @@ export function useLogTransaction(itemId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: {
-      type:          TransactionType;
+      type:          LogTransactionType;
       quantity:      number;
+      batch_id?:     string;
       reference_id?: string;
       notes?:        string;
     }) => api.post(`/inventory/${itemId}/transactions`, data).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['inventory'] });
       qc.invalidateQueries({ queryKey: ['inventory-transactions', itemId] });
+      qc.invalidateQueries({ queryKey: ['inventory-batches', itemId] });
       toast.success('Transaction logged');
     },
-    onError: () => toast.error('Failed to log transaction'),
+    onError: (err: { response?: { data?: { error?: { message?: string } } } }) => {
+      toast.error(err?.response?.data?.error?.message ?? 'Failed to log transaction');
+    },
   });
 }

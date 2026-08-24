@@ -1040,7 +1040,7 @@ function ItemSearch({
   const { data } = useInventoryItems(
     debouncedQuery ? { search: debouncedQuery, limit: 8 } : undefined,
   );
-  const results = (data?.items ?? []).filter((i) => i.selling_price !== null);
+  const results = (data?.items ?? []).filter((i) => i.current_price !== null);
 
   return (
     <div className="relative">
@@ -1073,7 +1073,7 @@ function ItemSearch({
                   onSelect({
                     id: item.id,
                     name: item.name,
-                    selling_price: item.selling_price!,
+                    selling_price: item.current_price!,
                   });
                   setQuery("");
                   setOpen(false);
@@ -1085,7 +1085,7 @@ function ItemSearch({
                   <span className="text-sm truncate">{item.name}</span>
                 </div>
                 <span className="text-xs text-muted-foreground shrink-0">
-                  {formatCurrency(item.selling_price!)} / {item.unit}
+                  {formatCurrency(item.current_price!)} / {item.unit}
                 </span>
               </button>
             ))

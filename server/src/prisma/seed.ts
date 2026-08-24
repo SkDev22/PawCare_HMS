@@ -72,25 +72,58 @@ async function main() {
   // Create sample inventory items (drugs, vaccines, supplies, equipment)
   const inventoryCount = await prisma.inventoryItem.count({ where: { clinic_id: clinic.id } });
 
+  // name -> [unit_cost, selling_price] for the initial stock batch seeded below.
+  const seedItemPricing: Record<string, [number, number]> = {
+    'Normal Saline 0.9% 500ml':          [3.5, 12],
+    'Disposable Syringe 5ml':            [0.2, 1.5],
+    'IV Catheter 22G':                   [1.2, 6],
+    'Surgical Gloves (pair)':            [0.3, 2],
+    'Gauze Pads':                        [1.5, 5],
+    'Amoxicillin 250mg':                 [0.4, 2],
+    'Meloxicam 1.5mg/ml':                [0.6, 3],
+    'Tramadol 50mg':                     [0.5, 2.5],
+    'Rabies Vaccine':                    [4, 25],
+    'DHPP Vaccine':                      [5, 30],
+    'Digital Thermometer':               [15, 15],
+    'Blood Glucose Test Strips':         [0.8, 4],
+    'Prescription Diet Food (dog, 5kg)': [20, 45],
+  };
+
   if (inventoryCount === 0) {
     await prisma.inventoryItem.createMany({
       data: [
-        { clinic_id: clinic.id, name: 'Normal Saline 0.9% 500ml', category: 'SURGICAL_SUPPLY', unit: 'bag', unit_cost: 3.5, selling_price: 12, quantity_on_hand: 50, reorder_threshold: 10 },
-        { clinic_id: clinic.id, name: 'Disposable Syringe 5ml', category: 'SURGICAL_SUPPLY', unit: 'each', unit_cost: 0.2, selling_price: 1.5, quantity_on_hand: 200, reorder_threshold: 50 },
-        { clinic_id: clinic.id, name: 'IV Catheter 22G', category: 'SURGICAL_SUPPLY', unit: 'each', unit_cost: 1.2, selling_price: 6, quantity_on_hand: 80, reorder_threshold: 20 },
-        { clinic_id: clinic.id, name: 'Surgical Gloves (pair)', category: 'SURGICAL_SUPPLY', unit: 'pair', unit_cost: 0.3, selling_price: 2, quantity_on_hand: 300, reorder_threshold: 50 },
-        { clinic_id: clinic.id, name: 'Gauze Pads', category: 'SURGICAL_SUPPLY', unit: 'pack', unit_cost: 1.5, selling_price: 5, quantity_on_hand: 100, reorder_threshold: 20 },
-        { clinic_id: clinic.id, name: 'Amoxicillin 250mg', category: 'MEDICATION', unit: 'tablet', unit_cost: 0.4, selling_price: 2, quantity_on_hand: 500, reorder_threshold: 100 },
-        { clinic_id: clinic.id, name: 'Meloxicam 1.5mg/ml', category: 'MEDICATION', unit: 'ml', unit_cost: 0.6, selling_price: 3, quantity_on_hand: 200, reorder_threshold: 40 },
-        { clinic_id: clinic.id, name: 'Tramadol 50mg', category: 'MEDICATION', unit: 'tablet', unit_cost: 0.5, selling_price: 2.5, quantity_on_hand: 150, reorder_threshold: 30, is_controlled: true },
-        { clinic_id: clinic.id, name: 'Rabies Vaccine', category: 'VACCINE', unit: 'dose', unit_cost: 4, selling_price: 25, quantity_on_hand: 60, reorder_threshold: 15 },
-        { clinic_id: clinic.id, name: 'DHPP Vaccine', category: 'VACCINE', unit: 'dose', unit_cost: 5, selling_price: 30, quantity_on_hand: 60, reorder_threshold: 15 },
-        { clinic_id: clinic.id, name: 'Digital Thermometer', category: 'EQUIPMENT', unit: 'each', unit_cost: 15, quantity_on_hand: 10, reorder_threshold: 2 },
-        { clinic_id: clinic.id, name: 'Blood Glucose Test Strips', category: 'DIAGNOSTIC_SUPPLY', unit: 'strip', unit_cost: 0.8, selling_price: 4, quantity_on_hand: 150, reorder_threshold: 30 },
-        { clinic_id: clinic.id, name: 'Prescription Diet Food (dog, 5kg)', category: 'FOOD', unit: 'bag', unit_cost: 20, selling_price: 45, quantity_on_hand: 30, reorder_threshold: 5 },
+        { clinic_id: clinic.id, name: 'Normal Saline 0.9% 500ml', category: 'SURGICAL_SUPPLY', unit: 'bag', quantity_on_hand: 50, reorder_threshold: 10 },
+        { clinic_id: clinic.id, name: 'Disposable Syringe 5ml', category: 'SURGICAL_SUPPLY', unit: 'each', quantity_on_hand: 200, reorder_threshold: 50 },
+        { clinic_id: clinic.id, name: 'IV Catheter 22G', category: 'SURGICAL_SUPPLY', unit: 'each', quantity_on_hand: 80, reorder_threshold: 20 },
+        { clinic_id: clinic.id, name: 'Surgical Gloves (pair)', category: 'SURGICAL_SUPPLY', unit: 'pair', quantity_on_hand: 300, reorder_threshold: 50 },
+        { clinic_id: clinic.id, name: 'Gauze Pads', category: 'SURGICAL_SUPPLY', unit: 'pack', quantity_on_hand: 100, reorder_threshold: 20 },
+        { clinic_id: clinic.id, name: 'Amoxicillin 250mg', category: 'MEDICATION', unit: 'tablet', quantity_on_hand: 500, reorder_threshold: 100 },
+        { clinic_id: clinic.id, name: 'Meloxicam 1.5mg/ml', category: 'MEDICATION', unit: 'ml', quantity_on_hand: 200, reorder_threshold: 40 },
+        { clinic_id: clinic.id, name: 'Tramadol 50mg', category: 'MEDICATION', unit: 'tablet', quantity_on_hand: 150, reorder_threshold: 30, is_controlled: true },
+        { clinic_id: clinic.id, name: 'Rabies Vaccine', category: 'VACCINE', unit: 'dose', quantity_on_hand: 60, reorder_threshold: 15 },
+        { clinic_id: clinic.id, name: 'DHPP Vaccine', category: 'VACCINE', unit: 'dose', quantity_on_hand: 60, reorder_threshold: 15 },
+        { clinic_id: clinic.id, name: 'Digital Thermometer', category: 'EQUIPMENT', unit: 'each', quantity_on_hand: 10, reorder_threshold: 2 },
+        { clinic_id: clinic.id, name: 'Blood Glucose Test Strips', category: 'DIAGNOSTIC_SUPPLY', unit: 'strip', quantity_on_hand: 150, reorder_threshold: 30 },
+        { clinic_id: clinic.id, name: 'Prescription Diet Food (dog, 5kg)', category: 'FOOD', unit: 'bag', quantity_on_hand: 30, reorder_threshold: 5 },
       ],
     });
     console.log('✅ Created 13 sample inventory items');
+
+    const createdItems = await prisma.inventoryItem.findMany({ where: { clinic_id: clinic.id } });
+    await prisma.stockBatch.createMany({
+      data: createdItems.map((item) => {
+        const [unit_cost, selling_price] = seedItemPricing[item.name] ?? [1, 1];
+        return {
+          item_id:            item.id,
+          batch_no:           'SEED-001',
+          quantity_received:  item.quantity_on_hand,
+          quantity_remaining: item.quantity_on_hand,
+          unit_cost,
+          selling_price,
+        };
+      }),
+    });
+    console.log('✅ Created initial stock batches for seeded inventory');
   } else {
     console.log(`ℹ️  Inventory already has ${inventoryCount} item(s)`);
   }
@@ -190,6 +223,10 @@ async function main() {
   await prisma.inventoryItem.updateMany({
     where: { clinic_id: clinicId, name: 'Tramadol 50mg' },
     data: { quantity_on_hand: 8 },
+  });
+  await prisma.stockBatch.updateMany({
+    where: { item: { clinic_id: clinicId, name: 'Tramadol 50mg' } },
+    data: { quantity_remaining: 8 },
   });
 
   // ── Demo scenario: owners, pets, a realistic week of appointments ─────────

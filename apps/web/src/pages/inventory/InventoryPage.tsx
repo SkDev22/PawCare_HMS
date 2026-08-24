@@ -14,13 +14,6 @@ import {
 import { Skeleton } from "../../components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "../../components/ui/dialog";
-import {
   Pagination,
   PaginationContent,
   PaginationItem,
@@ -28,32 +21,10 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "../../components/ui/pagination";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "../../components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import {
-  useInventoryItems,
-  useInventoryAlerts,
-  useCreateInventoryItem,
-} from "../../hooks/use-inventory";
+import { useInventoryItems, useInventoryAlerts } from "../../hooks/use-inventory";
 import { useDebounce } from "../../hooks/use-debounce";
 import { formatCurrency } from "../../lib/currency";
-import type { ItemCategory, InventoryItem } from "../../types/inventory";
+import type { ItemCategory } from "../../types/inventory";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -77,244 +48,6 @@ const CATEGORY_LABEL: Record<ItemCategory, string> = {
   EQUIPMENT: "Equipment",
   OTHER: "Other",
 };
-
-// ── Create form ───────────────────────────────────────────────────────────────
-
-const CreateSchema = z.object({
-  name: z.string().min(1, "Name is required").max(200),
-  category: z.enum([
-    "MEDICATION",
-    "VACCINE",
-    "SURGICAL_SUPPLY",
-    "DIAGNOSTIC_SUPPLY",
-    "FOOD",
-    "EQUIPMENT",
-    "OTHER",
-  ]),
-  unit: z.string().min(1, "Unit is required").max(50),
-  unit_cost: z.coerce.number().min(0),
-  reorder_threshold: z.coerce.number().int().min(0).default(10),
-  sku: z.string().max(100).default(""),
-  supplier_name: z.string().max(200).default(""),
-  location: z.string().max(200).default(""),
-  is_controlled: z.boolean().default(false),
-});
-
-function CreateItemForm({
-  onSuccess,
-  onCancel,
-}: {
-  onSuccess: (item: InventoryItem) => void;
-  onCancel: () => void;
-}) {
-  const create = useCreateInventoryItem();
-
-  const form = useForm<z.infer<typeof CreateSchema>>({
-    resolver: zodResolver(CreateSchema),
-    defaultValues: {
-      name: "",
-      category: "MEDICATION",
-      unit: "",
-      unit_cost: 0,
-      reorder_threshold: 10,
-      sku: "",
-      supplier_name: "",
-      location: "",
-      is_controlled: false,
-    },
-  });
-
-  function onSubmit(values: z.infer<typeof CreateSchema>) {
-    create.mutate(
-      {
-        name: values.name,
-        category: values.category,
-        unit: values.unit,
-        unit_cost: values.unit_cost,
-        reorder_threshold: values.reorder_threshold,
-        ...(values.sku ? { sku: values.sku } : {}),
-        ...(values.supplier_name
-          ? { supplier_name: values.supplier_name }
-          : {}),
-        ...(values.location ? { location: values.location } : {}),
-        is_controlled: values.is_controlled,
-      },
-      { onSuccess },
-    );
-  }
-
-  return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <FormItem className="col-span-2">
-                <FormLabel>
-                  Name <span className="text-destructive">*</span>
-                </FormLabel>
-                <FormControl>
-                  <Input placeholder="e.g. Amoxicillin 250mg" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="category"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>
-                  Category <span className="text-destructive">*</span>
-                </FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {CATEGORIES.filter((c) => c.value !== "ALL").map((c) => (
-                      <SelectItem key={c.value} value={c.value}>
-                        {c.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="unit"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>
-                  Unit <span className="text-destructive">*</span>
-                </FormLabel>
-                <FormControl>
-                  <Input placeholder="tablet, ml, box, each" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="unit_cost"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>
-                  Unit Cost <span className="text-destructive">*</span>
-                </FormLabel>
-                <FormControl>
-                  <Input type="number" step="0.01" min="0" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="reorder_threshold"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Reorder Threshold</FormLabel>
-                <FormControl>
-                  <Input type="number" min="0" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="sku"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>SKU</FormLabel>
-                <FormControl>
-                  <Input placeholder="Optional" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="supplier_name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Supplier</FormLabel>
-                <FormControl>
-                  <Input placeholder="Optional" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="location"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Location / Shelf</FormLabel>
-                <FormControl>
-                  <Input placeholder="e.g. Cabinet A, Shelf 2" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() =>
-              form.setValue("is_controlled", !form.watch("is_controlled"))
-            }
-            className={`w-10 h-6 rounded-full transition-colors shrink-0 ${
-              form.watch("is_controlled")
-                ? "bg-destructive"
-                : "bg-muted border border-input"
-            }`}
-          >
-            <span
-              className={`block h-4 w-4 rounded-full bg-white shadow transition-transform mx-auto ${
-                form.watch("is_controlled") ? "translate-x-2" : "-translate-x-2"
-              }`}
-            />
-          </button>
-          <span className="text-sm">Controlled substance</span>
-        </div>
-
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={create.isPending}>
-            {create.isPending ? "Creating..." : "Create Item"}
-          </Button>
-        </div>
-      </form>
-    </Form>
-  );
-}
 
 // ── Stock level badge ─────────────────────────────────────────────────────────
 
@@ -346,7 +79,6 @@ export function InventoryPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<ItemCategory | "ALL">("ALL");
   const [search, setSearch] = useState("");
-  const [createOpen, setCreateOpen] = useState(false);
   const debouncedSearch = useDebounce(search, 300);
 
   // Cursor-based pagination: cursorHistory[i] is the cursor that fetches page i+2
@@ -410,26 +142,13 @@ export function InventoryPage() {
               {alertCount} Alert{alertCount !== 1 ? "s" : ""}
             </Button>
           )}
-          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Item
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Add Inventory Item</DialogTitle>
-              </DialogHeader>
-              <CreateItemForm
-                onSuccess={(item) => {
-                  setCreateOpen(false);
-                  navigate(`/inventory/${item.id}`);
-                }}
-                onCancel={() => setCreateOpen(false)}
-              />
-            </DialogContent>
-          </Dialog>
+          <Button variant="outline" onClick={() => navigate("/inventory/grn")}>
+            Goods Received
+          </Button>
+          <Button onClick={() => navigate("/inventory/new")}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Item
+          </Button>
         </div>
       </div>
 
@@ -502,10 +221,10 @@ export function InventoryPage() {
                       Status
                     </th>
                     <th className="text-right font-medium text-muted-foreground px-4 py-3">
-                      Unit Cost
+                      Current Price
                     </th>
                     <th className="text-left font-medium text-muted-foreground px-4 py-3">
-                      Expiry
+                      Nearest Expiry
                     </th>
                     <th className="text-left font-medium text-muted-foreground px-4 py-3">
                       Location
@@ -515,8 +234,8 @@ export function InventoryPage() {
                 <tbody>
                   {items.map((item) => {
                     const expiringSoon =
-                      item.expiry_date &&
-                      new Date(item.expiry_date) <=
+                      item.nearest_expiry &&
+                      new Date(item.nearest_expiry) <=
                         new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
                     return (
@@ -557,16 +276,20 @@ export function InventoryPage() {
                           />
                         </td>
                         <td className="px-4 py-4 text-right">
-                          {formatCurrency(item.unit_cost)}
+                          {item.current_price ? (
+                            formatCurrency(item.current_price)
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-4">
-                          {item.expiry_date ? (
+                          {item.nearest_expiry ? (
                             <div
                               className={`flex items-center gap-1 text-xs ${expiringSoon ? "text-orange-600" : "text-muted-foreground"}`}
                             >
                               {expiringSoon && <Clock className="h-3 w-3" />}
                               {format(
-                                new Date(item.expiry_date),
+                                new Date(item.nearest_expiry),
                                 "MMM d, yyyy",
                               )}
                             </div>

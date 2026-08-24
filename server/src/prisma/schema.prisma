@@ -23,9 +23,11 @@ model Clinic {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  staff    StaffUser[]
-  services Service[]
-  rooms    Room[]
+  staff               StaffUser[]
+  services            Service[]
+  rooms               Room[]
+  goods_received_notes GoodsReceivedNote[]
+  suppliers            Supplier[]
 
   @@map("clinics")
 }
@@ -68,6 +70,7 @@ model StaffUser {
   medical_records MedicalRecord[]
   lab_orders      LabOrder[]      @relation("LabOrderVet")
   medical_record_charges MedicalRecordCharge[]
+  goods_received_notes   GoodsReceivedNote[]
 
   @@map("staff_users")
 }
@@ -547,11 +550,8 @@ model InventoryItem {
   unit               String
   quantity_on_hand   Int          @default(0)
   reorder_threshold  Int          @default(10)
-  unit_cost          Decimal      @db.Decimal(10, 2)
-  selling_price      Decimal?     @db.Decimal(10, 2)
   supplier_name      String?
   supplier_sku       String?
-  expiry_date        DateTime?
   location           String?
   is_controlled      Boolean      @default(false)
   is_active          Boolean      @default(true)
@@ -562,13 +562,107 @@ model InventoryItem {
   invoice_line_items InvoiceLineItem[]
   charges            MedicalRecordCharge[]
   prescriptions      Prescription[]
+  batches            StockBatch[]
+  grn_items          GoodsReceivedNoteItem[]
 
   @@map("inventory_items")
+}
+
+// A single physical lot of stock for an item — created exclusively by receiving
+// a GoodsReceivedNote line (or, for pre-existing data, by the one-time backfill
+// migration). Cost, selling price, discount, and expiry are per-batch so that
+// older discounted stock keeps selling at its own terms after a restock at a
+// different price.
+model StockBatch {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  item_id            String    @db.Uuid
+  grn_item_id        String?   @unique @db.Uuid
+  batch_no           String?
+  quantity_received  Int
+  quantity_remaining Int
+  unit_cost          Decimal   @db.Decimal(10, 2)
+  selling_price      Decimal   @db.Decimal(10, 2)
+  discount_percent   Decimal   @default(0) @db.Decimal(5, 2)
+  expiry_date        DateTime?
+  received_at        DateTime  @default(now())
+  is_closed          Boolean   @default(false)
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+
+  item         InventoryItem          @relation(fields: [item_id], references: [id])
+  grn_item     GoodsReceivedNoteItem? @relation(fields: [grn_item_id], references: [id])
+  transactions InventoryTransaction[]
+  charges      MedicalRecordCharge[]
+  line_items   InvoiceLineItem[]
+
+  @@map("stock_batches")
+}
+
+// A reusable supplier record, scoped per clinic. GRNs snapshot the supplier's
+// name at the time of receiving (see GoodsReceivedNote.supplier_name) so a
+// later rename doesn't rewrite history, but also link supplier_id so the same
+// supplier can be searched/reused across GRNs instead of retyped every time.
+model Supplier {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clinic_id  String   @db.Uuid
+  name       String
+  phone      String?
+  email      String?
+  address    String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  clinic                Clinic              @relation(fields: [clinic_id], references: [id])
+  goods_received_notes  GoodsReceivedNote[]
+
+  @@unique([clinic_id, name])
+  @@map("suppliers")
+}
+
+model GoodsReceivedNote {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clinic_id           String   @db.Uuid
+  grn_number          String
+  supplier_id         String?  @db.Uuid
+  supplier_name       String
+  supplier_invoice_no String?
+  notes               String?
+  received_by         String   @db.Uuid
+  received_at         DateTime @default(now())
+  created_at          DateTime @default(now())
+
+  clinic            Clinic                  @relation(fields: [clinic_id], references: [id])
+  supplier          Supplier?               @relation(fields: [supplier_id], references: [id])
+  received_by_staff StaffUser               @relation(fields: [received_by], references: [id])
+  items             GoodsReceivedNoteItem[]
+
+  @@unique([clinic_id, grn_number])
+  @@map("goods_received_notes")
+}
+
+model GoodsReceivedNoteItem {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  grn_id           String    @db.Uuid
+  item_id          String    @db.Uuid
+  batch_no         String?
+  quantity         Int
+  unit_cost        Decimal   @db.Decimal(10, 2)
+  selling_price    Decimal   @db.Decimal(10, 2)
+  discount_percent Decimal   @default(0) @db.Decimal(5, 2)
+  expiry_date      DateTime?
+  created_at       DateTime  @default(now())
+
+  grn   GoodsReceivedNote @relation(fields: [grn_id], references: [id])
+  item  InventoryItem     @relation(fields: [item_id], references: [id])
+  batch StockBatch?
+
+  @@map("goods_received_note_items")
 }
 
 model InventoryTransaction {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   item_id      String   @db.Uuid
+  batch_id     String?  @db.Uuid
   performed_by String   @db.Uuid
   type         String
   quantity     Int
@@ -576,7 +670,8 @@ model InventoryTransaction {
   notes        String?
   created_at   DateTime @default(now())
 
-  item InventoryItem @relation(fields: [item_id], references: [id])
+  item  InventoryItem @relation(fields: [item_id], references: [id])
+  batch StockBatch?   @relation(fields: [batch_id], references: [id])
 
   @@map("inventory_transactions")
 }
@@ -645,6 +740,7 @@ model InvoiceLineItem {
   invoice_id  String   @db.Uuid
   service_id  String?  @db.Uuid
   item_id     String?  @db.Uuid
+  batch_id    String?  @db.Uuid
   description String
   quantity    Int      @default(1)
   unit_price  Decimal  @db.Decimal(10, 2)
@@ -654,6 +750,7 @@ model InvoiceLineItem {
   invoice Invoice        @relation(fields: [invoice_id], references: [id])
   service Service?       @relation(fields: [service_id], references: [id])
   item    InventoryItem? @relation(fields: [item_id], references: [id])
+  batch   StockBatch?    @relation(fields: [batch_id], references: [id])
   charge  MedicalRecordCharge?
 
   @@map("invoice_line_items")
@@ -681,6 +778,7 @@ model MedicalRecordCharge {
   id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   medical_record_id     String   @db.Uuid
   item_id               String?  @db.Uuid
+  batch_id              String?  @db.Uuid
   service_id            String?  @db.Uuid
   description           String
   quantity              Int      @default(1)
@@ -692,6 +790,7 @@ model MedicalRecordCharge {
 
   medical_record    MedicalRecord    @relation(fields: [medical_record_id], references: [id])
   item              InventoryItem?   @relation(fields: [item_id], references: [id])
+  batch             StockBatch?      @relation(fields: [batch_id], references: [id])
   service           Service?         @relation(fields: [service_id], references: [id])
   invoice_line_item InvoiceLineItem? @relation(fields: [invoice_line_item_id], references: [id])
   created_by_staff  StaffUser        @relation(fields: [created_by], references: [id])

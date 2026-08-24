@@ -181,23 +181,32 @@ export async function getExpiringItems(clinicId: string, days: number) {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() + days);
 
-  const items = await prisma.inventoryItem.findMany({
+  const batches = await prisma.stockBatch.findMany({
     where: {
-      clinic_id:   clinicId,
-      is_active:   true,
+      item: { clinic_id: clinicId, is_active: true },
+      is_closed: false,
+      quantity_remaining: { gt: 0 },
       expiry_date: { not: null, lte: cutoff },
     },
-    select: {
-      id: true, name: true, category: true, sku: true, unit: true,
-      quantity_on_hand: true, expiry_date: true, location: true,
+    include: {
+      item: { select: { id: true, name: true, category: true, sku: true, unit: true, location: true } },
     },
     orderBy: { expiry_date: 'asc' },
   });
 
   const now = new Date();
-  const rows = items.map((i) => ({
-    ...i,
-    isExpired: i.expiry_date ? i.expiry_date < now : false,
+  const rows = batches.map((b) => ({
+    id:                b.id,
+    item_id:           b.item.id,
+    name:              b.item.name,
+    category:          b.item.category,
+    sku:               b.item.sku,
+    unit:              b.item.unit,
+    location:          b.item.location,
+    batch_no:          b.batch_no,
+    quantity_remaining: b.quantity_remaining,
+    expiry_date:       b.expiry_date,
+    isExpired:         b.expiry_date ? b.expiry_date < now : false,
   }));
 
   return { items: rows, expiredCount: rows.filter((r) => r.isExpired).length };
@@ -210,16 +219,23 @@ export async function getStockLevels(clinicId: string) {
     where: { clinic_id: clinicId, is_active: true },
     select: {
       id: true, name: true, category: true, sku: true, unit: true,
-      quantity_on_hand: true, reorder_threshold: true, unit_cost: true, location: true,
+      quantity_on_hand: true, reorder_threshold: true, location: true,
+      batches: {
+        where: { is_closed: false, quantity_remaining: { gt: 0 } },
+        select: { quantity_remaining: true, unit_cost: true },
+      },
     },
     orderBy: { name: 'asc' },
   });
 
-  const rows = items.map((i) => ({
-    ...i,
-    isLow:      i.quantity_on_hand <= i.reorder_threshold,
-    stockValue: Number(i.unit_cost) * i.quantity_on_hand,
-  }));
+  const rows = items.map(({ batches, ...i }) => {
+    const stockValue = batches.reduce((sum, b) => sum + Number(b.unit_cost) * b.quantity_remaining, 0);
+    return {
+      ...i,
+      isLow: i.quantity_on_hand <= i.reorder_threshold,
+      stockValue,
+    };
+  });
 
   return {
     items:           rows,

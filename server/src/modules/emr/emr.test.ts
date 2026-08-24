@@ -61,12 +61,21 @@ beforeAll(async () => {
       name: 'Amoxicillin 250mg',
       category: 'MEDICATION',
       unit: 'tablet',
-      unit_cost: 0.5,
-      selling_price: 2,
       quantity_on_hand: 500,
     },
   });
   itemId = item.id;
+
+  await prisma.stockBatch.create({
+    data: {
+      item_id: itemId,
+      quantity_received: 500,
+      quantity_remaining: 500,
+      unit_cost: 0.5,
+      selling_price: 2,
+      discount_percent: 0,
+    },
+  });
 });
 
 afterAll(async () => {
@@ -78,6 +87,7 @@ afterAll(async () => {
   await prisma.medicalRecord.deleteMany({ where: { pet_id: petId } });
   await prisma.appointment.deleteMany({ where: { clinic_id: clinicId } });
   await prisma.inventoryTransaction.deleteMany({ where: { item_id: itemId } });
+  await prisma.stockBatch.deleteMany({ where: { item_id: itemId } });
   await prisma.inventoryItem.delete({ where: { id: itemId } });
   await prisma.pet.deleteMany({ where: { owner_id: ownerId } });
   await prisma.owner.deleteMany({ where: { clinic_id: clinicId } });
@@ -157,7 +167,8 @@ describe('POST /api/v1/medical-records/:id/charges', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ item_id: itemId, quantity: 999999 });
 
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toMatch(/left at the current price/);
   });
 
   it('removing a charge restocks the item and shrinks the invoice total', async () => {
@@ -277,5 +288,111 @@ describe('POST /api/v1/medical-records/:id/prescriptions — clinic vs pharmacy 
 
     const invoice = await prisma.invoice.findUniqueOrThrow({ where: { appointment_id: appointmentId } });
     expect(Number(invoice.total)).toBe(0);
+  });
+});
+
+describe('Batch-aware charging (FIFO price resolution)', () => {
+  let fifoItemId: string;
+  let oldBatchId: string;
+
+  beforeAll(async () => {
+    const item = await prisma.inventoryItem.create({
+      data: { clinic_id: clinicId, name: 'Fifo Test Drug', category: 'MEDICATION', unit: 'tablet', quantity_on_hand: 15 },
+    });
+    fifoItemId = item.id;
+
+    const oldBatch = await prisma.stockBatch.create({
+      data: {
+        item_id: fifoItemId,
+        batch_no: 'OLD',
+        quantity_received: 5,
+        quantity_remaining: 5,
+        unit_cost: 1,
+        selling_price: 10,
+        discount_percent: 50,
+        received_at: new Date(Date.now() - 86_400_000),
+      },
+    });
+    oldBatchId = oldBatch.id;
+
+    await prisma.stockBatch.create({
+      data: {
+        item_id: fifoItemId,
+        batch_no: 'NEW',
+        quantity_received: 10,
+        quantity_remaining: 10,
+        unit_cost: 2,
+        selling_price: 20,
+        discount_percent: 0,
+        received_at: new Date(),
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.medicalRecordCharge.deleteMany({ where: { item_id: fifoItemId } });
+    await prisma.invoiceLineItem.deleteMany({ where: { item_id: fifoItemId } });
+    await prisma.inventoryTransaction.deleteMany({ where: { item_id: fifoItemId } });
+    await prisma.stockBatch.deleteMany({ where: { item_id: fifoItemId } });
+    await prisma.inventoryItem.delete({ where: { id: fifoItemId } });
+  });
+
+  async function newRecord() {
+    const res = await request
+      .post('/api/v1/medical-records')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ pet_id: petId, chief_complaint: 'Fifo pricing test' });
+    return res.body.id as string;
+  }
+
+  it('bills the first sale at the oldest batch\'s discounted price', async () => {
+    const recordId = await newRecord();
+    const res = await request
+      .post(`/api/v1/medical-records/${recordId}/charges`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ item_id: fifoItemId, quantity: 3 });
+
+    expect(res.status).toBe(201);
+    expect(res.body.unit_price).toBe('5');
+    expect(res.body.total).toBe('15');
+
+    const oldBatch = await prisma.stockBatch.findUniqueOrThrow({ where: { id: oldBatchId } });
+    expect(oldBatch.quantity_remaining).toBe(2);
+    expect(oldBatch.is_closed).toBe(false);
+  });
+
+  it('rejects a sale that would span into the next batch instead of blending prices', async () => {
+    const recordId = await newRecord();
+    const res = await request
+      .post(`/api/v1/medical-records/${recordId}/charges`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ item_id: fifoItemId, quantity: 5 });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toMatch(/Only 2 unit\(s\)/);
+  });
+
+  it('automatically moves to the next batch\'s price once the old batch is exhausted', async () => {
+    const drainRecordId = await newRecord();
+    const drainRes = await request
+      .post(`/api/v1/medical-records/${drainRecordId}/charges`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ item_id: fifoItemId, quantity: 2 });
+    expect(drainRes.status).toBe(201);
+    expect(drainRes.body.unit_price).toBe('5');
+
+    const oldBatch = await prisma.stockBatch.findUniqueOrThrow({ where: { id: oldBatchId } });
+    expect(oldBatch.quantity_remaining).toBe(0);
+    expect(oldBatch.is_closed).toBe(true);
+
+    const recordId = await newRecord();
+    const res = await request
+      .post(`/api/v1/medical-records/${recordId}/charges`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ item_id: fifoItemId, quantity: 3 });
+
+    expect(res.status).toBe(201);
+    expect(res.body.unit_price).toBe('20');
+    expect(res.body.total).toBe('60');
   });
 });

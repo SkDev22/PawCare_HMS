@@ -9,6 +9,7 @@ import {
   MinusCircle,
   XCircle,
   Plus,
+  Layers,
 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
@@ -47,32 +48,31 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   useInventoryItem,
+  useItemBatches,
   useLogTransaction,
   useUpdateInventoryItem,
+  useDeleteInventoryItem,
 } from "../../hooks/use-inventory";
 import { formatCurrency } from "../../lib/currency";
-import type { TransactionType } from "../../types/inventory";
+import type { LogTransactionType, StockBatch } from "../../types/inventory";
 
 // ── Transaction type display ──────────────────────────────────────────────────
 
-const TX_ICONS: Record<
-  TransactionType,
-  React.ComponentType<{ className?: string }>
-> = {
+const TX_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   purchase: TrendingUp,
   dispensed: TrendingDown,
   adjustment: MinusCircle,
   expired: XCircle,
 };
 
-const TX_COLORS: Record<TransactionType, string> = {
+const TX_COLORS: Record<string, string> = {
   purchase: "text-green-600",
   dispensed: "text-red-600",
   adjustment: "text-blue-600",
   expired: "text-orange-600",
 };
 
-const TX_LABEL: Record<TransactionType, string> = {
+const TX_LABEL: Record<string, string> = {
   purchase: "Purchase",
   dispensed: "Dispensed",
   adjustment: "Adjustment",
@@ -81,33 +81,47 @@ const TX_LABEL: Record<TransactionType, string> = {
 
 // ── Log transaction dialog ────────────────────────────────────────────────────
 
-const TxSchema = z.object({
-  type: z.enum(["purchase", "dispensed", "adjustment", "expired"]),
-  quantity: z.coerce
-    .number()
-    .int()
-    .refine((n) => n !== 0, "Cannot be zero"),
-  reference_id: z.string().max(200).default(""),
-  notes: z.string().max(500).default(""),
-});
+const AUTO_BATCH = "__auto__";
+
+const TxSchema = z
+  .object({
+    type: z.enum(["dispensed", "adjustment", "expired"]),
+    batch_id: z.string().default(AUTO_BATCH),
+    quantity: z.coerce
+      .number()
+      .int()
+      .refine((n) => n !== 0, "Cannot be zero"),
+    reference_id: z.string().max(200).default(""),
+    notes: z.string().max(500).default(""),
+  })
+  .refine((data) => data.type === "dispensed" || data.batch_id !== AUTO_BATCH, {
+    message: "Select a batch for this transaction type",
+    path: ["batch_id"],
+  });
 
 function LogTransactionDialog({
   itemId,
   unit,
+  batches,
+  presetBatchId,
   open,
   onOpenChange,
 }: {
   itemId: string;
   unit: string;
+  batches: StockBatch[];
+  presetBatchId: string | undefined;
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
   const logTx = useLogTransaction(itemId);
+  const presetBatch = batches.find((b) => b.id === presetBatchId);
 
   const form = useForm<z.infer<typeof TxSchema>>({
     resolver: zodResolver(TxSchema),
     defaultValues: {
-      type: "purchase",
+      type: "dispensed",
+      batch_id: presetBatchId ?? AUTO_BATCH,
       quantity: 1,
       reference_id: "",
       notes: "",
@@ -121,8 +135,11 @@ function LogTransactionDialog({
     const qty = isOut ? -Math.abs(values.quantity) : Math.abs(values.quantity);
     logTx.mutate(
       {
-        type: values.type as TransactionType,
+        type: values.type as LogTransactionType,
         quantity: qty,
+        ...(values.batch_id !== AUTO_BATCH
+          ? { batch_id: values.batch_id }
+          : {}),
         ...(values.reference_id ? { reference_id: values.reference_id } : {}),
         ...(values.notes ? { notes: values.notes } : {}),
       },
@@ -161,9 +178,6 @@ function LogTransactionDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="purchase">
-                        Purchase (stock in)
-                      </SelectItem>
                       <SelectItem value="dispensed">
                         Dispensed (stock out)
                       </SelectItem>
@@ -177,6 +191,55 @@ function LogTransactionDialog({
                 </FormItem>
               )}
             />
+
+            {presetBatch ? (
+              <div className="rounded-md border px-3 py-2 text-sm">
+                <p className="text-xs text-muted-foreground">Batch</p>
+                <p>
+                  {presetBatch.batch_no ??
+                    presetBatch.id.slice(0, 8).toUpperCase()}{" "}
+                  · {presetBatch.quantity_remaining} {unit} remaining
+                </p>
+              </div>
+            ) : (
+              <FormField
+                control={form.control}
+                name="batch_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Batch{" "}
+                      {txType !== "dispensed" && (
+                        <span className="text-destructive">*</span>
+                      )}
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {txType === "dispensed" && (
+                          <SelectItem value={AUTO_BATCH}>
+                            Auto (oldest batch first)
+                          </SelectItem>
+                        )}
+                        {batches
+                          .filter((b) => !b.is_closed)
+                          .map((b) => (
+                            <SelectItem key={b.id} value={b.id}>
+                              {b.batch_no ?? b.id.slice(0, 8).toUpperCase()} ·{" "}
+                              {b.quantity_remaining} {unit} left
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}
@@ -262,13 +325,23 @@ export function InventoryDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [txOpen, setTxOpen] = useState(false);
+  const [txBatchId, setTxBatchId] = useState<string | undefined>(undefined);
 
   const { data: item, isLoading } = useInventoryItem(id);
+  const { data: batches } = useItemBatches(id);
   const updateItem = useUpdateInventoryItem(id ?? "");
+  const deleteItem = useDeleteInventoryItem();
+
+  const batchLabelById = new Map(
+    (batches ?? []).map((b) => [
+      b.id,
+      b.batch_no ?? b.id.slice(0, 8).toUpperCase(),
+    ]),
+  );
 
   if (isLoading) {
     return (
-      <div className="space-y-4 max-w-4xl mx-auto">
+      <div className="space-y-4 max-w-5xl mx-auto">
         <Skeleton className="h-10 w-64" />
         <div className="grid grid-cols-3 gap-4">
           {Array.from({ length: 3 }).map((_, i) => (
@@ -293,12 +366,26 @@ export function InventoryDetailPage() {
 
   const isLowStock = item.quantity_on_hand <= item.reorder_threshold;
   const expiringSoon =
-    item.expiry_date &&
-    new Date(item.expiry_date) <=
+    item.nearest_expiry &&
+    new Date(item.nearest_expiry) <=
       new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
+  function openBatchAction(batchId: string) {
+    setTxBatchId(batchId);
+    setTxOpen(true);
+  }
+
+  const hasStockHistory = (batches?.length ?? 0) > 0;
+
+  function handleDelete() {
+    if (!id) return;
+    if (window.confirm(`Delete "${item?.name}"? This cannot be undone.`)) {
+      deleteItem.mutate(id, { onSuccess: () => navigate("/inventory") });
+    }
+  }
+
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6 w-full mx-auto">
       {/* Back + Header */}
       <div className="flex items-center gap-3">
         <Button
@@ -329,7 +416,12 @@ export function InventoryDetailPage() {
         </div>
         <div className="flex gap-2">
           {item.is_active && (
-            <Button onClick={() => setTxOpen(true)}>
+            <Button
+              onClick={() => {
+                setTxBatchId(undefined);
+                setTxOpen(true);
+              }}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Log Transaction
             </Button>
@@ -337,10 +429,28 @@ export function InventoryDetailPage() {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => navigate(`/inventory/${id}/edit`)}
+          >
+            Edit
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => updateItem.mutate({ is_active: !item.is_active })}
           >
             {item.is_active ? "Deactivate" : "Reactivate"}
           </Button>
+          {!hasStockHistory && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive border-destructive/40 hover:bg-destructive/10"
+              onClick={handleDelete}
+              disabled={deleteItem.isPending}
+            >
+              Delete
+            </Button>
+          )}
         </div>
       </div>
 
@@ -371,21 +481,24 @@ export function InventoryDetailPage() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Unit Cost</p>
+            <p className="text-xs text-muted-foreground">Current Price</p>
             <p className="text-2xl font-bold">
-              {formatCurrency(item.unit_cost)}
+              {item.current_price ? formatCurrency(item.current_price) : "—"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              From oldest active batch
             </p>
           </CardContent>
         </Card>
         <Card className={expiringSoon ? "border-orange-300" : ""}>
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Expiry Date</p>
-            {item.expiry_date ? (
+            <p className="text-xs text-muted-foreground">Nearest Expiry</p>
+            {item.nearest_expiry ? (
               <>
                 <p
                   className={`text-sm font-bold mt-1 ${expiringSoon ? "text-orange-600" : ""}`}
                 >
-                  {format(new Date(item.expiry_date), "MMM d, yyyy")}
+                  {format(new Date(item.nearest_expiry), "MMM d, yyyy")}
                 </p>
                 {expiringSoon && (
                   <p className="text-xs text-orange-600 mt-1">Expiring soon</p>
@@ -397,6 +510,109 @@ export function InventoryDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Batches */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Layers className="h-4 w-4" /> Batches ({(batches ?? []).length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {!batches || batches.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <Layers className="h-8 w-8 text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">
+                No stock received yet — receive stock via a Goods Received Note.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left font-medium text-muted-foreground px-4 py-2">
+                      Batch
+                    </th>
+                    <th className="text-left font-medium text-muted-foreground px-4 py-2">
+                      Received
+                    </th>
+                    <th className="text-right font-medium text-muted-foreground px-4 py-2">
+                      Remaining
+                    </th>
+                    <th className="text-right font-medium text-muted-foreground px-4 py-2">
+                      Cost
+                    </th>
+                    <th className="text-right font-medium text-muted-foreground px-4 py-2">
+                      Price
+                    </th>
+                    <th className="text-right font-medium text-muted-foreground px-4 py-2">
+                      Discount
+                    </th>
+                    <th className="text-left font-medium text-muted-foreground px-4 py-2">
+                      Expiry
+                    </th>
+                    <th className="text-left font-medium text-muted-foreground px-4 py-2">
+                      Status
+                    </th>
+                    <th className="px-4 py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {batches.map((b) => (
+                    <tr key={b.id} className="border-b last:border-b-0">
+                      <td className="px-4 py-3 font-medium">
+                        {b.batch_no ?? b.id.slice(0, 8).toUpperCase()}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {format(new Date(b.received_at), "MMM d, yyyy")}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono">
+                        {b.quantity_remaining} / {b.quantity_received}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {formatCurrency(b.unit_cost)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {formatCurrency(b.selling_price)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {Number(b.discount_percent) > 0
+                          ? `${b.discount_percent}%`
+                          : "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        {b.expiry_date
+                          ? format(new Date(b.expiry_date), "MMM d, yyyy")
+                          : "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge
+                          variant={b.is_closed ? "secondary" : "success"}
+                          className="text-xs"
+                        >
+                          {b.is_closed ? "Closed" : "Active"}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {!b.is_closed && item.is_active && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openBatchAction(b.id)}
+                          >
+                            Adjust
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Details + Transactions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -425,12 +641,6 @@ export function InventoryDetailPage() {
                 <p>{item.location}</p>
               </div>
             )}
-            {item.selling_price && (
-              <div>
-                <p className="text-xs text-muted-foreground">Selling Price</p>
-                <p>{formatCurrency(item.selling_price)}</p>
-              </div>
-            )}
             <div>
               <p className="text-xs text-muted-foreground">Added</p>
               <p>{format(new Date(item.created_at), "MMM d, yyyy")}</p>
@@ -449,7 +659,10 @@ export function InventoryDetailPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setTxOpen(true)}
+                  onClick={() => {
+                    setTxBatchId(undefined);
+                    setTxOpen(true);
+                  }}
                 >
                   <Plus className="h-3 w-3 mr-1" />
                   Log
@@ -467,9 +680,8 @@ export function InventoryDetailPage() {
               ) : (
                 <div className="divide-y max-h-[480px] overflow-y-auto">
                   {item.transactions.map((tx) => {
-                    const Icon =
-                      TX_ICONS[tx.type as TransactionType] ?? MinusCircle;
-                    const color = TX_COLORS[tx.type as TransactionType] ?? "";
+                    const Icon = TX_ICONS[tx.type] ?? MinusCircle;
+                    const color = TX_COLORS[tx.type] ?? "";
                     const isOut = tx.quantity < 0;
 
                     return (
@@ -483,8 +695,13 @@ export function InventoryDetailPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">
-                              {TX_LABEL[tx.type as TransactionType]}
+                              {TX_LABEL[tx.type] ?? tx.type}
                             </span>
+                            {tx.batch_id && batchLabelById.has(tx.batch_id) && (
+                              <span className="text-xs text-muted-foreground">
+                                Batch {batchLabelById.get(tx.batch_id)}
+                              </span>
+                            )}
                             {tx.reference_id && (
                               <span className="text-xs text-muted-foreground">
                                 #{tx.reference_id}
@@ -529,8 +746,13 @@ export function InventoryDetailPage() {
         <LogTransactionDialog
           itemId={id}
           unit={item.unit}
+          batches={batches ?? []}
+          presetBatchId={txBatchId}
           open={txOpen}
-          onOpenChange={setTxOpen}
+          onOpenChange={(v) => {
+            setTxOpen(v);
+            if (!v) setTxBatchId(undefined);
+          }}
         />
       )}
     </div>

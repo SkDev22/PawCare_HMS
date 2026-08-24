@@ -59,15 +59,17 @@ export type OutstandingBalancesReport = {
 // ── Expiring Items ───────────────────────────────────────────────────────────
 
 export type ExpiringItem = {
-  id:               string;
-  name:             string;
-  category:         string;
-  sku:              string | null;
-  unit:             string;
-  quantity_on_hand: number;
-  expiry_date:      string | null;
-  location:         string | null;
-  isExpired:        boolean;
+  id:                 string;
+  item_id:            string;
+  name:               string;
+  category:           string;
+  sku:                string | null;
+  unit:               string;
+  location:           string | null;
+  batch_no:           string | null;
+  quantity_remaining: number;
+  expiry_date:        string | null;
+  isExpired:          boolean;
 };
 
 export type ExpiringItemsReport = {
@@ -85,7 +87,6 @@ export type StockLevelItem = {
   unit:              string;
   quantity_on_hand:  number;
   reorder_threshold: number;
-  unit_cost:         string;
   location:          string | null;
   isLow:             boolean;
   stockValue:        number;

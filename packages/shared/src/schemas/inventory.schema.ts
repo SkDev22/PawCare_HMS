@@ -16,11 +16,8 @@ export const CreateInventoryItemSchema = z.object({
   category:          ItemCategoryEnum,
   unit:              z.string().min(1, 'Unit is required').max(50),
   reorder_threshold: z.coerce.number().int().min(0).default(10),
-  unit_cost:         z.coerce.number().min(0, 'Unit cost must be non-negative'),
-  selling_price:     z.coerce.number().min(0).optional(),
   supplier_name:     z.string().max(200).optional(),
   supplier_sku:      z.string().max(100).optional(),
-  expiry_date:       z.string().optional(),
   location:          z.string().max(200).optional(),
   is_controlled:     z.boolean().default(false),
 });
@@ -29,14 +26,28 @@ export const UpdateInventoryItemSchema = CreateInventoryItemSchema.partial().ext
   is_active: z.boolean().optional(),
 });
 
+// Full set of transaction kinds that can ever appear in the ledger. 'purchase'
+// rows are only ever created internally by the GRN module (see grn.schema.ts) —
+// LogTransactionTypeEnum below is the restricted subset a client may submit
+// through POST /inventory/:id/transactions.
 export const TransactionTypeEnum = z.enum(['purchase', 'dispensed', 'adjustment', 'expired']);
 
-export const LogTransactionSchema = z.object({
-  type:         TransactionTypeEnum,
-  quantity:     z.coerce.number().int().refine((n) => n !== 0, 'Quantity cannot be zero'),
-  reference_id: z.string().max(200).optional(),
-  notes:        z.string().max(500).optional(),
-});
+export const LogTransactionTypeEnum = z.enum(['dispensed', 'adjustment', 'expired']);
+
+export const LogTransactionSchema = z
+  .object({
+    type:         LogTransactionTypeEnum,
+    quantity:     z.coerce.number().int().refine((n) => n !== 0, 'Quantity cannot be zero'),
+    batch_id:     z.string().uuid().optional(),
+    reference_id: z.string().max(200).optional(),
+    notes:        z.string().max(500).optional(),
+  })
+  // Adjustments and write-offs correct a specific physical batch, so a batch
+  // must be picked; a plain dispense may omit it to auto-consume FIFO.
+  .refine((data) => data.type === 'dispensed' || data.batch_id !== undefined, {
+    message: 'A batch must be selected for this transaction type',
+    path:    ['batch_id'],
+  });
 
 export const InventoryQuerySchema = z.object({
   category:   ItemCategoryEnum.optional(),

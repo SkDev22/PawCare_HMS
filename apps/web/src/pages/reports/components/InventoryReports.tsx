@@ -155,8 +155,8 @@ export function ExpiringItemsReportView({ days }: { days: number }) {
             <TableHeader>
               <TableRow>
                 <TableHead>Item</TableHead>
-                <TableHead>SKU</TableHead>
-                <TableHead className="text-right">On Hand</TableHead>
+                <TableHead>Batch</TableHead>
+                <TableHead className="text-right">Remaining</TableHead>
                 <TableHead>Expiry Date</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead className="text-right">Status</TableHead>
@@ -166,9 +166,9 @@ export function ExpiringItemsReportView({ days }: { days: number }) {
               {data.items.map((i) => (
                 <TableRow key={i.id}>
                   <TableCell className="text-sm font-medium">{i.name}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{i.sku ?? "—"}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{i.batch_no ?? "—"}</TableCell>
                   <TableCell className="text-right text-sm">
-                    {i.quantity_on_hand} {i.unit}
+                    {i.quantity_remaining} {i.unit}
                   </TableCell>
                   <TableCell className="text-sm whitespace-nowrap">
                     {i.expiry_date ? format(new Date(i.expiry_date), "MMM d, yyyy") : "—"}

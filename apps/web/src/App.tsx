@@ -30,7 +30,13 @@ import { LabOrderDetailPage } from './pages/lab/LabOrderDetailPage';
 import { WardPage } from './pages/ward/WardPage';
 import { HospitalizationDetailPage } from './pages/ward/HospitalizationDetailPage';
 import { InventoryPage } from './pages/inventory/InventoryPage';
+import { InventoryNewPage } from './pages/inventory/InventoryNewPage';
+import { InventoryEditPage } from './pages/inventory/InventoryEditPage';
 import { InventoryDetailPage } from './pages/inventory/InventoryDetailPage';
+import { InventoryAlertsPage } from './pages/inventory/InventoryAlertsPage';
+import { GrnListPage } from './pages/inventory/grn/GrnListPage';
+import { GrnFormPage } from './pages/inventory/grn/GrnFormPage';
+import { GrnDetailPage } from './pages/inventory/grn/GrnDetailPage';
 import { ReportsPage } from './pages/reports/ReportsPage';
 import { ReportDetailPage } from './pages/reports/ReportDetailPage';
 import { NotificationsPage } from './pages/notifications/NotificationsPage';
@@ -169,8 +175,14 @@ export function App() {
           <Route path="/ward/:id" element={<AuthLayout permission="WARD_READ"><HospitalizationDetailPage /></AuthLayout>} />
 
           {/* Inventory */}
-          <Route path="/inventory"     element={<AuthLayout permission="INVENTORY_READ"><InventoryPage /></AuthLayout>} />
-          <Route path="/inventory/:id" element={<AuthLayout permission="INVENTORY_READ"><InventoryDetailPage /></AuthLayout>} />
+          <Route path="/inventory"          element={<AuthLayout permission="INVENTORY_READ"><InventoryPage /></AuthLayout>} />
+          <Route path="/inventory/new"      element={<AuthLayout permission="INVENTORY_WRITE"><InventoryNewPage /></AuthLayout>} />
+          <Route path="/inventory/alerts"   element={<AuthLayout permission="INVENTORY_READ"><InventoryAlertsPage /></AuthLayout>} />
+          <Route path="/inventory/grn"      element={<AuthLayout permission="INVENTORY_READ"><GrnListPage /></AuthLayout>} />
+          <Route path="/inventory/grn/new"  element={<AuthLayout permission="INVENTORY_WRITE"><GrnFormPage /></AuthLayout>} />
+          <Route path="/inventory/grn/:id"  element={<AuthLayout permission="INVENTORY_READ"><GrnDetailPage /></AuthLayout>} />
+          <Route path="/inventory/:id"      element={<AuthLayout permission="INVENTORY_READ"><InventoryDetailPage /></AuthLayout>} />
+          <Route path="/inventory/:id/edit" element={<AuthLayout permission="INVENTORY_WRITE"><InventoryEditPage /></AuthLayout>} />
 
           {/* Reports */}
           <Route path="/reports"      element={<AuthLayout permission="REPORT_READ"><ReportsPage /></AuthLayout>} />

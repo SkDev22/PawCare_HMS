@@ -115,6 +115,12 @@ const NAV_GROUPS: {
         href: "/inventory",
         icon: Package,
         permission: "INVENTORY_READ",
+        items: [
+          { title: "Items", href: "/inventory" },
+          { title: "Add Item", href: "/inventory/new" },
+          { title: "Goods Received", href: "/inventory/grn" },
+          { title: "Alerts", href: "/inventory/alerts" },
+        ],
       },
       {
         title: "Reports",

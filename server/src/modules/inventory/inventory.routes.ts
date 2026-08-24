@@ -94,6 +94,32 @@ inventoryRouter.put(
   },
 );
 
+inventoryRouter.delete(
+  '/:id',
+  authenticate,
+  authorize('INVENTORY_WRITE'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await svc.deleteItem(req.params.id, authed(req).user.clinic_id);
+      res.status(204).end();
+    } catch (err) { next(err); }
+  },
+);
+
+// ── Batches ───────────────────────────────────────────────────────────────────
+
+inventoryRouter.get(
+  '/:id/batches',
+  authenticate,
+  authorize('INVENTORY_READ'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const batches = await svc.listBatches(req.params.id, authed(req).user.clinic_id);
+      res.json(batches);
+    } catch (err) { next(err); }
+  },
+);
+
 // ── Transactions ──────────────────────────────────────────────────────────────
 
 inventoryRouter.post(

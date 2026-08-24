@@ -9,6 +9,8 @@ export * from './schemas/staff.schema';
 export * from './schemas/lab.schema';
 export * from './schemas/ward.schema';
 export * from './schemas/inventory.schema';
+export * from './schemas/grn.schema';
+export * from './schemas/suppliers.schema';
 export * from './schemas/reports.schema';
 export * from './schemas/dashboard.schema';
 export * from './schemas/notifications.schema';

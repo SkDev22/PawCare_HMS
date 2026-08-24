@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { clampZero } from '../billing/billing.service';
-import { applyStockChangeTx } from '../inventory/inventory.service';
+import { applyStockChangeTx, resolveBatchForSaleTx } from '../inventory/inventory.service';
 import type {
   CreateMedicalRecordInput,
   UpdateMedicalRecordInput,
@@ -445,18 +445,19 @@ async function createChargeTx(
   let unitPrice: Decimal;
   let description: string;
   let resolvedItemId: string | null = null;
+  let resolvedBatchId: string | null = null;
 
   if (data.item_id) {
     const item = await tx.inventoryItem.findFirst({
       where: { id: data.item_id, clinic_id: clinicId, is_active: true },
     });
     if (!item) throw new AppError('NOT_FOUND', 'Inventory item not found', 404);
-    if (item.selling_price === null) {
-      throw new AppError('BAD_REQUEST', `"${item.name}" has no selling price configured`, 400);
-    }
-    unitPrice = item.selling_price;
+
+    const { batch, unitPrice: batchPrice } = await resolveBatchForSaleTx(tx, item.id, clinicId, data.quantity);
+    unitPrice = batchPrice;
     description = data.description ?? item.name;
     resolvedItemId = item.id;
+    resolvedBatchId = batch.id;
   } else {
     const serviceId = data.service_id;
     if (!serviceId) throw new AppError('BAD_REQUEST', 'Either item_id or service_id is required', 400);
@@ -511,6 +512,7 @@ async function createChargeTx(
     data: {
       invoice_id: invoice.id,
       ...(data.item_id ? { item_id: data.item_id } : {}),
+      ...(resolvedBatchId ? { batch_id: resolvedBatchId } : {}),
       ...(data.service_id ? { service_id: data.service_id } : {}),
       description,
       quantity: data.quantity,
@@ -530,6 +532,7 @@ async function createChargeTx(
     data: {
       medical_record_id: recordId,
       ...(data.item_id ? { item_id: data.item_id } : {}),
+      ...(resolvedBatchId ? { batch_id: resolvedBatchId } : {}),
       ...(data.service_id ? { service_id: data.service_id } : {}),
       description,
       quantity: data.quantity,
@@ -541,10 +544,11 @@ async function createChargeTx(
     include: chargeIncludes,
   });
 
-  if (resolvedItemId) {
+  if (resolvedItemId && resolvedBatchId) {
     await applyStockChangeTx(tx, resolvedItemId, clinicId, staffId, {
       type: 'dispensed',
       quantity: -data.quantity,
+      batch_id: resolvedBatchId,
       reference_id: charge.id,
       notes: `Dispensed for visit ${recordId}`,
     });
@@ -599,6 +603,7 @@ async function removeChargeTx(
     await applyStockChangeTx(tx, charge.item_id, clinicId, staffId, {
       type: 'adjustment',
       quantity: charge.quantity,
+      ...(charge.batch_id ? { batch_id: charge.batch_id } : {}),
       reference_id: charge.id,
       notes: `Reversed charge for visit ${recordId}`,
     });
