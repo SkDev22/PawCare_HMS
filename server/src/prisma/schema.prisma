@@ -10,18 +10,31 @@ datasource db {
 // CLINIC & CONFIGURATION
 // ─────────────────────────────────────────
 
+enum ClinicPlan {
+  TRIAL
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
 model Clinic {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name       String
-  address    String?
-  phone      String?
-  email      String?
-  logo_url   String?
-  timezone   String   @default("UTC")
-  currency   String   @default("LKR")
-  is_active  Boolean  @default(true)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  id            String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String
+  address       String?
+  phone         String?
+  email         String?
+  logo_url      String?
+  timezone      String     @default("UTC")
+  currency      String     @default("LKR")
+  is_active     Boolean    @default(true)
+  plan          ClinicPlan @default(TRIAL)
+  trial_ends_at DateTime?
+  // Individually-granted add-on features beyond the plan's normal bundle —
+  // e.g. one clinic buying a module that isn't part of its plan tier, without
+  // changing what any other clinic on that same plan sees (see ADR-04).
+  extra_features String[] @default([])
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @updatedAt
 
   staff               StaffUser[]
   services            Service[]

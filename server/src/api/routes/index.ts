@@ -1,4 +1,6 @@
 import { Router, IRouter } from 'express';
+import { authenticate } from '../../middleware/authenticate';
+import { authorizeFeature } from '../../middleware/authorize-feature';
 import { authRouter } from '../../modules/auth/auth.routes';
 import { patientsRouter } from '../../modules/patients/patients.routes';
 import { appointmentsRouter } from '../../modules/appointments/appointments.routes';
@@ -25,10 +27,15 @@ apiRouter.use('/appointments', appointmentsRouter);
 apiRouter.use('/medical-records', emrRouter);
 apiRouter.use('/billing', billingRouter);
 apiRouter.use('/staff', staffRouter);
-apiRouter.use('/lab-orders', labRouter);
-apiRouter.use('/ward', wardRouter);
-apiRouter.use('/inventory', inventoryRouter);
-apiRouter.use('/grn', grnRouter);
-apiRouter.use('/suppliers', suppliersRouter);
-apiRouter.use('/reports', reportsRouter);
+// These four modules differ by plan (ADR-04) — gate them once here rather
+// than touching every route's own authenticate/authorize chain. authenticate
+// runs again inside each router too (each route already calls it directly);
+// that's redundant but harmless, and keeps this the only place plan-gating
+// needs to be added or changed per module.
+apiRouter.use('/lab-orders', authenticate, authorizeFeature('LABORATORY'), labRouter);
+apiRouter.use('/ward', authenticate, authorizeFeature('WARD'), wardRouter);
+apiRouter.use('/inventory', authenticate, authorizeFeature('INVENTORY'), inventoryRouter);
+apiRouter.use('/grn', authenticate, authorizeFeature('INVENTORY'), grnRouter);
+apiRouter.use('/suppliers', authenticate, authorizeFeature('INVENTORY'), suppliersRouter);
+apiRouter.use('/reports', authenticate, authorizeFeature('REPORTS'), reportsRouter);
 apiRouter.use('/notifications', notificationsRouter);

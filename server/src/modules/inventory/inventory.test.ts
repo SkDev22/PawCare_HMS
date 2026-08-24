@@ -93,3 +93,66 @@ describe('DELETE /api/v1/inventory/:id', () => {
     await prisma.clinic.delete({ where: { id: otherClinic.id } });
   });
 });
+
+describe('Plan gating (ADR-04)', () => {
+  it('blocks a BASIC-plan clinic from the Inventory module entirely', async () => {
+    const basicClinic = await prisma.clinic.create({
+      data: { name: 'Basic Plan Clinic', plan: 'BASIC' },
+    });
+    await prisma.staffUser.create({
+      data: {
+        clinic_id: basicClinic.id,
+        email: 'admin@basicplan.test',
+        password_hash: await bcrypt.hash('Admin@1234', 12),
+        first_name: 'Basic',
+        last_name: 'Admin',
+        role: 'ADMIN',
+      },
+    });
+
+    const login = await request
+      .post('/api/v1/auth/login')
+      .send({ email: 'admin@basicplan.test', password: 'Admin@1234' });
+
+    const res = await request
+      .get('/api/v1/inventory')
+      .set('Authorization', `Bearer ${login.body.accessToken}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('FEATURE_NOT_ENABLED');
+
+    await prisma.refreshToken.deleteMany({ where: { staff: { clinic_id: basicClinic.id } } });
+    await prisma.staffUser.deleteMany({ where: { clinic_id: basicClinic.id } });
+    await prisma.clinic.delete({ where: { id: basicClinic.id } });
+  });
+
+  it('grants access via extra_features even when the plan alone would not', async () => {
+    const basicClinic = await prisma.clinic.create({
+      data: { name: 'Basic Plan Clinic With Add-On', plan: 'BASIC', extra_features: ['INVENTORY'] },
+    });
+    await prisma.staffUser.create({
+      data: {
+        clinic_id: basicClinic.id,
+        email: 'admin@basicplanaddon.test',
+        password_hash: await bcrypt.hash('Admin@1234', 12),
+        first_name: 'Basic',
+        last_name: 'Admin',
+        role: 'ADMIN',
+      },
+    });
+
+    const login = await request
+      .post('/api/v1/auth/login')
+      .send({ email: 'admin@basicplanaddon.test', password: 'Admin@1234' });
+
+    const res = await request
+      .get('/api/v1/inventory')
+      .set('Authorization', `Bearer ${login.body.accessToken}`);
+
+    expect(res.status).toBe(200);
+
+    await prisma.refreshToken.deleteMany({ where: { staff: { clinic_id: basicClinic.id } } });
+    await prisma.staffUser.deleteMany({ where: { clinic_id: basicClinic.id } });
+    await prisma.clinic.delete({ where: { id: basicClinic.id } });
+  });
+});

@@ -15,6 +15,7 @@ export const NOTIFICATION_TYPES = [
   { type: 'lab_result_abnormal', label: 'Abnormal lab result' },
   { type: 'invoice_overdue', label: 'Invoice overdue (daily alert)' },
   { type: 'daily_digest', label: 'Daily digest summary' },
+  { type: 'trial_expiring', label: 'Trial ending soon' },
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number]['type'];

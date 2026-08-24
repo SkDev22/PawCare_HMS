@@ -2,12 +2,14 @@ import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
-import type { PermissionKey, AuthUser } from '@pawcare/shared';
+import type { PermissionKey, FeatureKey, AuthUser } from '@pawcare/shared';
 import { useAuthStore } from './stores/auth.store';
 import { hasPermission } from './lib/permissions';
+import { hasFeature } from './lib/features';
 import { api } from './lib/api';
 import { ForbiddenPage } from './components/ForbiddenPage';
 import { LoginPage } from './pages/auth/LoginPage';
+import { TrialExpiredPage } from './pages/TrialExpiredPage';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { OwnersPage } from './pages/patients/OwnersPage';
@@ -73,12 +75,15 @@ function FullScreenLoader() {
 function AuthLayout({
   children,
   permission,
+  feature,
 }: {
   children: React.ReactNode;
   permission?: PermissionKey;
+  feature?: FeatureKey;
 }) {
   const role = useAuthStore((s) => s.user?.role);
-  const allowed = !permission || hasPermission(role, permission);
+  const user = useAuthStore((s) => s.user);
+  const allowed = (!permission || hasPermission(role, permission)) && (!feature || hasFeature(user, feature));
 
   return (
     <RequireAuth>
@@ -139,6 +144,8 @@ export function App() {
             }
           />
 
+          <Route path="/trial-expired" element={<TrialExpiredPage />} />
+
           <Route path="/dashboard" element={<AuthLayout permission="DASHBOARD_READ"><DashboardPage /></AuthLayout>} />
 
           {/* Patient Management */}
@@ -167,26 +174,26 @@ export function App() {
           <Route path="/staff/:id" element={<AuthLayout permission="STAFF_READ"><StaffDetailPage /></AuthLayout>} />
 
           {/* Laboratory */}
-          <Route path="/lab"     element={<AuthLayout permission="LAB_ORDER_WRITE"><LabPage /></AuthLayout>} />
-          <Route path="/lab/:id" element={<AuthLayout permission="LAB_ORDER_WRITE"><LabOrderDetailPage /></AuthLayout>} />
+          <Route path="/lab"     element={<AuthLayout permission="LAB_ORDER_WRITE" feature="LABORATORY"><LabPage /></AuthLayout>} />
+          <Route path="/lab/:id" element={<AuthLayout permission="LAB_ORDER_WRITE" feature="LABORATORY"><LabOrderDetailPage /></AuthLayout>} />
 
           {/* Ward & Hospitalization */}
-          <Route path="/ward"     element={<AuthLayout permission="WARD_READ"><WardPage /></AuthLayout>} />
-          <Route path="/ward/:id" element={<AuthLayout permission="WARD_READ"><HospitalizationDetailPage /></AuthLayout>} />
+          <Route path="/ward"     element={<AuthLayout permission="WARD_READ" feature="WARD"><WardPage /></AuthLayout>} />
+          <Route path="/ward/:id" element={<AuthLayout permission="WARD_READ" feature="WARD"><HospitalizationDetailPage /></AuthLayout>} />
 
           {/* Inventory */}
-          <Route path="/inventory"          element={<AuthLayout permission="INVENTORY_READ"><InventoryPage /></AuthLayout>} />
-          <Route path="/inventory/new"      element={<AuthLayout permission="INVENTORY_WRITE"><InventoryNewPage /></AuthLayout>} />
-          <Route path="/inventory/alerts"   element={<AuthLayout permission="INVENTORY_READ"><InventoryAlertsPage /></AuthLayout>} />
-          <Route path="/inventory/grn"      element={<AuthLayout permission="INVENTORY_READ"><GrnListPage /></AuthLayout>} />
-          <Route path="/inventory/grn/new"  element={<AuthLayout permission="INVENTORY_WRITE"><GrnFormPage /></AuthLayout>} />
-          <Route path="/inventory/grn/:id"  element={<AuthLayout permission="INVENTORY_READ"><GrnDetailPage /></AuthLayout>} />
-          <Route path="/inventory/:id"      element={<AuthLayout permission="INVENTORY_READ"><InventoryDetailPage /></AuthLayout>} />
-          <Route path="/inventory/:id/edit" element={<AuthLayout permission="INVENTORY_WRITE"><InventoryEditPage /></AuthLayout>} />
+          <Route path="/inventory"          element={<AuthLayout permission="INVENTORY_READ" feature="INVENTORY"><InventoryPage /></AuthLayout>} />
+          <Route path="/inventory/new"      element={<AuthLayout permission="INVENTORY_WRITE" feature="INVENTORY"><InventoryNewPage /></AuthLayout>} />
+          <Route path="/inventory/alerts"   element={<AuthLayout permission="INVENTORY_READ" feature="INVENTORY"><InventoryAlertsPage /></AuthLayout>} />
+          <Route path="/inventory/grn"      element={<AuthLayout permission="INVENTORY_READ" feature="INVENTORY"><GrnListPage /></AuthLayout>} />
+          <Route path="/inventory/grn/new"  element={<AuthLayout permission="INVENTORY_WRITE" feature="INVENTORY"><GrnFormPage /></AuthLayout>} />
+          <Route path="/inventory/grn/:id"  element={<AuthLayout permission="INVENTORY_READ" feature="INVENTORY"><GrnDetailPage /></AuthLayout>} />
+          <Route path="/inventory/:id"      element={<AuthLayout permission="INVENTORY_READ" feature="INVENTORY"><InventoryDetailPage /></AuthLayout>} />
+          <Route path="/inventory/:id/edit" element={<AuthLayout permission="INVENTORY_WRITE" feature="INVENTORY"><InventoryEditPage /></AuthLayout>} />
 
           {/* Reports */}
-          <Route path="/reports"      element={<AuthLayout permission="REPORT_READ"><ReportsPage /></AuthLayout>} />
-          <Route path="/reports/:key" element={<AuthLayout permission="REPORT_READ"><ReportDetailPage /></AuthLayout>} />
+          <Route path="/reports"      element={<AuthLayout permission="REPORT_READ" feature="REPORTS"><ReportsPage /></AuthLayout>} />
+          <Route path="/reports/:key" element={<AuthLayout permission="REPORT_READ" feature="REPORTS"><ReportDetailPage /></AuthLayout>} />
 
           {/* Notifications */}
           <Route path="/notifications" element={<AuthLayout><NotificationsPage /></AuthLayout>} />

@@ -30,6 +30,16 @@ api.interceptors.response.use(
   async (error) => {
     const original = error.config as typeof error.config & { _retry?: boolean };
 
+    // A locked-out trial clinic — every authenticated request will keep
+    // returning this until the clinic converts, so send the user straight
+    // to the trial-expired screen instead of retrying anything.
+    if (error.response?.data?.error?.code === 'TRIAL_EXPIRED') {
+      if (window.location.pathname !== '/trial-expired') {
+        window.location.replace('/trial-expired');
+      }
+      return Promise.reject(error);
+    }
+
     // The refresh call itself must never trigger another refresh attempt —
     // doing so recurses into the queueing logic below and deadlocks forever.
     if (

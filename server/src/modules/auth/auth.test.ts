@@ -201,3 +201,91 @@ describe('Auth — POST /api/v1/auth/sessions/revoke-others', () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe('Auth — trial lockout', () => {
+  let clinicId: string;
+  let accessToken: string;
+  let refreshCookie: string;
+
+  beforeAll(async () => {
+    const clinic = await prisma.clinic.create({
+      data: {
+        name: 'Expired Trial Clinic',
+        plan: 'TRIAL',
+        trial_ends_at: new Date(Date.now() - 24 * 60 * 60 * 1000), // yesterday
+      },
+    });
+    clinicId = clinic.id;
+
+    await prisma.staffUser.create({
+      data: {
+        clinic_id: clinicId,
+        email: 'admin@expiredtrial.test',
+        password_hash: await bcrypt.hash('Secure@123', 12),
+        first_name: 'Trial',
+        last_name: 'Admin',
+        role: 'ADMIN',
+      },
+    });
+
+    const login = await request
+      .post('/api/v1/auth/login')
+      .send({ email: 'admin@expiredtrial.test', password: 'Secure@123' });
+    accessToken = login.body.accessToken;
+    refreshCookie = (login.headers['set-cookie'] as unknown as string[])[0]!;
+  });
+
+  afterAll(async () => {
+    await prisma.refreshToken.deleteMany({ where: { staff: { clinic_id: clinicId } } });
+    await prisma.staffUser.deleteMany({ where: { clinic_id: clinicId } });
+    await prisma.clinic.delete({ where: { id: clinicId } });
+  });
+
+  it('blocks a normal authenticated request with TRIAL_EXPIRED', async () => {
+    const res = await request
+      .get('/api/v1/dashboard/summary')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('TRIAL_EXPIRED');
+  });
+
+  it('still allows logout despite the expired trial', async () => {
+    const res = await request
+      .post('/api/v1/auth/logout')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Cookie', refreshCookie);
+
+    expect(res.status).toBe(204);
+  });
+
+  it('does not lock a TRIAL clinic with no trial_ends_at set', async () => {
+    const openEndedClinic = await prisma.clinic.create({
+      data: { name: 'Open-Ended Trial Clinic', plan: 'TRIAL' },
+    });
+    await prisma.staffUser.create({
+      data: {
+        clinic_id: openEndedClinic.id,
+        email: 'admin@openended.test',
+        password_hash: await bcrypt.hash('Secure@123', 12),
+        first_name: 'Open',
+        last_name: 'Admin',
+        role: 'ADMIN',
+      },
+    });
+
+    const login = await request
+      .post('/api/v1/auth/login')
+      .send({ email: 'admin@openended.test', password: 'Secure@123' });
+
+    const res = await request
+      .get('/api/v1/dashboard/summary')
+      .set('Authorization', `Bearer ${login.body.accessToken}`);
+
+    expect(res.status).toBe(200);
+
+    await prisma.refreshToken.deleteMany({ where: { staff: { clinic_id: openEndedClinic.id } } });
+    await prisma.staffUser.deleteMany({ where: { clinic_id: openEndedClinic.id } });
+    await prisma.clinic.delete({ where: { id: openEndedClinic.id } });
+  });
+});

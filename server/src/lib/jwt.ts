@@ -7,6 +7,9 @@ export interface AccessTokenPayload {
   sub: string;
   clinic_id: string;
   role: string;
+  plan: string;
+  trial_ends_at: string | null;
+  extra_features: string[];
 }
 
 interface SignedPayload extends AccessTokenPayload {

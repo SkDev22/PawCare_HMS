@@ -25,9 +25,10 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import type { PermissionKey } from "@pawcare/shared";
+import type { PermissionKey, FeatureKey } from "@pawcare/shared";
 import { useAuthStore } from "@/stores/auth.store";
 import { hasPermission } from "@/lib/permissions";
+import { hasFeature } from "@/lib/features";
 import { NavMain } from "./nav-main";
 import { NavUser } from "./nav-user";
 
@@ -38,6 +39,7 @@ const NAV_GROUPS: {
     href: string;
     icon: LucideIcon;
     permission?: PermissionKey;
+    feature?: FeatureKey;
     items?: { title: string; href: string }[];
   }[];
 }[] = [
@@ -92,12 +94,14 @@ const NAV_GROUPS: {
         href: "/lab",
         icon: FlaskConical,
         permission: "LAB_ORDER_WRITE",
+        feature: "LABORATORY",
       },
       {
         title: "Ward",
         href: "/ward",
         icon: BedDouble,
         permission: "WARD_READ",
+        feature: "WARD",
       },
     ],
   },
@@ -115,6 +119,7 @@ const NAV_GROUPS: {
         href: "/inventory",
         icon: Package,
         permission: "INVENTORY_READ",
+        feature: "INVENTORY",
         items: [
           { title: "Items", href: "/inventory" },
           { title: "Add Item", href: "/inventory/new" },
@@ -127,6 +132,7 @@ const NAV_GROUPS: {
         href: "/reports",
         icon: BarChart3,
         permission: "REPORT_READ",
+        feature: "REPORTS",
       },
     ],
   },
@@ -146,11 +152,14 @@ const NAV_GROUPS: {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const role = useAuthStore((s) => s.user?.role);
+  const user = useAuthStore((s) => s.user);
 
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter(
-      (item) => !item.permission || hasPermission(role, item.permission),
+      (item) =>
+        (!item.permission || hasPermission(role, item.permission)) &&
+        (!item.feature || hasFeature(user, item.feature)),
     ),
   })).filter((group) => group.items.length > 0);
 

@@ -24,6 +24,7 @@ function refreshTokenExpiry(): Date {
 export async function login(email: string, password: string) {
   const staff = await prisma.staffUser.findFirst({
     where: { email, deleted_at: null, is_active: true },
+    include: { clinic: { select: { plan: true, trial_ends_at: true, extra_features: true } } },
   });
 
   // Perform comparison even on missing user to prevent timing attacks
@@ -34,10 +35,15 @@ export async function login(email: string, password: string) {
     throw new AppError('INVALID_CREDENTIALS', 'Invalid email or password', 401);
   }
 
+  const trialEndsAt = staff.clinic.trial_ends_at?.toISOString() ?? null;
+
   const accessToken = signAccessToken({
     sub: staff.id,
     clinic_id: staff.clinic_id,
     role: staff.role,
+    plan: staff.clinic.plan,
+    trial_ends_at: trialEndsAt,
+    extra_features: staff.clinic.extra_features,
   });
 
   const rawRefreshToken = generateRawToken();
@@ -66,6 +72,9 @@ export async function login(email: string, password: string) {
       last_name: staff.last_name,
       role: staff.role,
       clinic_id: staff.clinic_id,
+      plan: staff.clinic.plan,
+      trial_ends_at: trialEndsAt,
+      extra_features: staff.clinic.extra_features,
       ...(staff.avatar_url ? { avatar_url: staff.avatar_url } : {}),
       ...(staff.phone ? { phone: staff.phone } : {}),
       ...(staff.specialization ? { specialization: staff.specialization } : {}),
@@ -92,6 +101,7 @@ export async function refresh(rawRefreshToken: string) {
           license_number: true,
           is_active: true,
           deleted_at: true,
+          clinic: { select: { plan: true, trial_ends_at: true, extra_features: true } },
         },
       },
     },
@@ -105,10 +115,15 @@ export async function refresh(rawRefreshToken: string) {
     throw new AppError('ACCOUNT_INACTIVE', 'Account is inactive', 401);
   }
 
+  const trialEndsAt = stored.staff.clinic.trial_ends_at?.toISOString() ?? null;
+
   const accessToken = signAccessToken({
     sub: stored.staff.id,
     clinic_id: stored.staff.clinic_id,
     role: stored.staff.role,
+    plan: stored.staff.clinic.plan,
+    trial_ends_at: trialEndsAt,
+    extra_features: stored.staff.clinic.extra_features,
   });
 
   return {
@@ -120,6 +135,9 @@ export async function refresh(rawRefreshToken: string) {
       last_name: stored.staff.last_name,
       role: stored.staff.role,
       clinic_id: stored.staff.clinic_id,
+      plan: stored.staff.clinic.plan,
+      trial_ends_at: trialEndsAt,
+      extra_features: stored.staff.clinic.extra_features,
       ...(stored.staff.avatar_url ? { avatar_url: stored.staff.avatar_url } : {}),
       ...(stored.staff.phone ? { phone: stored.staff.phone } : {}),
       ...(stored.staff.specialization ? { specialization: stored.staff.specialization } : {}),

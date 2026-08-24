@@ -3,6 +3,7 @@ import { logger } from '../lib/logger';
 import { runInvoiceOverdueAlert } from './invoice-overdue.job';
 import { runDailyDigest } from './daily-digest.job';
 import { runNotificationRetention } from './notification-retention.job';
+import { runTrialExpiryReminder } from './trial-expiry.job';
 
 // Daily, fixed UTC time — no per-clinic timezone awareness yet.
 const DAILY_CRON = '0 7 * * *';
@@ -12,6 +13,7 @@ const JOBS: Record<string, () => Promise<void>> = {
   'invoice-overdue-alert':  runInvoiceOverdueAlert,
   'daily-digest':           runDailyDigest,
   'notification-retention': runNotificationRetention,
+  'trial-expiry-reminder':  runTrialExpiryReminder,
 };
 
 let tasks: ScheduledTask[] = [];

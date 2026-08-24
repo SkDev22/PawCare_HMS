@@ -1,3 +1,5 @@
+import type { ClinicPlanType } from '../constants/features';
+
 export type StaffRole =
   | 'ADMIN'
   | 'VETERINARIAN'
@@ -12,6 +14,9 @@ export interface AuthUser {
   last_name: string;
   role: StaffRole;
   clinic_id: string;
+  plan: ClinicPlanType;
+  trial_ends_at: string | null;
+  extra_features: string[];
   avatar_url?: string;
   phone?: string;
   specialization?: string;
