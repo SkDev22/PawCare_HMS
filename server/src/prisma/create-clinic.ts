@@ -10,11 +10,18 @@
 //     --password "TempPass123!" \
 //     --firstName "Jane" \
 //     --lastName "Doe" \
-//     --days 30
+//     --days 30 \
+//     --clinicEmail "contact@citypaws.com" \
+//     --phone "+1-555-0100" \
+//     --address "123 Vet Lane, Springfield"
 //
 // --days sets the trial length (default 30). Omit it (or pass --plan BASIC /
 // PRO / ENTERPRISE instead of relying on the default) to create a non-trial
 // clinic that never locks.
+//
+// --clinicEmail / --phone / --address are optional and populate the clinic's
+// own contact fields (shown/edited later in Settings) — distinct from
+// --email, which is only the first admin's login.
 
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -74,6 +81,9 @@ async function main() {
       name: args['name']!,
       plan,
       ...(trial_ends_at ? { trial_ends_at } : {}),
+      ...(args['clinicEmail'] ? { email: args['clinicEmail'] } : {}),
+      ...(args['phone'] ? { phone: args['phone'] } : {}),
+      ...(args['address'] ? { address: args['address'] } : {}),
     },
   });
 
@@ -92,6 +102,9 @@ async function main() {
   console.log('✅ Clinic created');
   console.log(`   Clinic:  ${clinic.name}  (${clinic.id})`);
   console.log(`   Plan:    ${plan}${trial_ends_at ? ` — expires ${trial_ends_at.toISOString().slice(0, 10)} (${days} days)` : ''}`);
+  if (clinic.email) console.log(`   Email:   ${clinic.email}`);
+  if (clinic.phone) console.log(`   Phone:   ${clinic.phone}`);
+  if (clinic.address) console.log(`   Address: ${clinic.address}`);
   console.log(`   Admin:   ${admin.first_name} ${admin.last_name} <${admin.email}>`);
   console.log('   They can log in now with the email/password you provided.');
 }

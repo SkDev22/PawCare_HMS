@@ -27,6 +27,7 @@ async function assertInvoice(id: string, clinicId: string) {
       status: true,
       subtotal: true,
       tax_amount: true,
+      tax_auto: true,
       discount_amount: true,
       total: true,
       paid_amount: true,
@@ -38,6 +39,22 @@ async function assertInvoice(id: string, clinicId: string) {
 
 export function clampZero(d: Decimal) {
   return d.isNegative() ? new Decimal(0) : d;
+}
+
+function daysFromNow(days: number): Date {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+// Recomputes tax from the clinic's configured tax_rate — only ever called for
+// invoices still in "auto" mode (see Invoice.tax_auto).
+async function autoTax(clinicId: string, subtotal: Decimal): Promise<Decimal> {
+  const clinic = await prisma.clinic.findUnique({
+    where: { id: clinicId },
+    select: { tax_rate: true },
+  });
+  return subtotal.times(clinic?.tax_rate ?? 0).dividedBy(100).toDecimalPlaces(2);
 }
 
 const invoiceListIncludes = {
@@ -142,24 +159,50 @@ export async function createInvoice(clinicId: string, data: CreateInvoiceInput) 
     }
   }
 
-  const tax      = new Decimal(data.tax_amount);
+  // Subtotal starts at 0 (no line items yet), so an auto tax_amount is 0
+  // regardless of tax_rate — it recalculates for real as items are added
+  // (see addLineItem). An explicitly-passed tax_amount opts out of auto mode
+  // from the start, same as editing it later would.
+  const taxAuto  = data.tax_amount === undefined;
+  const tax      = data.tax_amount !== undefined ? new Decimal(data.tax_amount) : new Decimal(0);
   const discount = new Decimal(data.discount_amount);
   const total    = clampZero(tax.minus(discount));
 
-  return prisma.invoice.create({
-    data: {
-      clinic_id:       clinicId,
-      owner_id:        data.owner_id,
-      subtotal:        new Decimal(0),
-      tax_amount:      tax,
-      discount_amount: discount,
-      total,
-      paid_amount:     new Decimal(0),
-      notes:           data.notes ?? null,
-      due_date:        data.due_date ? new Date(data.due_date) : null,
-      ...(data.appointment_id ? { appointment_id: data.appointment_id } : {}),
-    },
-    include: invoiceFullIncludes,
+  const clinic = await prisma.clinic.findUniqueOrThrow({
+    where: { id: clinicId },
+    select: { invoice_prefix: true, invoice_due_days: true },
+  });
+  const dueDate = data.due_date
+    ? new Date(data.due_date)
+    : daysFromNow(clinic.invoice_due_days);
+
+  return prisma.$transaction(async (tx) => {
+    // Atomic increment: the value returned is the counter *after*
+    // incrementing, so this invoice's number is one less than that.
+    const updated = await tx.clinic.update({
+      where: { id: clinicId },
+      data: { invoice_next_number: { increment: 1 } },
+      select: { invoice_next_number: true },
+    });
+    const invoiceNumber = `${clinic.invoice_prefix}${String(updated.invoice_next_number - 1).padStart(5, '0')}`;
+
+    return tx.invoice.create({
+      data: {
+        clinic_id:       clinicId,
+        owner_id:        data.owner_id,
+        invoice_number:  invoiceNumber,
+        subtotal:        new Decimal(0),
+        tax_amount:      tax,
+        tax_auto:        taxAuto,
+        discount_amount: discount,
+        total,
+        paid_amount:     new Decimal(0),
+        notes:           data.notes ?? null,
+        due_date:        dueDate,
+        ...(data.appointment_id ? { appointment_id: data.appointment_id } : {}),
+      },
+      include: invoiceFullIncludes,
+    });
   });
 }
 
@@ -178,7 +221,7 @@ export async function updateInvoice(id: string, clinicId: string, data: UpdateIn
     data: {
       ...(data.notes           !== undefined ? { notes: data.notes }                   : {}),
       ...(data.due_date        !== undefined ? { due_date: data.due_date ? new Date(data.due_date) : null } : {}),
-      ...(data.tax_amount      !== undefined ? { tax_amount: newTax }                  : {}),
+      ...(data.tax_amount      !== undefined ? { tax_amount: newTax, tax_auto: false } : {}),
       ...(data.discount_amount !== undefined ? { discount_amount: newDiscount }        : {}),
       total: newTotal,
     },
@@ -196,7 +239,8 @@ export async function addLineItem(invoiceId: string, clinicId: string, data: Add
 
   const itemTotal   = new Decimal(data.unit_price).times(data.quantity);
   const newSubtotal = invoice.subtotal.plus(itemTotal);
-  const newTotal    = clampZero(newSubtotal.plus(invoice.tax_amount).minus(invoice.discount_amount));
+  const newTax      = invoice.tax_auto ? await autoTax(clinicId, newSubtotal) : invoice.tax_amount;
+  const newTotal    = clampZero(newSubtotal.plus(newTax).minus(invoice.discount_amount));
 
   return prisma.$transaction(async (tx) => {
     const lineItem = await tx.invoiceLineItem.create({
@@ -215,7 +259,7 @@ export async function addLineItem(invoiceId: string, clinicId: string, data: Add
 
     await tx.invoice.update({
       where: { id: invoiceId },
-      data: { subtotal: newSubtotal, total: newTotal },
+      data: { subtotal: newSubtotal, tax_amount: newTax, total: newTotal },
     });
 
     return lineItem;
@@ -235,13 +279,14 @@ export async function removeLineItem(invoiceId: string, lineId: string, clinicId
   if (!lineItem) throw new AppError('NOT_FOUND', 'Line item not found', 404);
 
   const newSubtotal = clampZero(invoice.subtotal.minus(lineItem.total));
-  const newTotal    = clampZero(newSubtotal.plus(invoice.tax_amount).minus(invoice.discount_amount));
+  const newTax      = invoice.tax_auto ? await autoTax(clinicId, newSubtotal) : invoice.tax_amount;
+  const newTotal    = clampZero(newSubtotal.plus(newTax).minus(invoice.discount_amount));
 
   await prisma.$transaction(async (tx) => {
     await tx.invoiceLineItem.delete({ where: { id: lineId } });
     await tx.invoice.update({
       where: { id: invoiceId },
-      data: { subtotal: newSubtotal, total: newTotal },
+      data: { subtotal: newSubtotal, tax_amount: newTax, total: newTotal },
     });
   });
 }

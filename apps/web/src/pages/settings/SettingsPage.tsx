@@ -1,24 +1,26 @@
-import { Building2, Bell, ShieldCheck } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Bell, ShieldCheck } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   useNotificationPreferences,
   useUpdateNotificationPreferences,
-} from '@/hooks/use-notifications';
+} from "@/hooks/use-notifications";
+import { useAuthStore } from "@/stores/auth.store";
+import { hasPermission } from "@/lib/permissions";
+import { hasFeature } from "@/lib/features";
+import { ClinicInformationForm } from "./components/ClinicInformationForm";
+import { SubscriptionCard } from "./components/SubscriptionCard";
+import { BusinessHoursForm } from "./components/BusinessHoursForm";
+import { DataExportCard } from "./components/DataExportCard";
 
 const PLACEHOLDER_SECTIONS = [
   {
-    icon: Building2,
-    title: 'Clinic Information',
-    description: 'Name, address, contact details, timezone, and currency.',
-  },
-  {
     icon: ShieldCheck,
-    title: 'Security',
-    description: 'Password policy and session management.',
+    title: "Security",
+    description: "Password policy and session management.",
   },
 ];
 
@@ -41,17 +43,17 @@ function NotificationPreferencesCard() {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 5 }).map((_, i) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {Array.from({ length: 6 }).map((_, i) => (
               <Skeleton key={i} className="h-9 w-full" />
             ))}
           </div>
         ) : (
-          <div className="divide-y">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
             {data?.map((pref) => (
               <div
                 key={pref.type}
-                className="flex items-center justify-between py-3 first:pt-0 last:pb-0"
+                className="flex items-center justify-between gap-3 rounded-md border px-3 py-2.5"
               >
                 <Label
                   htmlFor={`pref-${pref.type}`}
@@ -76,15 +78,30 @@ function NotificationPreferencesCard() {
 }
 
 export function SettingsPage() {
+  const user = useAuthStore((s) => s.user);
+  const role = user?.role;
+  const canViewClinicInfo = hasPermission(role, "CLINIC_READ");
+  const canExport = hasPermission(role, "REPORT_READ") && hasFeature(user, "REPORTS");
+
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 w-full">
       <div>
         <h1 className="text-2xl font-semibold">Settings</h1>
-        <p className="text-sm text-muted-foreground">Clinic and account configuration</p>
+        <p className="text-sm text-muted-foreground">
+          Clinic and account configuration
+        </p>
       </div>
 
       <div className="space-y-4">
+        <SubscriptionCard />
+
+        {canViewClinicInfo && <ClinicInformationForm />}
+
+        {canViewClinicInfo && <BusinessHoursForm />}
+
         <NotificationPreferencesCard />
+
+        {canExport && <DataExportCard />}
 
         {PLACEHOLDER_SECTIONS.map((section) => (
           <Card key={section.title}>
@@ -96,7 +113,9 @@ export function SettingsPage() {
               <Badge variant="secondary">Coming soon</Badge>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">{section.description}</p>
+              <p className="text-sm text-muted-foreground">
+                {section.description}
+              </p>
             </CardContent>
           </Card>
         ))}

@@ -1,6 +1,8 @@
 import { format } from 'date-fns';
 import { formatCurrency } from '../../../lib/currency';
 import type { Invoice } from '../../../types/billing';
+import { useAuthStore } from '../../../stores/auth.store';
+import { useClinic } from '../../../hooks/use-clinic';
 
 interface Props {
   invoice: Invoice;
@@ -11,20 +13,25 @@ interface Props {
 // interactive invoice dashboard. Kept as plain light-mode styling since it
 // should look the same on paper regardless of the app's current theme.
 export function InvoiceReceipt({ invoice, statusLabel }: Props) {
+  const clinicName = useAuthStore((s) => s.user?.clinic_name);
+  // Only ADMIN can call GET /clinic (CLINIC_READ) — other roles simply fall
+  // back to the default terms line below, no footer text.
+  const { data: clinic } = useClinic();
+
   const subtotal = parseFloat(invoice.subtotal);
   const tax = parseFloat(invoice.tax_amount);
   const discount = parseFloat(invoice.discount_amount);
   const total = parseFloat(invoice.total);
   const paid = parseFloat(invoice.paid_amount);
   const balance = total - paid;
-  const invoiceNumber = invoice.id.slice(0, 8).toUpperCase();
+  const invoiceNumber = invoice.invoice_number ?? invoice.id.slice(0, 8).toUpperCase();
 
   return (
     <div className="hidden print:block bg-white text-slate-900 p-10">
       {/* Letterhead */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h2 className="text-lg font-bold">PawCare HMS</h2>
+          <h2 className="text-lg font-bold">{clinicName ?? 'PawCare HMS'}</h2>
           <p className="text-sm text-slate-500">Pet Hospital &amp; Clinic</p>
         </div>
         <span className="h-fit shrink-0 rounded-full border border-brand-700 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-brand-700">
@@ -159,8 +166,8 @@ export function InvoiceReceipt({ invoice, statusLabel }: Props) {
             ? `Payment is due by ${format(new Date(invoice.due_date), 'MMM d, yyyy')}.`
             : 'Payment is due upon receipt.'}
         </p>
-        <p className="text-xs text-slate-500">
-          Thank you for trusting us with your pet&apos;s care.
+        <p className="text-xs text-slate-500 whitespace-pre-line">
+          {clinic?.invoice_footer_text || "Thank you for trusting us with your pet's care."}
         </p>
       </div>
     </div>

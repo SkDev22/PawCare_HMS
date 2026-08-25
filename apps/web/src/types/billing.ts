@@ -45,6 +45,7 @@ export type InvoiceListItem = {
   id: string;
   clinic_id: string;
   owner_id: string;
+  invoice_number: string | null;
   status: InvoiceStatus;
   subtotal: string;
   tax_amount: string;
@@ -63,6 +64,7 @@ export type Invoice = {
   clinic_id: string;
   owner_id: string;
   appointment_id: string | null;
+  invoice_number: string | null;
   status: InvoiceStatus;
   subtotal: string;
   tax_amount: string;

@@ -11,6 +11,36 @@ function authed(req: Request): AuthenticatedRequest {
   return req as AuthenticatedRequest;
 }
 
+// ── Data Export ────────────────────────────────────────────────────────────────
+
+reportsRouter.get(
+  '/export/patients',
+  authenticate,
+  authorize('REPORT_READ'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const csv = await svc.exportPatientsCsv(authed(req).user.clinic_id);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="patients.csv"');
+      res.send(csv);
+    } catch (err) { next(err); }
+  },
+);
+
+reportsRouter.get(
+  '/export/invoices',
+  authenticate,
+  authorize('REPORT_READ'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const csv = await svc.exportInvoicesCsv(authed(req).user.clinic_id);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="invoices.csv"');
+      res.send(csv);
+    } catch (err) { next(err); }
+  },
+);
+
 reportsRouter.get(
   '/revenue',
   authenticate,

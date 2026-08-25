@@ -33,6 +33,16 @@ model Clinic {
   // e.g. one clinic buying a module that isn't part of its plan tier, without
   // changing what any other clinic on that same plan sees (see ADR-04).
   extra_features String[] @default([])
+  // Percentage (e.g. 8.5 = 8.5%). Auto-applied to new invoices' tax_amount
+  // as line items are added/removed, until a staff member manually edits an
+  // invoice's tax amount — see Invoice.tax_auto.
+  tax_rate            Decimal @default(0) @db.Decimal(5, 2)
+  invoice_prefix       String  @default("INV-")
+  // The number to assign to the *next* invoice created; incremented
+  // atomically at invoice-creation time (see billing.service.createInvoice).
+  invoice_next_number  Int     @default(1)
+  invoice_due_days     Int     @default(14)
+  invoice_footer_text  String?
   created_at    DateTime   @default(now())
   updated_at    DateTime   @updatedAt
 
@@ -41,8 +51,28 @@ model Clinic {
   rooms               Room[]
   goods_received_notes GoodsReceivedNote[]
   suppliers            Supplier[]
+  hours                ClinicHours[]
 
   @@map("clinics")
+}
+
+// One row per day of the week (0=Sun … 6=Sat). open_time/close_time use the
+// same "HH:MM" string convention as StaffSchedule. A day not present in the
+// table (or with is_closed = true) is treated as closed.
+model ClinicHours {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clinic_id   String   @db.Uuid
+  day_of_week Int
+  open_time   String?
+  close_time  String?
+  is_closed   Boolean  @default(false)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  clinic Clinic @relation(fields: [clinic_id], references: [id])
+
+  @@unique([clinic_id, day_of_week])
+  @@map("clinic_hours")
 }
 
 // ─────────────────────────────────────────
@@ -727,9 +757,18 @@ model Invoice {
   clinic_id                String        @db.Uuid
   owner_id                 String        @db.Uuid
   appointment_id           String?       @unique @db.Uuid
+  // Human-readable number assigned once at creation from the clinic's
+  // invoice_prefix/invoice_next_number counter — never reassigned, even if
+  // the clinic later changes its prefix. Null on invoices created before
+  // this field existed (see db:backfill-invoice-numbers).
+  invoice_number           String?
   status                   InvoiceStatus @default(DRAFT)
   subtotal                 Decimal       @db.Decimal(10, 2)
   tax_amount               Decimal       @default(0) @db.Decimal(10, 2)
+  // True until a staff member explicitly sets tax_amount via an invoice
+  // update, at which point it locks and stops being recalculated as line
+  // items change (see billing.service.ts).
+  tax_auto                 Boolean       @default(true)
   discount_amount          Decimal       @default(0) @db.Decimal(10, 2)
   total                    Decimal       @db.Decimal(10, 2)
   paid_amount              Decimal       @default(0) @db.Decimal(10, 2)
@@ -744,6 +783,7 @@ model Invoice {
   line_items  InvoiceLineItem[]
   payments    Payment[]
 
+  @@unique([clinic_id, invoice_number])
   @@index([owner_id, status])
   @@map("invoices")
 }

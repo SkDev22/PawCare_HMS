@@ -7,6 +7,7 @@ export * from './schemas/appointments.schema';
 export * from './schemas/emr.schema';
 export * from './schemas/billing.schema';
 export * from './schemas/staff.schema';
+export * from './schemas/clinic.schema';
 export * from './schemas/lab.schema';
 export * from './schemas/ward.schema';
 export * from './schemas/inventory.schema';

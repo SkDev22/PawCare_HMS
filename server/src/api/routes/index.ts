@@ -7,6 +7,7 @@ import { appointmentsRouter } from '../../modules/appointments/appointments.rout
 import { emrRouter } from '../../modules/emr/emr.routes';
 import { billingRouter } from '../../modules/billing/billing.routes';
 import { staffRouter } from '../../modules/staff/staff.routes';
+import { clinicRouter } from '../../modules/clinic/clinic.routes';
 import { labRouter } from '../../modules/laboratory/lab.routes';
 import { wardRouter } from '../../modules/ward/ward.routes';
 import { inventoryRouter } from '../../modules/inventory/inventory.routes';
@@ -27,6 +28,7 @@ apiRouter.use('/appointments', appointmentsRouter);
 apiRouter.use('/medical-records', emrRouter);
 apiRouter.use('/billing', billingRouter);
 apiRouter.use('/staff', staffRouter);
+apiRouter.use('/clinic', clinicRouter);
 // These four modules differ by plan (ADR-04) — gate them once here rather
 // than touching every route's own authenticate/authorize chain. authenticate
 // runs again inside each router too (each route already calls it directly);

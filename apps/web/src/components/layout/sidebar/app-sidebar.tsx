@@ -174,7 +174,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <PawPrint className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">PawCare HMS</span>
+                  <span className="truncate font-semibold">
+                    {user?.clinic_name ?? "PawCare HMS"}
+                  </span>
                   <span className="text-muted-foreground truncate text-xs">
                     Hospital Management
                   </span>

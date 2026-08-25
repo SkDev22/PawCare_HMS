@@ -113,3 +113,95 @@ describe('GET /api/v1/billing?search=', () => {
     expect(ids).not.toContain(invoiceOneId);
   });
 });
+
+describe('Invoice numbering and auto tax', () => {
+  let taxClinicId: string;
+  let taxAccessToken: string;
+  let taxOwnerId: string;
+
+  beforeAll(async () => {
+    const clinic = await prisma.clinic.create({
+      data: { name: 'Tax Test Clinic', tax_rate: 10, invoice_prefix: 'TX-' },
+    });
+    taxClinicId = clinic.id;
+
+    await prisma.staffUser.create({
+      data: {
+        clinic_id: taxClinicId,
+        email: 'admin@taxtest.test',
+        password_hash: await bcrypt.hash('Admin@1234', 12),
+        first_name: 'Tax',
+        last_name: 'Admin',
+        role: 'ADMIN',
+      },
+    });
+
+    const login = await request
+      .post('/api/v1/auth/login')
+      .send({ email: 'admin@taxtest.test', password: 'Admin@1234' });
+    taxAccessToken = login.body.accessToken;
+
+    const owner = await prisma.owner.create({
+      data: { clinic_id: taxClinicId, first_name: 'Tax', last_name: 'Owner', phone: '+1555302' },
+    });
+    taxOwnerId = owner.id;
+  });
+
+  afterAll(async () => {
+    await prisma.invoiceLineItem.deleteMany({ where: { invoice: { clinic_id: taxClinicId } } });
+    await prisma.invoice.deleteMany({ where: { clinic_id: taxClinicId } });
+    await prisma.owner.deleteMany({ where: { clinic_id: taxClinicId } });
+    await prisma.refreshToken.deleteMany({ where: { staff: { clinic_id: taxClinicId } } });
+    await prisma.staffUser.deleteMany({ where: { clinic_id: taxClinicId } });
+    await prisma.clinic.delete({ where: { id: taxClinicId } });
+  });
+
+  it('assigns sequential invoice numbers using the clinic prefix', async () => {
+    const first = await request
+      .post('/api/v1/billing')
+      .set('Authorization', `Bearer ${taxAccessToken}`)
+      .send({ owner_id: taxOwnerId });
+    const second = await request
+      .post('/api/v1/billing')
+      .set('Authorization', `Bearer ${taxAccessToken}`)
+      .send({ owner_id: taxOwnerId });
+
+    expect(first.body.invoice_number).toBe('TX-00001');
+    expect(second.body.invoice_number).toBe('TX-00002');
+  });
+
+  it('auto-calculates tax from the clinic tax_rate as line items are added, until manually overridden', async () => {
+    const created = await request
+      .post('/api/v1/billing')
+      .set('Authorization', `Bearer ${taxAccessToken}`)
+      .send({ owner_id: taxOwnerId });
+    const invoiceId = created.body.id;
+
+    const lineItemRes = await request
+      .post(`/api/v1/billing/${invoiceId}/line-items`)
+      .set('Authorization', `Bearer ${taxAccessToken}`)
+      .send({ description: 'Consultation', unit_price: 100, quantity: 1 });
+
+    expect(lineItemRes.body.total).toBe('100.00');
+    const afterItem = await request
+      .get(`/api/v1/billing/${invoiceId}`)
+      .set('Authorization', `Bearer ${taxAccessToken}`);
+    expect(afterItem.body.tax_amount).toBe('10.00'); // 10% of 100
+
+    const manualTax = await request
+      .put(`/api/v1/billing/${invoiceId}`)
+      .set('Authorization', `Bearer ${taxAccessToken}`)
+      .send({ tax_amount: 0 });
+    expect(manualTax.body.tax_amount).toBe('0.00');
+
+    await request
+      .post(`/api/v1/billing/${invoiceId}/line-items`)
+      .set('Authorization', `Bearer ${taxAccessToken}`)
+      .send({ description: 'Extra item', unit_price: 50, quantity: 1 });
+
+    const afterManualOverride = await request
+      .get(`/api/v1/billing/${invoiceId}`)
+      .set('Authorization', `Bearer ${taxAccessToken}`);
+    expect(afterManualOverride.body.tax_amount).toBe('0.00'); // stays locked, not recalculated
+  });
+});

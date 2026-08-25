@@ -546,7 +546,7 @@ export function InvoiceDetailPage() {
             <div>
               <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-2xl font-bold font-mono">
-                  #{invoice.id.slice(0, 8).toUpperCase()}
+                  {invoice.invoice_number ?? `#${invoice.id.slice(0, 8).toUpperCase()}`}
                 </h1>
                 <Badge variant={STATUS_BADGE[invoice.status]}>
                   {STATUS_LABEL[invoice.status]}

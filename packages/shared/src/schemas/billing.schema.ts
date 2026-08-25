@@ -9,7 +9,9 @@ export const CreateInvoiceSchema = z.object({
   appointment_id: z.string().uuid('Invalid appointment ID').optional(),
   due_date: z.string().optional(),
   notes: z.string().max(1000).optional(),
-  tax_amount: z.coerce.number().min(0).default(0),
+  // Omit to let the clinic's tax_rate auto-apply as line items are added
+  // (Invoice.tax_auto) — pass a value to set it manually from the start.
+  tax_amount: z.coerce.number().min(0).optional(),
   discount_amount: z.coerce.number().min(0).default(0),
 });
 

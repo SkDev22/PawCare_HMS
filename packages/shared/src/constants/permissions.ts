@@ -28,6 +28,10 @@ export const PERMISSIONS = {
   STAFF_READ:           ['ADMIN'] as const,
   STAFF_WRITE:          ['ADMIN'] as const,
 
+  // Clinic profile
+  CLINIC_READ:          ['ADMIN'] as const,
+  CLINIC_WRITE:         ['ADMIN'] as const,
+
   // Reports
   REPORT_READ:          ['ADMIN', 'VETERINARIAN'] as const,
 

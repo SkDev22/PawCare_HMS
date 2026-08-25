@@ -14,6 +14,7 @@ export interface AuthUser {
   last_name: string;
   role: StaffRole;
   clinic_id: string;
+  clinic_name: string;
   plan: ClinicPlanType;
   trial_ends_at: string | null;
   extra_features: string[];

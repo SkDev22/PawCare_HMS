@@ -1,4 +1,63 @@
 import { prisma } from '../../lib/prisma';
+import { toCsv } from '../../lib/csv';
+
+// ── Data Export ──────────────────────────────────────────────────────────────
+
+export async function exportPatientsCsv(clinicId: string): Promise<string> {
+  const pets = await prisma.pet.findMany({
+    where: { deleted_at: null, owner: { clinic_id: clinicId, deleted_at: null } },
+    include: {
+      owner: { select: { first_name: true, last_name: true, email: true, phone: true } },
+    },
+    orderBy: { created_at: 'asc' },
+  });
+
+  return toCsv(
+    [
+      'Pet Name', 'Species', 'Breed', 'Sex', 'Date of Birth', 'Weight (kg)',
+      'Status', 'Owner Name', 'Owner Phone', 'Owner Email',
+    ],
+    pets.map((p) => [
+      p.name,
+      p.species,
+      p.breed,
+      p.sex,
+      p.date_of_birth ? p.date_of_birth.toISOString().split('T')[0] : '',
+      p.weight_kg?.toString(),
+      p.status,
+      `${p.owner.first_name} ${p.owner.last_name}`,
+      p.owner.phone,
+      p.owner.email,
+    ]),
+  );
+}
+
+export async function exportInvoicesCsv(clinicId: string): Promise<string> {
+  const invoices = await prisma.invoice.findMany({
+    where: { clinic_id: clinicId },
+    include: { owner: { select: { first_name: true, last_name: true } } },
+    orderBy: { created_at: 'asc' },
+  });
+
+  return toCsv(
+    [
+      'Invoice Number', 'Owner', 'Status', 'Subtotal', 'Tax', 'Discount',
+      'Total', 'Paid', 'Due Date', 'Created At',
+    ],
+    invoices.map((inv) => [
+      inv.invoice_number ?? inv.id.slice(0, 8).toUpperCase(),
+      `${inv.owner.first_name} ${inv.owner.last_name}`,
+      inv.status,
+      inv.subtotal.toString(),
+      inv.tax_amount.toString(),
+      inv.discount_amount.toString(),
+      inv.total.toString(),
+      inv.paid_amount.toString(),
+      inv.due_date ? inv.due_date.toISOString().split('T')[0] : '',
+      inv.created_at.toISOString(),
+    ]),
+  );
+}
 
 // ── Revenue ──────────────────────────────────────────────────────────────────
 

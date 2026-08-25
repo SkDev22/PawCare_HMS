@@ -24,7 +24,7 @@ function refreshTokenExpiry(): Date {
 export async function login(email: string, password: string) {
   const staff = await prisma.staffUser.findFirst({
     where: { email, deleted_at: null, is_active: true },
-    include: { clinic: { select: { plan: true, trial_ends_at: true, extra_features: true } } },
+    include: { clinic: { select: { name: true, plan: true, trial_ends_at: true, extra_features: true } } },
   });
 
   // Perform comparison even on missing user to prevent timing attacks
@@ -72,6 +72,7 @@ export async function login(email: string, password: string) {
       last_name: staff.last_name,
       role: staff.role,
       clinic_id: staff.clinic_id,
+      clinic_name: staff.clinic.name,
       plan: staff.clinic.plan,
       trial_ends_at: trialEndsAt,
       extra_features: staff.clinic.extra_features,
@@ -101,7 +102,7 @@ export async function refresh(rawRefreshToken: string) {
           license_number: true,
           is_active: true,
           deleted_at: true,
-          clinic: { select: { plan: true, trial_ends_at: true, extra_features: true } },
+          clinic: { select: { name: true, plan: true, trial_ends_at: true, extra_features: true } },
         },
       },
     },
@@ -135,6 +136,7 @@ export async function refresh(rawRefreshToken: string) {
       last_name: stored.staff.last_name,
       role: stored.staff.role,
       clinic_id: stored.staff.clinic_id,
+      clinic_name: stored.staff.clinic.name,
       plan: stored.staff.clinic.plan,
       trial_ends_at: trialEndsAt,
       extra_features: stored.staff.clinic.extra_features,

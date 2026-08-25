@@ -210,7 +210,7 @@ export function BillingPage() {
                         onClick={() => navigate(`/billing/${invoice.id}`)}
                       >
                         <TableCell className="font-mono text-xs text-muted-foreground">
-                          #{invoice.id.slice(0, 8).toUpperCase()}
+                          {invoice.invoice_number ?? `#${invoice.id.slice(0, 8).toUpperCase()}`}
                         </TableCell>
                         <TableCell>
                           <div className="font-medium text-sm">
