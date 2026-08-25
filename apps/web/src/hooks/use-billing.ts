@@ -195,3 +195,20 @@ export function useRecordPayment(invoiceId: string) {
     onError: () => toast.error('Failed to record payment'),
   });
 }
+
+export function useVoidPayment(invoiceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ paymentId, reason }: { paymentId: string; reason: string }) =>
+      api
+        .post(`/billing/${invoiceId}/payments/${paymentId}/void`, { reason })
+        .then((r) => r.data as InvoicePayment),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['invoices'] });
+      toast.success('Payment voided');
+    },
+    onError: (err: { response?: { data?: { error?: { message?: string } } } }) => {
+      toast.error(err?.response?.data?.error?.message ?? 'Failed to void payment');
+    },
+  });
+}

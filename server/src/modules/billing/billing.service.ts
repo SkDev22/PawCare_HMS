@@ -8,6 +8,7 @@ import type {
   InvoiceQueryInput,
   AddLineItemInput,
   RecordPaymentInput,
+  VoidPaymentInput,
   CreateServiceInput,
   UpdateServiceInput,
   InvoiceStatusType,
@@ -345,6 +346,70 @@ export async function recordPayment(invoiceId: string, clinicId: string, data: R
     });
 
     return payment;
+  });
+}
+
+// Reverses a payment's effect on the invoice without ever deleting the row —
+// it stays visible in the payments list, marked voided with who/why/when,
+// which is the only safe way to correct money already logged (never a hard
+// delete — see ADR-style note on Payment.voided_at in schema.prisma).
+export async function voidPayment(
+  invoiceId: string,
+  paymentId: string,
+  clinicId: string,
+  data: VoidPaymentInput,
+  voidedByStaffId: string,
+) {
+  const invoice = await assertInvoice(invoiceId, clinicId);
+  if (invoice.status === 'REFUNDED') {
+    throw new AppError(
+      'BAD_REQUEST',
+      'Cannot void a payment on a refunded invoice',
+      400,
+    );
+  }
+
+  const payment = await prisma.payment.findFirst({
+    where: { id: paymentId, invoice_id: invoiceId },
+  });
+  if (!payment) throw new AppError('NOT_FOUND', 'Payment not found', 404);
+  if (payment.voided_at) throw new AppError('BAD_REQUEST', 'Payment is already voided', 400);
+
+  const newPaidAmount = clampZero(invoice.paid_amount.minus(payment.amount));
+
+  // Mirrors recordPayment's forward logic in reverse — but a paid-off invoice
+  // that loses a payment shouldn't silently fall back to DRAFT.
+  let newStatus: InvoiceStatusType = invoice.status as InvoiceStatusType;
+  if (newPaidAmount.gte(invoice.total) && invoice.total.gt(0)) {
+    newStatus = 'PAID';
+  } else if (newPaidAmount.gt(0)) {
+    newStatus = 'PARTIALLY_PAID';
+  } else if (invoice.status !== 'DRAFT') {
+    newStatus = 'SENT';
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const voided = await tx.payment.update({
+      where: { id: paymentId },
+      data: {
+        voided_at:     new Date(),
+        voided_reason: data.reason,
+        voided_by:     voidedByStaffId,
+      },
+    });
+
+    await tx.invoice.update({
+      where: { id: invoiceId },
+      data: { paid_amount: newPaidAmount, status: newStatus },
+    });
+
+    await notifyRole(tx, clinicId, ['ADMIN'], {
+      type:    'payment_voided',
+      subject: 'Payment Voided',
+      body:    `Payment of ${payment.amount} on invoice ${invoiceId.slice(0, 8).toUpperCase()} was voided: ${data.reason}`,
+    });
+
+    return voided;
   });
 }
 

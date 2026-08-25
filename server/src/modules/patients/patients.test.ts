@@ -169,3 +169,46 @@ describe('Pets — GET /api/v1/pets', () => {
     });
   });
 });
+
+describe('Owners — DELETE /api/v1/owners/:id', () => {
+  it('blocks deletion while the owner still has an active pet', async () => {
+    const owner = await request
+      .post('/api/v1/owners')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ first_name: 'Delete', last_name: 'Blocked', phone: '+1555400' });
+    const ownerId = owner.body.id;
+
+    await request
+      .post('/api/v1/pets')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ owner_id: ownerId, name: 'Rex', species: 'DOG' });
+
+    const res = await request
+      .delete(`/api/v1/owners/${ownerId}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(409);
+
+    const stillThere = await request
+      .get(`/api/v1/owners/${ownerId}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(stillThere.status).toBe(200);
+  });
+
+  it('deletes an owner with no pets', async () => {
+    const owner = await request
+      .post('/api/v1/owners')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ first_name: 'Delete', last_name: 'Allowed', phone: '+1555401' });
+    const ownerId = owner.body.id;
+
+    const res = await request
+      .delete(`/api/v1/owners/${ownerId}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(res.status).toBe(204);
+
+    const gone = await request
+      .get(`/api/v1/owners/${ownerId}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(gone.status).toBe(404);
+  });
+});

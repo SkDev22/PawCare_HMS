@@ -19,6 +19,9 @@ export const PERMISSIONS = {
   INVOICE_READ:         ['ADMIN', 'RECEPTIONIST', 'VETERINARIAN'] as const,
   INVOICE_WRITE:        ['ADMIN', 'RECEPTIONIST'] as const,
   PAYMENT_PROCESS:      ['ADMIN', 'RECEPTIONIST'] as const,
+  // Voiding a recorded payment reverses real money already logged — kept
+  // ADMIN-only, unlike recording one, given the overpayment risk this closes.
+  PAYMENT_VOID:         ['ADMIN'] as const,
 
   // Inventory
   INVENTORY_READ:       ['ADMIN', 'VETERINARIAN', 'NURSE', 'RECEPTIONIST'] as const,

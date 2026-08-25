@@ -12,6 +12,7 @@ import {
   CreateServiceSchema,
   UpdateServiceSchema,
   ServiceQuerySchema,
+  VoidPaymentSchema,
 } from '@pawcare/shared';
 import type { InvoiceQueryInput, ServiceQueryInput } from '@pawcare/shared';
 import * as svc from './billing.service';
@@ -177,6 +178,25 @@ billingRouter.post(
     try {
       const payment = await svc.recordPayment(req.params.id, authed(req).user.clinic_id, req.body);
       res.status(201).json(payment);
+    } catch (err) { next(err); }
+  },
+);
+
+billingRouter.post(
+  '/:id/payments/:paymentId/void',
+  authenticate,
+  authorize('PAYMENT_VOID'),
+  validate({ body: VoidPaymentSchema }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const payment = await svc.voidPayment(
+        req.params.id,
+        req.params.paymentId,
+        authed(req).user.clinic_id,
+        req.body,
+        authed(req).user.id,
+      );
+      res.json(payment);
     } catch (err) { next(err); }
   },
 );

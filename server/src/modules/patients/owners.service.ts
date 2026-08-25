@@ -123,6 +123,21 @@ export async function deleteOwner(id: string, clinicId: string) {
     throw new AppError('NOT_FOUND', 'Owner not found', 404);
   }
 
+  // Archiving an owner would otherwise silently hide their pets from every
+  // list/search (pets.service scopes through owner.deleted_at) without the
+  // pets themselves ever being reviewed — force each pet to be archived or
+  // transferred first so nothing disappears unintentionally.
+  const activePetCount = await prisma.pet.count({
+    where: { owner_id: id, deleted_at: null },
+  });
+  if (activePetCount > 0) {
+    throw new AppError(
+      'CONFLICT',
+      `Cannot delete owner: ${activePetCount} pet(s) are still linked. Archive or transfer them first.`,
+      409,
+    );
+  }
+
   await prisma.owner.update({
     where: { id },
     data: { deleted_at: new Date() },

@@ -8,19 +8,26 @@ import {
   MapPin,
   AlertCircle,
   Pencil,
+  Trash2,
   PawPrint,
   MessageCircle,
   ShieldCheck,
   Calendar,
 } from "lucide-react";
 import { format } from "date-fns";
-import { useOwner } from "@/hooks/use-owners";
+import { useOwner, useDeleteOwner } from "@/hooks/use-owners";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { OwnerForm } from "@/components/patients/OwnerForm";
 import { PetForm } from "@/components/patients/PetForm";
 import { speciesBadgeVariant, speciesIcon } from "@/lib/patient-utils";
@@ -34,9 +41,18 @@ export function OwnerDetailPage() {
   const role = useAuthStore((s) => s.user?.role);
   const canWrite = hasPermission(role, "PATIENT_WRITE");
   const { data: owner, isLoading, error } = useOwner(id);
+  const deleteOwner = useDeleteOwner();
 
   const [editOpen, setEditOpen] = useState(false);
   const [addPetOpen, setAddPetOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  function handleDelete() {
+    if (!owner) return;
+    deleteOwner.mutate(owner.id, {
+      onSuccess: () => navigate("/owners"),
+    });
+  }
 
   if (error) {
     return (
@@ -137,6 +153,15 @@ export function OwnerDetailPage() {
                     >
                       <Pencil className="w-4 h-4" />
                       Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive border-destructive/40 hover:bg-destructive/10"
+                      onClick={() => setDeleteOpen(true)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete
                     </Button>
                   </div>
                 )}
@@ -257,6 +282,32 @@ export function OwnerDetailPage() {
             onClose={() => setAddPetOpen(false)}
             ownerId={owner.id}
           />
+
+          <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Delete Owner?</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">
+                {owner.first_name} {owner.last_name} will be removed from owner
+                lists and search. Their pets must be archived or transferred
+                first — if any are still active, this will be blocked. This
+                cannot be undone from the UI.
+              </p>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={deleteOwner.isPending}
+                  onClick={handleDelete}
+                >
+                  {deleteOwner.isPending ? "Deleting..." : "Delete"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </>
       )}
     </div>

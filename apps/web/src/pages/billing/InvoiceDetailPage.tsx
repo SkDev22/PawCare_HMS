@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
-import { ArrowLeft, Plus, Trash2, CreditCard, Printer } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, CreditCard, Printer, Ban } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import {
@@ -53,15 +53,19 @@ import {
   useAddLineItem,
   useRemoveLineItem,
   useRecordPayment,
+  useVoidPayment,
   useUpdateInvoiceStatus,
 } from "../../hooks/use-billing";
 import { formatCurrency } from "../../lib/currency";
 import { InvoiceReceipt } from "./components/InvoiceReceipt";
+import { useAuthStore } from "../../stores/auth.store";
+import { hasPermission } from "../../lib/permissions";
 import type {
   InvoiceStatus,
   PaymentMethod,
   LineItem,
   Service,
+  InvoicePayment,
 } from "../../types/billing";
 
 // ── Status helpers ──────────────────────────────────────────────────────────
@@ -473,6 +477,77 @@ function RecordPaymentDialog({
   );
 }
 
+function VoidPaymentDialog({
+  invoiceId,
+  payment,
+  onOpenChange,
+}: {
+  invoiceId: string;
+  payment: InvoicePayment | null;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const voidPayment = useVoidPayment(invoiceId);
+  const [reason, setReason] = useState("");
+
+  return (
+    <Dialog
+      open={!!payment}
+      onOpenChange={(v) => {
+        onOpenChange(v);
+        if (!v) setReason("");
+      }}
+    >
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Void Payment?</DialogTitle>
+        </DialogHeader>
+        {payment && (
+          <>
+            <p className="text-sm text-muted-foreground">
+              This reverses{" "}
+              <span className="font-semibold text-foreground">
+                {formatCurrency(payment.amount)}
+              </span>{" "}
+              off the invoice's paid amount and updates its status. The payment
+              stays visible in the history, marked as voided — it is never
+              deleted.
+            </p>
+            <div className="space-y-1.5">
+              <Label htmlFor="void-reason">
+                Reason <span className="text-destructive">*</span>
+              </Label>
+              <Textarea
+                id="void-reason"
+                rows={2}
+                placeholder="e.g. Entered in error, duplicate entry, refunded in cash..."
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={reason.trim().length < 3 || voidPayment.isPending}
+                onClick={() =>
+                  voidPayment.mutate(
+                    { paymentId: payment.id, reason: reason.trim() },
+                    { onSuccess: () => onOpenChange(false) },
+                  )
+                }
+              >
+                {voidPayment.isPending ? "Voiding..." : "Void Payment"}
+              </Button>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export function InvoiceDetailPage() {
@@ -482,10 +557,13 @@ export function InvoiceDetailPage() {
   const { data: invoice, isLoading } = useInvoice(id);
   const updateStatus = useUpdateInvoiceStatus(id!);
   const removeLineItem = useRemoveLineItem(id!);
+  const role = useAuthStore((s) => s.user?.role);
+  const canVoidPayments = hasPermission(role, "PAYMENT_VOID");
 
   const [addLineOpen, setAddLineOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<LineItem | null>(null);
+  const [voidTarget, setVoidTarget] = useState<InvoicePayment | null>(null);
 
   if (isLoading) {
     return (
@@ -742,11 +820,12 @@ export function InvoiceDetailPage() {
                         <TableHead>Method</TableHead>
                         <TableHead>Notes</TableHead>
                         <TableHead className="text-right">Amount</TableHead>
+                        {canVoidPayments && <TableHead className="w-10 print:hidden" />}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {invoice.payments.map((p) => (
-                        <TableRow key={p.id}>
+                        <TableRow key={p.id} className={p.voided_at ? "opacity-60" : undefined}>
                           <TableCell className="text-sm whitespace-nowrap">
                             {format(new Date(p.received_at), "MMM d, yyyy")}
                           </TableCell>
@@ -754,11 +833,38 @@ export function InvoiceDetailPage() {
                             {PAYMENT_METHOD_LABELS[p.method]}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            {p.notes ?? "—"}
+                            {p.voided_at ? (
+                              <span className="flex items-center gap-1.5">
+                                <Badge variant="destructive" className="text-[10px]">
+                                  Voided
+                                </Badge>
+                                {p.voided_reason}
+                              </span>
+                            ) : (
+                              (p.notes ?? "—")
+                            )}
                           </TableCell>
-                          <TableCell className="text-right text-sm font-medium text-emerald-600">
+                          <TableCell
+                            className={`text-right text-sm font-medium ${
+                              p.voided_at ? "line-through text-muted-foreground" : "text-emerald-600"
+                            }`}
+                          >
                             {formatCurrency(p.amount)}
                           </TableCell>
+                          {canVoidPayments && (
+                            <TableCell className="print:hidden">
+                              {!p.voided_at && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                  onClick={() => setVoidTarget(p)}
+                                >
+                                  <Ban className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>
@@ -866,6 +972,14 @@ export function InvoiceDetailPage() {
         balanceDue={balance}
         open={paymentOpen}
         onOpenChange={setPaymentOpen}
+      />
+
+      <VoidPaymentDialog
+        invoiceId={id!}
+        payment={voidTarget}
+        onOpenChange={(open) => {
+          if (!open) setVoidTarget(null);
+        }}
       />
 
       {/* Remove line item confirmation */}

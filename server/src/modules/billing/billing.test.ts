@@ -305,6 +305,7 @@ describe('Billable services management', () => {
 describe('Recording payments', () => {
   let payClinicId: string;
   let payToken: string;
+  let receptionistToken: string;
   let payOwnerId: string;
 
   beforeAll(async () => {
@@ -321,11 +322,26 @@ describe('Recording payments', () => {
         role: 'ADMIN',
       },
     });
+    await prisma.staffUser.create({
+      data: {
+        clinic_id: payClinicId,
+        email: 'receptionist@paymentstest.test',
+        password_hash: await bcrypt.hash('Front@1234', 12),
+        first_name: 'Payments',
+        last_name: 'Receptionist',
+        role: 'RECEPTIONIST',
+      },
+    });
 
     const login = await request
       .post('/api/v1/auth/login')
       .send({ email: 'admin@paymentstest.test', password: 'Admin@1234' });
     payToken = login.body.accessToken;
+
+    const receptionistLogin = await request
+      .post('/api/v1/auth/login')
+      .send({ email: 'receptionist@paymentstest.test', password: 'Front@1234' });
+    receptionistToken = receptionistLogin.body.accessToken;
 
     const owner = await prisma.owner.create({
       data: { clinic_id: payClinicId, first_name: 'Pay', last_name: 'Owner', phone: '+1555303' },
@@ -407,5 +423,66 @@ describe('Recording payments', () => {
       .set('Authorization', `Bearer ${payToken}`);
     expect(invoice.body.status).toBe('PAID');
     expect(invoice.body.paid_amount).toBe('1000.00');
+  });
+
+  it('voids a payment, reversing its effect on paid_amount and status without deleting it', async () => {
+    const invoiceId = await makeInvoiceWithTotal(1000);
+    const payment = await request
+      .post(`/api/v1/billing/${invoiceId}/payments`)
+      .set('Authorization', `Bearer ${payToken}`)
+      .send({ amount: 500, method: 'cash' });
+    const paymentId = payment.body.id;
+
+    const voided = await request
+      .post(`/api/v1/billing/${invoiceId}/payments/${paymentId}/void`)
+      .set('Authorization', `Bearer ${payToken}`)
+      .send({ reason: 'Entered in error' });
+    expect(voided.status).toBe(200);
+    expect(voided.body.voided_reason).toBe('Entered in error');
+
+    const invoice = await request
+      .get(`/api/v1/billing/${invoiceId}`)
+      .set('Authorization', `Bearer ${payToken}`);
+    expect(invoice.body.status).toBe('SENT');
+    expect(invoice.body.paid_amount).toBe('0.00');
+    // Still present in the history, not deleted
+    const found = invoice.body.payments.find((p: { id: string }) => p.id === paymentId);
+    expect(found).toBeDefined();
+    expect(found.voided_at).not.toBeNull();
+  });
+
+  it('rejects voiding the same payment twice', async () => {
+    const invoiceId = await makeInvoiceWithTotal(1000);
+    const payment = await request
+      .post(`/api/v1/billing/${invoiceId}/payments`)
+      .set('Authorization', `Bearer ${payToken}`)
+      .send({ amount: 500, method: 'cash' });
+    const paymentId = payment.body.id;
+
+    await request
+      .post(`/api/v1/billing/${invoiceId}/payments/${paymentId}/void`)
+      .set('Authorization', `Bearer ${payToken}`)
+      .send({ reason: 'First void' });
+
+    const secondVoid = await request
+      .post(`/api/v1/billing/${invoiceId}/payments/${paymentId}/void`)
+      .set('Authorization', `Bearer ${payToken}`)
+      .send({ reason: 'Second attempt' });
+    expect(secondVoid.status).toBe(400);
+  });
+
+  it('lets a receptionist record a payment but not void one', async () => {
+    const invoiceId = await makeInvoiceWithTotal(1000);
+    const payment = await request
+      .post(`/api/v1/billing/${invoiceId}/payments`)
+      .set('Authorization', `Bearer ${receptionistToken}`)
+      .send({ amount: 500, method: 'cash' });
+    expect(payment.status).toBe(201);
+
+    const voidAttempt = await request
+      .post(`/api/v1/billing/${invoiceId}/payments/${payment.body.id}/void`)
+      .set('Authorization', `Bearer ${receptionistToken}`)
+      .send({ reason: 'Should be forbidden' });
+    expect(voidAttempt.status).toBe(403);
   });
 });

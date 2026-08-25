@@ -33,6 +33,9 @@ export type InvoicePayment = {
   stripe_charge_id: string | null;
   received_at: string;
   notes: string | null;
+  voided_at: string | null;
+  voided_reason: string | null;
+  voided_by: string | null;
 };
 
 export type InvoiceOwner = {

@@ -817,6 +817,12 @@ model Payment {
   stripe_charge_id String?
   received_at      DateTime @default(now())
   notes            String?
+  // A voided payment is never deleted — it stays visible on the invoice for
+  // audit purposes, with its effect reversed out of the invoice's
+  // paid_amount/status (see billing.service.ts voidPayment).
+  voided_at        DateTime?
+  voided_reason    String?
+  voided_by        String?    @db.Uuid
 
   invoice Invoice @relation(fields: [invoice_id], references: [id])
 

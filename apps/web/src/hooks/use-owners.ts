@@ -57,8 +57,8 @@ export function useDeleteOwner() {
       qc.invalidateQueries({ queryKey: ['owners'] });
       toast.success('Owner removed');
     },
-    onError: () => {
-      toast.error('Failed to remove owner');
+    onError: (err: { response?: { data?: { error?: { message?: string } } } }) => {
+      toast.error(err?.response?.data?.error?.message ?? 'Failed to remove owner');
     },
   });
 }

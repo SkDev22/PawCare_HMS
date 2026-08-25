@@ -10,6 +10,7 @@ export const NOTIFICATION_TYPES = [
   { type: 'ward_discharge', label: 'Ward discharge' },
   { type: 'schedule_changed', label: 'My schedule changed' },
   { type: 'payment_recorded', label: 'Payment recorded' },
+  { type: 'payment_voided', label: 'Payment voided' },
   { type: 'low_stock', label: 'Low stock alert' },
   { type: 'controlled_substance_dispensed', label: 'Controlled substance dispensed' },
   { type: 'lab_result_abnormal', label: 'Abnormal lab result' },

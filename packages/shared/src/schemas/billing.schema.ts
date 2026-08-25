@@ -49,6 +49,10 @@ export const UpdateInvoiceStatusSchema = z.object({
   status: InvoiceStatusEnum,
 });
 
+export const VoidPaymentSchema = z.object({
+  reason: z.string().min(3, 'A reason is required to void a payment').max(500),
+});
+
 export const ServiceCategoryEnum = z.enum(['exam', 'procedure', 'lab', 'medication', 'grooming', 'other']);
 
 export const CreateServiceSchema = z.object({
@@ -81,6 +85,7 @@ export type InvoiceQueryInput = z.infer<typeof InvoiceQuerySchema>;
 export type AddLineItemInput = z.infer<typeof AddLineItemSchema>;
 export type RecordPaymentInput = z.infer<typeof RecordPaymentSchema>;
 export type UpdateInvoiceStatusInput = z.infer<typeof UpdateInvoiceStatusSchema>;
+export type VoidPaymentInput = z.infer<typeof VoidPaymentSchema>;
 export type CreateServiceInput = z.infer<typeof CreateServiceSchema>;
 export type UpdateServiceInput = z.infer<typeof UpdateServiceSchema>;
 export type ServiceQueryInput = z.infer<typeof ServiceQuerySchema>;
