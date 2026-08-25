@@ -205,3 +205,207 @@ describe('Invoice numbering and auto tax', () => {
     expect(afterManualOverride.body.tax_amount).toBe('0.00'); // stays locked, not recalculated
   });
 });
+
+describe('Billable services management', () => {
+  let svcClinicId: string;
+  let adminToken: string;
+  let vetToken: string;
+
+  beforeAll(async () => {
+    const clinic = await prisma.clinic.create({ data: { name: 'Services Test Clinic' } });
+    svcClinicId = clinic.id;
+
+    await prisma.staffUser.create({
+      data: {
+        clinic_id: svcClinicId,
+        email: 'admin@servicestest.test',
+        password_hash: await bcrypt.hash('Admin@1234', 12),
+        first_name: 'Services',
+        last_name: 'Admin',
+        role: 'ADMIN',
+      },
+    });
+    await prisma.staffUser.create({
+      data: {
+        clinic_id: svcClinicId,
+        email: 'vet@servicestest.test',
+        password_hash: await bcrypt.hash('Vet@1234567', 12),
+        first_name: 'Services',
+        last_name: 'Vet',
+        role: 'VETERINARIAN',
+      },
+    });
+
+    const adminLogin = await request
+      .post('/api/v1/auth/login')
+      .send({ email: 'admin@servicestest.test', password: 'Admin@1234' });
+    adminToken = adminLogin.body.accessToken;
+
+    const vetLogin = await request
+      .post('/api/v1/auth/login')
+      .send({ email: 'vet@servicestest.test', password: 'Vet@1234567' });
+    vetToken = vetLogin.body.accessToken;
+  });
+
+  afterAll(async () => {
+    await prisma.service.deleteMany({ where: { clinic_id: svcClinicId } });
+    await prisma.refreshToken.deleteMany({ where: { staff: { clinic_id: svcClinicId } } });
+    await prisma.staffUser.deleteMany({ where: { clinic_id: svcClinicId } });
+    await prisma.clinic.delete({ where: { id: svcClinicId } });
+  });
+
+  it('lets an admin create a service, and hides it from the default list once deactivated', async () => {
+    const created = await request
+      .post('/api/v1/billing/services')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Consultation Fee', category: 'exam', price: 45, is_taxable: true });
+    expect(created.status).toBe(201);
+    expect(created.body.name).toBe('Consultation Fee');
+    expect(created.body.is_active).toBe(true);
+    const serviceId = created.body.id;
+
+    const listActive = await request
+      .get('/api/v1/billing/services')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(listActive.body.map((s: { id: string }) => s.id)).toContain(serviceId);
+
+    const updated = await request
+      .put(`/api/v1/billing/services/${serviceId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ price: 50, is_active: false });
+    expect(updated.status).toBe(200);
+    expect(updated.body.price).toBe('50.00');
+    expect(updated.body.is_active).toBe(false);
+
+    const listAfterDeactivate = await request
+      .get('/api/v1/billing/services')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(listAfterDeactivate.body.map((s: { id: string }) => s.id)).not.toContain(serviceId);
+
+    const listIncludingInactive = await request
+      .get('/api/v1/billing/services?include_inactive=true')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(listIncludingInactive.body.map((s: { id: string }) => s.id)).toContain(serviceId);
+  });
+
+  it('lets a vet read services but not create or update them', async () => {
+    const readRes = await request
+      .get('/api/v1/billing/services')
+      .set('Authorization', `Bearer ${vetToken}`);
+    expect(readRes.status).toBe(200);
+
+    const createRes = await request
+      .post('/api/v1/billing/services')
+      .set('Authorization', `Bearer ${vetToken}`)
+      .send({ name: 'Unauthorized Service', category: 'exam', price: 10, is_taxable: true });
+    expect(createRes.status).toBe(403);
+  });
+});
+
+describe('Recording payments', () => {
+  let payClinicId: string;
+  let payToken: string;
+  let payOwnerId: string;
+
+  beforeAll(async () => {
+    const clinic = await prisma.clinic.create({ data: { name: 'Payments Test Clinic' } });
+    payClinicId = clinic.id;
+
+    await prisma.staffUser.create({
+      data: {
+        clinic_id: payClinicId,
+        email: 'admin@paymentstest.test',
+        password_hash: await bcrypt.hash('Admin@1234', 12),
+        first_name: 'Payments',
+        last_name: 'Admin',
+        role: 'ADMIN',
+      },
+    });
+
+    const login = await request
+      .post('/api/v1/auth/login')
+      .send({ email: 'admin@paymentstest.test', password: 'Admin@1234' });
+    payToken = login.body.accessToken;
+
+    const owner = await prisma.owner.create({
+      data: { clinic_id: payClinicId, first_name: 'Pay', last_name: 'Owner', phone: '+1555303' },
+    });
+    payOwnerId = owner.id;
+  });
+
+  afterAll(async () => {
+    await prisma.invoiceLineItem.deleteMany({ where: { invoice: { clinic_id: payClinicId } } });
+    await prisma.payment.deleteMany({ where: { invoice: { clinic_id: payClinicId } } });
+    await prisma.invoice.deleteMany({ where: { clinic_id: payClinicId } });
+    await prisma.owner.deleteMany({ where: { clinic_id: payClinicId } });
+    await prisma.refreshToken.deleteMany({ where: { staff: { clinic_id: payClinicId } } });
+    await prisma.staffUser.deleteMany({ where: { clinic_id: payClinicId } });
+    await prisma.clinic.delete({ where: { id: payClinicId } });
+  });
+
+  async function makeInvoiceWithTotal(total: number) {
+    const created = await request
+      .post('/api/v1/billing')
+      .set('Authorization', `Bearer ${payToken}`)
+      .send({ owner_id: payOwnerId, tax_amount: 0 });
+    const invoiceId = created.body.id;
+    await request
+      .post(`/api/v1/billing/${invoiceId}/line-items`)
+      .set('Authorization', `Bearer ${payToken}`)
+      .send({ description: 'Test charge', unit_price: total, quantity: 1 });
+    return invoiceId;
+  }
+
+  it('records a payment smaller than the total as PARTIALLY_PAID, not PAID', async () => {
+    const invoiceId = await makeInvoiceWithTotal(1000);
+
+    const res = await request
+      .post(`/api/v1/billing/${invoiceId}/payments`)
+      .set('Authorization', `Bearer ${payToken}`)
+      .send({ amount: 500, method: 'cash' });
+    expect(res.status).toBe(201);
+
+    const invoice = await request
+      .get(`/api/v1/billing/${invoiceId}`)
+      .set('Authorization', `Bearer ${payToken}`);
+    expect(invoice.body.status).toBe('PARTIALLY_PAID');
+    expect(invoice.body.paid_amount).toBe('500.00');
+  });
+
+  it('rejects a payment that exceeds the remaining balance instead of silently marking it PAID', async () => {
+    const invoiceId = await makeInvoiceWithTotal(1000);
+
+    // Simulates the exact accidental-concatenation bug: "1000500" instead of "500"
+    const res = await request
+      .post(`/api/v1/billing/${invoiceId}/payments`)
+      .set('Authorization', `Bearer ${payToken}`)
+      .send({ amount: 1000500, method: 'cash' });
+    expect(res.status).toBe(400);
+
+    const invoice = await request
+      .get(`/api/v1/billing/${invoiceId}`)
+      .set('Authorization', `Bearer ${payToken}`);
+    expect(invoice.body.status).toBe('DRAFT');
+    expect(invoice.body.paid_amount).toBe('0.00');
+  });
+
+  it('marks the invoice PAID once payments reach the full total', async () => {
+    const invoiceId = await makeInvoiceWithTotal(1000);
+
+    await request
+      .post(`/api/v1/billing/${invoiceId}/payments`)
+      .set('Authorization', `Bearer ${payToken}`)
+      .send({ amount: 500, method: 'cash' });
+    const second = await request
+      .post(`/api/v1/billing/${invoiceId}/payments`)
+      .set('Authorization', `Bearer ${payToken}`)
+      .send({ amount: 500, method: 'cash' });
+    expect(second.status).toBe(201);
+
+    const invoice = await request
+      .get(`/api/v1/billing/${invoiceId}`)
+      .set('Authorization', `Bearer ${payToken}`);
+    expect(invoice.body.status).toBe('PAID');
+    expect(invoice.body.paid_amount).toBe('1000.00');
+  });
+});

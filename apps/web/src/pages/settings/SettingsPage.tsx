@@ -15,6 +15,7 @@ import { ClinicInformationForm } from "./components/ClinicInformationForm";
 import { SubscriptionCard } from "./components/SubscriptionCard";
 import { BusinessHoursForm } from "./components/BusinessHoursForm";
 import { DataExportCard } from "./components/DataExportCard";
+import { ServicesManagementCard } from "./components/ServicesManagementCard";
 
 const PLACEHOLDER_SECTIONS = [
   {
@@ -83,6 +84,7 @@ export function SettingsPage() {
   // Editable clinic settings stay ADMIN-only even though CLINIC_READ (used
   // for printable letterheads) is now available to every role.
   const canEditClinicInfo = hasPermission(role, "CLINIC_WRITE");
+  const canManageServices = hasPermission(role, "INVOICE_WRITE");
   const canExport = hasPermission(role, "REPORT_READ") && hasFeature(user, "REPORTS");
 
   return (
@@ -100,6 +102,8 @@ export function SettingsPage() {
         {canEditClinicInfo && <ClinicInformationForm />}
 
         {canEditClinicInfo && <BusinessHoursForm />}
+
+        {canManageServices && <ServicesManagementCard />}
 
         <NotificationPreferencesCard />
 

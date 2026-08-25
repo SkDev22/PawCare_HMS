@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -121,6 +121,13 @@ const RecordPaymentSchema = z.object({
   method: z.enum(["cash", "card", "insurance", "bank_transfer"]),
   notes: z.string().default(""),
 });
+
+function makeRecordPaymentSchema(balanceDue: number) {
+  return RecordPaymentSchema.refine((v) => v.amount <= balanceDue, {
+    message: `Amount cannot exceed the balance due (${formatCurrency(balanceDue)})`,
+    path: ["amount"],
+  });
+}
 
 // ── Sub-components ───────────────────────────────────────────────────────────
 
@@ -295,11 +302,16 @@ function RecordPaymentDialog({
 }) {
   const recordPayment = useRecordPayment(invoiceId);
   const [cashReceived, setCashReceived] = useState("");
+  const schema = useMemo(() => makeRecordPaymentSchema(balanceDue), [balanceDue]);
 
   const form = useForm<z.infer<typeof RecordPaymentSchema>>({
-    resolver: zodResolver(RecordPaymentSchema),
+    resolver: zodResolver(schema),
     defaultValues: {
-      amount: Math.max(0, balanceDue),
+      // Deliberately left at 0, not pre-filled with balanceDue — a receptionist
+      // typing a partial amount into an already-filled field can end up
+      // concatenating onto it (e.g. "500" into "1000" becomes "1000500"),
+      // which used to silently overpay and mark the invoice PAID.
+      amount: 0,
       method: "cash",
       notes: "",
     },
@@ -366,6 +378,7 @@ function RecordPaymentDialog({
                       step="0.01"
                       max={balanceDue > 0 ? balanceDue : undefined}
                       {...field}
+                      onFocus={(e) => e.target.select()}
                     />
                   </FormControl>
                   <FormMessage />

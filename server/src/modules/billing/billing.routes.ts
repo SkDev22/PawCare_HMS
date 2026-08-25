@@ -10,8 +10,10 @@ import {
   RecordPaymentSchema,
   UpdateInvoiceStatusSchema,
   CreateServiceSchema,
+  UpdateServiceSchema,
+  ServiceQuerySchema,
 } from '@pawcare/shared';
-import type { InvoiceQueryInput } from '@pawcare/shared';
+import type { InvoiceQueryInput, ServiceQueryInput } from '@pawcare/shared';
 import * as svc from './billing.service';
 
 export const billingRouter: IRouter = Router();
@@ -26,9 +28,11 @@ billingRouter.get(
   '/services',
   authenticate,
   authorize('INVOICE_READ'),
+  validate({ query: ServiceQuerySchema }),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const services = await svc.listServices(authed(req).user.clinic_id);
+      const { include_inactive } = req.query as unknown as ServiceQueryInput;
+      const services = await svc.listServices(authed(req).user.clinic_id, include_inactive);
       res.json(services);
     } catch (err) { next(err); }
   },
@@ -43,6 +47,19 @@ billingRouter.post(
     try {
       const service = await svc.createService(authed(req).user.clinic_id, req.body);
       res.status(201).json(service);
+    } catch (err) { next(err); }
+  },
+);
+
+billingRouter.put(
+  '/services/:id',
+  authenticate,
+  authorize('INVOICE_WRITE'),
+  validate({ body: UpdateServiceSchema }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const service = await svc.updateService(req.params.id, authed(req).user.clinic_id, req.body);
+      res.json(service);
     } catch (err) { next(err); }
   },
 );

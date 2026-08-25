@@ -44,6 +44,54 @@ export function useServices() {
   });
 }
 
+// Includes inactive services too — for the Settings management screen only.
+// The charge/invoice pickers use useServices() above (active-only).
+export function useAllServices() {
+  return useQuery<Service[]>({
+    queryKey: ['billing-services', 'all'],
+    queryFn: () =>
+      api.get('/billing/services', { params: { include_inactive: true } }).then((r) => r.data),
+    staleTime: 30_000,
+  });
+}
+
+function invalidateServices(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ['billing-services'] });
+}
+
+export function useCreateService() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      name: string;
+      category: string;
+      price: number;
+      duration_minutes?: number | undefined;
+      is_taxable: boolean;
+    }) => api.post<Service>('/billing/services', data).then((r) => r.data),
+    onSuccess: () => invalidateServices(qc),
+  });
+}
+
+export function useUpdateService() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...data
+    }: {
+      id: string;
+      name?: string;
+      category?: string;
+      price?: number;
+      duration_minutes?: number | undefined;
+      is_taxable?: boolean;
+      is_active?: boolean;
+    }) => api.put<Service>(`/billing/services/${id}`, data).then((r) => r.data),
+    onSuccess: () => invalidateServices(qc),
+  });
+}
+
 export function useCreateInvoice() {
   const qc = useQueryClient();
   return useMutation({

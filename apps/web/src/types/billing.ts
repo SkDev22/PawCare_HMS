@@ -1,6 +1,8 @@
 export type InvoiceStatus = 'DRAFT' | 'SENT' | 'PAID' | 'PARTIALLY_PAID' | 'OVERDUE' | 'CANCELLED' | 'REFUNDED';
 export type PaymentMethod = 'cash' | 'card' | 'insurance' | 'bank_transfer';
 
+export type ServiceCategory = 'exam' | 'procedure' | 'lab' | 'medication' | 'grooming' | 'other';
+
 export type Service = {
   id: string;
   name: string;
@@ -8,6 +10,7 @@ export type Service = {
   price: string;
   duration_minutes: number | null;
   is_taxable: boolean;
+  is_active: boolean;
 };
 
 export type LineItem = {

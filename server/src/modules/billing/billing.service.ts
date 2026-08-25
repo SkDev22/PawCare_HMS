@@ -9,6 +9,7 @@ import type {
   AddLineItemInput,
   RecordPaymentInput,
   CreateServiceInput,
+  UpdateServiceInput,
   InvoiceStatusType,
 } from '@pawcare/shared';
 
@@ -304,6 +305,15 @@ export async function recordPayment(invoiceId: string, clinicId: string, data: R
   }
 
   const paymentAmount = new Decimal(data.amount);
+  const remainingBalance = clampZero(invoice.total.minus(invoice.paid_amount));
+  if (paymentAmount.gt(remainingBalance)) {
+    throw new AppError(
+      'BAD_REQUEST',
+      `Payment amount (${paymentAmount.toFixed(2)}) exceeds the remaining balance (${remainingBalance.toFixed(2)})`,
+      400,
+    );
+  }
+
   const newPaidAmount = invoice.paid_amount.plus(paymentAmount);
 
   let newStatus: InvoiceStatusType = invoice.status as InvoiceStatusType;
@@ -371,17 +381,20 @@ export async function updateStatus(id: string, clinicId: string, status: Invoice
 
 // ── Services ───────────────────────────────────────────────────────────────────
 
-export async function listServices(clinicId: string) {
+const SERVICE_FIELDS = {
+  id:               true,
+  name:             true,
+  category:         true,
+  price:            true,
+  duration_minutes: true,
+  is_taxable:       true,
+  is_active:        true,
+} as const;
+
+export async function listServices(clinicId: string, includeInactive = false) {
   return prisma.service.findMany({
-    where: { clinic_id: clinicId, is_active: true },
-    select: {
-      id: true,
-      name: true,
-      category: true,
-      price: true,
-      duration_minutes: true,
-      is_taxable: true,
-    },
+    where: { clinic_id: clinicId, ...(includeInactive ? {} : { is_active: true }) },
+    select: SERVICE_FIELDS,
     orderBy: [{ category: 'asc' }, { name: 'asc' }],
   });
 }
@@ -396,5 +409,31 @@ export async function createService(clinicId: string, data: CreateServiceInput) 
       is_taxable: data.is_taxable,
       ...(data.duration_minutes !== undefined ? { duration_minutes: data.duration_minutes } : {}),
     },
+    select: SERVICE_FIELDS,
+  });
+}
+
+async function assertService(id: string, clinicId: string) {
+  const service = await prisma.service.findFirst({
+    where: { id, clinic_id: clinicId },
+    select: { id: true },
+  });
+  if (!service) throw new AppError('NOT_FOUND', 'Service not found', 404);
+}
+
+export async function updateService(id: string, clinicId: string, data: UpdateServiceInput) {
+  await assertService(id, clinicId);
+
+  return prisma.service.update({
+    where: { id },
+    data: {
+      ...(data.name             !== undefined ? { name:             data.name }                    : {}),
+      ...(data.category         !== undefined ? { category:         data.category }                : {}),
+      ...(data.price            !== undefined ? { price:            new Decimal(data.price) }       : {}),
+      ...(data.duration_minutes !== undefined ? { duration_minutes: data.duration_minutes }         : {}),
+      ...(data.is_taxable       !== undefined ? { is_taxable:       data.is_taxable }                : {}),
+      ...(data.is_active        !== undefined ? { is_active:        data.is_active }                : {}),
+    },
+    select: SERVICE_FIELDS,
   });
 }

@@ -49,12 +49,30 @@ export const UpdateInvoiceStatusSchema = z.object({
   status: InvoiceStatusEnum,
 });
 
+export const ServiceCategoryEnum = z.enum(['exam', 'procedure', 'lab', 'medication', 'grooming', 'other']);
+
 export const CreateServiceSchema = z.object({
   name: z.string().min(1, 'Service name is required').max(200),
-  category: z.enum(['exam', 'procedure', 'lab', 'medication', 'grooming', 'other']),
+  category: ServiceCategoryEnum,
   price: z.coerce.number().min(0),
   duration_minutes: z.coerce.number().int().positive().optional(),
   is_taxable: z.boolean().default(true),
+});
+
+export const UpdateServiceSchema = z.object({
+  name: z.string().min(1, 'Service name is required').max(200).optional(),
+  category: ServiceCategoryEnum.optional(),
+  price: z.coerce.number().min(0).optional(),
+  duration_minutes: z.coerce.number().int().positive().optional(),
+  is_taxable: z.boolean().optional(),
+  is_active: z.boolean().optional(),
+});
+
+export const ServiceQuerySchema = z.object({
+  include_inactive: z
+    .union([z.literal('true'), z.literal('false')])
+    .transform((v) => v === 'true')
+    .optional(),
 });
 
 export type CreateInvoiceInput = z.infer<typeof CreateInvoiceSchema>;
@@ -64,4 +82,6 @@ export type AddLineItemInput = z.infer<typeof AddLineItemSchema>;
 export type RecordPaymentInput = z.infer<typeof RecordPaymentSchema>;
 export type UpdateInvoiceStatusInput = z.infer<typeof UpdateInvoiceStatusSchema>;
 export type CreateServiceInput = z.infer<typeof CreateServiceSchema>;
+export type UpdateServiceInput = z.infer<typeof UpdateServiceSchema>;
+export type ServiceQueryInput = z.infer<typeof ServiceQuerySchema>;
 export type InvoiceStatusType = z.infer<typeof InvoiceStatusEnum>;
