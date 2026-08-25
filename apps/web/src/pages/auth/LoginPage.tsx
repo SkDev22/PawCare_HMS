@@ -26,9 +26,10 @@ export function LoginPage() {
             <LoginForm />
           </div>
         </div>
-        <p className="text-center text-xs text-muted-foreground">
-          © 2026 PawCare HMS · All rights reserved
-        </p>
+        <div className="text-center text-xs text-muted-foreground space-y-0.5">
+          <p>© 2026 PawCare HMS · All rights reserved</p>
+          <p>Powered by InnoWhiZ · contact@innowhiz.lk · 071 637 8320</p>
+        </div>
       </div>
     </div>
   );

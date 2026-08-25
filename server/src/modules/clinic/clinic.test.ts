@@ -79,11 +79,12 @@ describe('Clinic — GET/PUT /api/v1/clinic', () => {
     expect(res.body.name).toBe('Test Clinic — Profile');
   });
 
-  it('rejects a non-admin from reading or writing the clinic profile', async () => {
+  it('lets a non-admin read the clinic profile (needed for print letterheads) but not write it', async () => {
     const getRes = await request
       .get('/api/v1/clinic')
       .set('Authorization', `Bearer ${nurseToken}`);
-    expect(getRes.status).toBe(403);
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.name).toBe('Test Clinic — Profile');
 
     const putRes = await request
       .put('/api/v1/clinic')
@@ -110,7 +111,7 @@ describe('Clinic — GET/PUT /api/v1/clinic', () => {
     expect(res.body.invoice_footer_text).toBe('Thanks for visiting!');
   });
 
-  it('lets an admin set and read business hours, rejecting a non-admin', async () => {
+  it('lets an admin set and any staff read business hours, but only an admin can write them', async () => {
     const putRes = await request
       .put('/api/v1/clinic/hours')
       .set('Authorization', `Bearer ${adminToken}`)
@@ -125,7 +126,7 @@ describe('Clinic — GET/PUT /api/v1/clinic', () => {
 
     const getRes = await request
       .get('/api/v1/clinic/hours')
-      .set('Authorization', `Bearer ${adminToken}`);
+      .set('Authorization', `Bearer ${nurseToken}`);
     expect(getRes.status).toBe(200);
     const sunday = getRes.body.find((h: { day_of_week: number }) => h.day_of_week === 0);
     const monday = getRes.body.find((h: { day_of_week: number }) => h.day_of_week === 1);
@@ -133,8 +134,9 @@ describe('Clinic — GET/PUT /api/v1/clinic', () => {
     expect(monday.open_time).toBe('09:00');
 
     const forbidden = await request
-      .get('/api/v1/clinic/hours')
-      .set('Authorization', `Bearer ${nurseToken}`);
+      .put('/api/v1/clinic/hours')
+      .set('Authorization', `Bearer ${nurseToken}`)
+      .send({ entries: [] });
     expect(forbidden.status).toBe(403);
   });
 });

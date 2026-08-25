@@ -7,6 +7,8 @@ import { Card, CardContent } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { getReportByKey } from "./report-registry";
+import { useAuthStore } from "../../stores/auth.store";
+import { useClinic } from "../../hooks/use-clinic";
 import {
   PatientVisitHistoryReport,
   MedicalRecordsSummaryReportView,
@@ -77,6 +79,8 @@ export function ReportDetailPage() {
   const { key } = useParams<{ key: string }>();
   const navigate = useNavigate();
   const report = getReportByKey(key);
+  const clinicName = useAuthStore((s) => s.user?.clinic_name);
+  const { data: clinic } = useClinic();
 
   const [preset, setPreset] = useState(1);
   const [startDate, setStartDate] = useState(PRESETS[1].start);
@@ -133,6 +137,22 @@ export function ReportDetailPage() {
 
       {/* Print-only header */}
       <div className="hidden print:block">
+        <div className="mb-3 flex items-start justify-between border-b-2 border-slate-900 pb-2.5">
+          <div>
+            <h2 className="text-lg font-bold">{clinicName ?? "PawCare HMS"}</h2>
+            {clinic?.address && (
+              <p className="text-xs text-slate-500">{clinic.address}</p>
+            )}
+            {(clinic?.phone || clinic?.email) && (
+              <p className="text-xs text-slate-500">
+                {[clinic?.phone, clinic?.email].filter(Boolean).join(" · ")}
+              </p>
+            )}
+          </div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            {format(new Date(), "MMM d, yyyy")}
+          </p>
+        </div>
         <h1 className="text-xl font-bold">{report.title}</h1>
         {report.filterType === "range" && (
           <p className="text-sm text-muted-foreground">

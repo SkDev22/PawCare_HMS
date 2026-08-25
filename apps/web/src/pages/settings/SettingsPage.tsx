@@ -80,7 +80,9 @@ function NotificationPreferencesCard() {
 export function SettingsPage() {
   const user = useAuthStore((s) => s.user);
   const role = user?.role;
-  const canViewClinicInfo = hasPermission(role, "CLINIC_READ");
+  // Editable clinic settings stay ADMIN-only even though CLINIC_READ (used
+  // for printable letterheads) is now available to every role.
+  const canEditClinicInfo = hasPermission(role, "CLINIC_WRITE");
   const canExport = hasPermission(role, "REPORT_READ") && hasFeature(user, "REPORTS");
 
   return (
@@ -95,9 +97,9 @@ export function SettingsPage() {
       <div className="space-y-4">
         <SubscriptionCard />
 
-        {canViewClinicInfo && <ClinicInformationForm />}
+        {canEditClinicInfo && <ClinicInformationForm />}
 
-        {canViewClinicInfo && <BusinessHoursForm />}
+        {canEditClinicInfo && <BusinessHoursForm />}
 
         <NotificationPreferencesCard />
 

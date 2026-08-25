@@ -28,8 +28,9 @@ export const PERMISSIONS = {
   STAFF_READ:           ['ADMIN'] as const,
   STAFF_WRITE:          ['ADMIN'] as const,
 
-  // Clinic profile
-  CLINIC_READ:          ['ADMIN'] as const,
+  // Clinic profile — read is broad (every printable letterhead needs the
+  // clinic's name/address/phone), write stays ADMIN-only.
+  CLINIC_READ:          ['ADMIN', 'VETERINARIAN', 'NURSE', 'RECEPTIONIST', 'LAB_TECHNICIAN'] as const,
   CLINIC_WRITE:         ['ADMIN'] as const,
 
   // Reports

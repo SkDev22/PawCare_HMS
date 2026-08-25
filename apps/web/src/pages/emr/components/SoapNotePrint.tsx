@@ -1,5 +1,7 @@
 import { format } from "date-fns";
 import type { MedicalRecord } from "../../../types/emr";
+import { useAuthStore } from "../../../stores/auth.store";
+import { useClinic } from "../../../hooks/use-clinic";
 
 interface Props {
   record: MedicalRecord;
@@ -62,25 +64,34 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 // interactive record page. Kept deliberately minimal — grayscale only, no
 // color blocks — so it reads cleanly on paper.
 export function SoapNotePrint({ record }: Props) {
+  const clinicName = useAuthStore((s) => s.user?.clinic_name);
+  const { data: clinic } = useClinic();
+
   const { pet, soap_note, vitals, diagnoses } = record;
   const activeRx = record.prescriptions.filter((rx) => rx.is_active);
 
   return (
     <div className="hidden print:flex print:min-h-screen print:flex-col bg-white p-8 text-slate-900">
       {/* Header */}
-      <div className="mb-4 flex items-center justify-between border-b-2 border-slate-900 pb-2.5">
+      <div className="mb-4 flex items-start justify-between border-b-2 border-slate-900 pb-2.5">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">
+          <h2 className="text-lg font-bold">{clinicName ?? "PawCare HMS"}</h2>
+          {clinic?.address && (
+            <p className="text-[10px] text-slate-500">{clinic.address}</p>
+          )}
+          {(clinic?.phone || clinic?.email) && (
+            <p className="text-[10px] text-slate-500">
+              {[clinic?.phone, clinic?.email].filter(Boolean).join(" · ")}
+            </p>
+          )}
+        </div>
+        <div className="text-right">
+          <h1 className="text-lg font-extrabold uppercase tracking-wide">
             Clinical Record
           </h1>
           <p className="mt-0.5 text-[10px] font-semibold uppercase text-slate-400">
             patient evaluations and treatment steps
           </p>
-        </div>
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded border border-dashed border-slate-300 text-center text-[8px] font-semibold uppercase leading-tight text-slate-400">
-          PawCare
-          <br />
-          HMS
         </div>
       </div>
 
