@@ -170,8 +170,13 @@ function ServiceFormDialog({
               step="1"
               min={1}
               placeholder="Optional"
-              {...register("duration_minutes")}
+              {...register("duration_minutes", {
+                setValueAs: (v) => (v === "" ? undefined : Number(v)),
+              })}
             />
+            {errors.duration_minutes && (
+              <p className="text-xs text-destructive">{errors.duration_minutes.message}</p>
+            )}
           </div>
 
           <div className="flex items-center justify-between rounded-md border px-3 py-2.5">

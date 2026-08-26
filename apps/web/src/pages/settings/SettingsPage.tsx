@@ -85,7 +85,8 @@ export function SettingsPage() {
   // for printable letterheads) is now available to every role.
   const canEditClinicInfo = hasPermission(role, "CLINIC_WRITE");
   const canManageServices = hasPermission(role, "INVOICE_WRITE");
-  const canExport = hasPermission(role, "REPORT_READ") && hasFeature(user, "REPORTS");
+  const canExport =
+    hasPermission(role, "REPORT_READ") && hasFeature(user, "REPORTS");
 
   return (
     <div className="space-y-6 w-full">
@@ -109,7 +110,7 @@ export function SettingsPage() {
 
         {canExport && <DataExportCard />}
 
-        {PLACEHOLDER_SECTIONS.map((section) => (
+        {/* {PLACEHOLDER_SECTIONS.map((section) => (
           <Card key={section.title}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <div className="flex items-center gap-3">
@@ -124,7 +125,7 @@ export function SettingsPage() {
               </p>
             </CardContent>
           </Card>
-        ))}
+        ))} */}
       </div>
     </div>
   );
