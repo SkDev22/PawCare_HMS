@@ -34,10 +34,27 @@ apiRouter.use('/clinic', clinicRouter);
 // runs again inside each router too (each route already calls it directly);
 // that's redundant but harmless, and keeps this the only place plan-gating
 // needs to be added or changed per module.
-apiRouter.use('/lab-orders', authenticate, authorizeFeature('LABORATORY'), labRouter);
-apiRouter.use('/ward', authenticate, authorizeFeature('WARD'), wardRouter);
-apiRouter.use('/inventory', authenticate, authorizeFeature('INVENTORY'), inventoryRouter);
-apiRouter.use('/grn', authenticate, authorizeFeature('INVENTORY'), grnRouter);
-apiRouter.use('/suppliers', authenticate, authorizeFeature('INVENTORY'), suppliersRouter);
+apiRouter.use('/lab-orders', authenticate, authorizeFeature('LABORATORY', { allowReadWithoutFeature: true }), labRouter);
+apiRouter.use(
+  '/ward',
+  authenticate,
+  authorizeFeature('WARD', {
+    allowReadWithoutFeature: true,
+    // Discharging a patient (which frees their kennel) and logging care during
+    // their stay must stay reachable even after a downgrade — otherwise a pet
+    // admitted while the clinic had WARD gets stranded with no way out.
+    exemptPaths: [
+      /^\/hospitalizations\/[^/]+\/discharge$/,
+      /^\/hospitalizations\/[^/]+\/care-logs$/,
+    ],
+  }),
+  wardRouter,
+);
+apiRouter.use('/inventory', authenticate, authorizeFeature('INVENTORY', { allowReadWithoutFeature: true }), inventoryRouter);
+apiRouter.use('/grn', authenticate, authorizeFeature('INVENTORY', { allowReadWithoutFeature: true }), grnRouter);
+apiRouter.use('/suppliers', authenticate, authorizeFeature('INVENTORY', { allowReadWithoutFeature: true }), suppliersRouter);
+// Reports has no "old data" of its own — every endpoint is a live computed
+// read over other tables, so unlike the modules above, letting GET through
+// here would just remove the plan gate entirely. Stays hard-gated.
 apiRouter.use('/reports', authenticate, authorizeFeature('REPORTS'), reportsRouter);
 apiRouter.use('/notifications', notificationsRouter);

@@ -1,0 +1,58 @@
+name: Database Backup
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # 02:00 UTC daily
+  workflow_dispatch: {}    # lets you trigger a backup manually from the Actions tab
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Install postgresql-client
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-client
+
+      - name: Dump database
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          mkdir -p dump
+          FILE="pawcare-$(date -u +'%Y-%m-%d_%H%M%S').dump"
+          pg_dump "$DATABASE_URL" --format=custom --no-owner --no-privileges --file="dump/$FILE"
+          # Abort before upload rather than silently archiving a broken/empty dump
+          [ -s "dump/$FILE" ] || { echo "::error::pg_dump produced an empty file"; exit 1; }
+          echo "DUMP_FILE=$FILE" >> "$GITHUB_ENV"
+
+      - name: Configure storage credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.BACKUP_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.BACKUP_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.BACKUP_AWS_REGION || 'us-east-1' }}
+
+      - name: Upload backup
+        env:
+          BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          # Only needed for an S3-compatible provider that isn't AWS (e.g.
+          # Cloudflare R2) — leave the BACKUP_S3_ENDPOINT secret unset for AWS S3.
+          ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+        run: |
+          set -euo pipefail
+          ARGS=()
+          [ -n "$ENDPOINT" ] && ARGS+=(--endpoint-url "$ENDPOINT")
+
+          aws s3 cp "dump/$DUMP_FILE" "s3://$BUCKET/db-backups/daily/$DUMP_FILE" "${ARGS[@]}"
+
+          # Keep an indefinite monthly snapshot alongside the daily rotation.
+          # The daily/ prefix expires on its own via a bucket lifecycle rule
+          # (configured on the bucket, not here) — no delete logic to maintain.
+          if [ "$(date -u +'%d')" = "01" ]; then
+            aws s3 cp "dump/$DUMP_FILE" "s3://$BUCKET/db-backups/monthly/$DUMP_FILE" "${ARGS[@]}"
+          fi

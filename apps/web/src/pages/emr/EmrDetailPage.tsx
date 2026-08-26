@@ -82,6 +82,8 @@ import { useInventoryItems } from "../../hooks/use-inventory";
 import { useServices } from "../../hooks/use-billing";
 import { useDebounce } from "../../hooks/use-debounce";
 import { formatCurrency } from "../../lib/currency";
+import { hasFeature } from "../../lib/features";
+import { useAuthStore } from "../../stores/auth.store";
 import { SoapNotePrint } from "./components/SoapNotePrint";
 import type {
   MedicalRecord,
@@ -615,6 +617,7 @@ function AddPrescriptionDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const addRx = useAddPrescription(recordId);
+  const hasInventory = hasFeature(useAuthStore((s) => s.user), "INVENTORY");
   const [addedCount, setAddedCount] = useState(0);
   const [fulfillment, setFulfillment] = useState<"clinic" | "pharmacy">(
     "pharmacy",
@@ -814,34 +817,36 @@ function AddPrescriptionDialog({
               /> */}
             </div>
 
-            <div>
-              <label className="text-sm font-medium mb-1.5 block">
-                Fulfilled by
-              </label>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={fulfillment === "clinic" ? "default" : "outline"}
-                  onClick={() => setFulfillment("clinic")}
-                >
-                  Clinic stock
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={fulfillment === "pharmacy" ? "default" : "outline"}
-                  onClick={() => {
-                    setFulfillment("pharmacy");
-                    setSelectedItem(null);
-                  }}
-                >
-                  Pharmacy
-                </Button>
+            {hasInventory && (
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">
+                  Fulfilled by
+                </label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={fulfillment === "clinic" ? "default" : "outline"}
+                    onClick={() => setFulfillment("clinic")}
+                  >
+                    Clinic stock
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={fulfillment === "pharmacy" ? "default" : "outline"}
+                    onClick={() => {
+                      setFulfillment("pharmacy");
+                      setSelectedItem(null);
+                    }}
+                  >
+                    Pharmacy
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
 
-            {fulfillment === "clinic" && (
+            {hasInventory && fulfillment === "clinic" && (
               <div className="space-y-2 rounded-md border border-border p-3 bg-muted/30">
                 <label className="text-xs font-medium text-muted-foreground block">
                   Match to inventory item
@@ -1106,8 +1111,11 @@ function AddChargeDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const addCharge = useAddCharge(recordId);
+  const hasInventory = hasFeature(useAuthStore((s) => s.user), "INVENTORY");
   const { data: services = [] } = useServices();
-  const [mode, setMode] = useState<"item" | "service">("item");
+  const [mode, setMode] = useState<"item" | "service">(
+    hasInventory ? "item" : "service",
+  );
   const [selectedItem, setSelectedItem] = useState<{
     id: string;
     name: string;
@@ -1124,7 +1132,7 @@ function AddChargeDialog({
   };
   const resetAll = () => {
     resetSelection();
-    setMode("item");
+    setMode(hasInventory ? "item" : "service");
     setAddedCount(0);
   };
 
@@ -1164,24 +1172,26 @@ function AddChargeDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant={mode === "item" ? "default" : "outline"}
-              onClick={() => setMode("item")}
-            >
-              Drug / Equipment
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={mode === "service" ? "default" : "outline"}
-              onClick={() => setMode("service")}
-            >
-              Service
-            </Button>
-          </div>
+          {hasInventory && (
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={mode === "item" ? "default" : "outline"}
+                onClick={() => setMode("item")}
+              >
+                Drug / Equipment
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={mode === "service" ? "default" : "outline"}
+                onClick={() => setMode("service")}
+              >
+                Service
+              </Button>
+            </div>
+          )}
 
           {mode === "item" ? (
             selectedItem ? (
