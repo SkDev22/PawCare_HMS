@@ -139,6 +139,8 @@ export type MedicalRecord = {
   vet_id: string;
   visit_date: string;
   chief_complaint: string | null;
+  next_visit_date: string | null;
+  next_visit_note: string | null;
   created_at: string;
   updated_at: string;
   pet: RecordPet;
@@ -190,6 +192,8 @@ export type PetHistoryRecord = {
   vet_id: string;
   visit_date: string;
   chief_complaint: string | null;
+  next_visit_date: string | null;
+  next_visit_note: string | null;
   created_at: string;
   updated_at: string;
   vet: { id: string; first_name: string; last_name: string; specialization: string | null };

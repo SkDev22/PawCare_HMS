@@ -68,6 +68,7 @@ import {
 } from "../../components/ui/select";
 import {
   useMedicalRecord,
+  useUpdateMedicalRecord,
   useUpsertSoapNote,
   useUpsertVitals,
   useAddDiagnosis,
@@ -96,6 +97,8 @@ import type {
 
 const SoapSchema = z.object({
   note: z.string().max(20000).default(""),
+  next_visit_date: z.string().optional(),
+  next_visit_note: z.string().max(500).optional(),
 });
 
 function SoapNoteTab({
@@ -106,15 +109,43 @@ function SoapNoteTab({
   onSaved: () => void;
 }) {
   const upsert = useUpsertSoapNote(record.id);
+  const updateRecord = useUpdateMedicalRecord(record.id);
+  const initialNextVisitDate = record.next_visit_date
+    ? format(new Date(record.next_visit_date), "yyyy-MM-dd")
+    : "";
+  const initialNextVisitNote = record.next_visit_note ?? "";
   const form = useForm<z.infer<typeof SoapSchema>>({
     resolver: zodResolver(SoapSchema),
     defaultValues: {
       note: record.soap_note?.note ?? "",
+      next_visit_date: initialNextVisitDate,
+      next_visit_note: initialNextVisitNote,
     },
   });
 
   const onSubmit = (values: z.infer<typeof SoapSchema>) => {
-    upsert.mutate(values, { onSuccess: onSaved });
+    const nextVisitChanged =
+      (values.next_visit_date ?? "") !== initialNextVisitDate ||
+      (values.next_visit_note ?? "") !== initialNextVisitNote;
+
+    upsert.mutate(
+      { note: values.note },
+      {
+        onSuccess: () => {
+          if (!nextVisitChanged) {
+            onSaved();
+            return;
+          }
+          updateRecord.mutate(
+            {
+              next_visit_date: values.next_visit_date ?? "",
+              next_visit_note: values.next_visit_note ?? "",
+            },
+            { onSuccess: onSaved },
+          );
+        },
+      },
+    );
   };
 
   return (
@@ -146,9 +177,49 @@ function SoapNoteTab({
               </FormItem>
             )}
           />
+          <div className="grid gap-4 rounded-md border p-4 sm:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="next_visit_date"
+              render={({ field: f }) => (
+                <FormItem>
+                  <FormLabel className="font-semibold">
+                    Next Visit Date
+                  </FormLabel>
+                  <FormControl>
+                    <Input type="date" {...f} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="next_visit_note"
+              render={({ field: f }) => (
+                <FormItem>
+                  <FormLabel className="font-semibold">
+                    Reason for Next Visit
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="e.g. Recheck bloodwork, booster due"
+                      {...f}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
           <div className="flex justify-end">
-            <Button type="submit" disabled={upsert.isPending}>
-              {upsert.isPending ? "Saving..." : "Save SOAP Note"}
+            <Button
+              type="submit"
+              disabled={upsert.isPending || updateRecord.isPending}
+            >
+              {upsert.isPending || updateRecord.isPending
+                ? "Saving..."
+                : "Save SOAP Note"}
             </Button>
           </div>
         </form>
@@ -1595,6 +1666,21 @@ export function EmrDetailPage() {
               Chief Complaint
             </p>
             <p className="text-sm">{record.chief_complaint}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Next Visit */}
+      {record.next_visit_date && (
+        <Card className="border-l-4 border-l-amber-500 print:hidden">
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+              Next Visit
+            </p>
+            <p className="text-sm">
+              {format(new Date(record.next_visit_date), "PPP")}
+              {record.next_visit_note ? ` — ${record.next_visit_note}` : ""}
+            </p>
           </CardContent>
         </Card>
       )}

@@ -11,6 +11,10 @@ export const CreateMedicalRecordSchema = z.object({
 export const UpdateMedicalRecordSchema = z.object({
   chief_complaint: z.string().max(2000).optional(),
   visit_date: z.string().optional(),
+  // Follow-up recommendation set by the vet at the end of a visit. An empty
+  // string clears a previously set date/note (mirrors chief_complaint's convention).
+  next_visit_date: z.string().max(10).optional(),
+  next_visit_note: z.string().max(500).optional(),
 });
 
 export const MedicalRecordQuerySchema = z.object({

@@ -199,6 +199,10 @@ export async function updateRecord(
     data: {
       ...(data.chief_complaint !== undefined ? { chief_complaint: data.chief_complaint } : {}),
       ...(data.visit_date      !== undefined ? { visit_date: new Date(data.visit_date) } : {}),
+      ...(data.next_visit_date !== undefined
+        ? { next_visit_date: data.next_visit_date ? new Date(data.next_visit_date) : null }
+        : {}),
+      ...(data.next_visit_note !== undefined ? { next_visit_note: data.next_visit_note || null } : {}),
     },
     include: recordFullIncludes,
   });

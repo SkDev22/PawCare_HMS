@@ -60,8 +60,12 @@ export function useCreateMedicalRecord() {
 export function useUpdateMedicalRecord(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { chief_complaint?: string; visit_date?: string }) =>
-      api.put(`/medical-records/${id}`, data).then((r) => r.data as MedicalRecord),
+    mutationFn: (data: {
+      chief_complaint?: string;
+      visit_date?: string;
+      next_visit_date?: string;
+      next_visit_note?: string;
+    }) => api.put(`/medical-records/${id}`, data).then((r) => r.data as MedicalRecord),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['medical-records'] });
       toast.success('Record updated');

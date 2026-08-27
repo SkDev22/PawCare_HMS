@@ -332,6 +332,8 @@ model MedicalRecord {
   vet_id          String    @db.Uuid
   visit_date      DateTime  @default(now())
   chief_complaint String?
+  next_visit_date DateTime? @db.Date
+  next_visit_note String?
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
 

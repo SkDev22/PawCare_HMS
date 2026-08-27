@@ -226,6 +226,19 @@ export function SoapNotePrint({ record }: Props) {
         </div>
       )}
 
+      {/* Next visit */}
+      {record.next_visit_date && (
+        <div className="mb-4 break-inside-avoid rounded border border-slate-400 px-3 py-2">
+          <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+            Next Visit
+          </p>
+          <p className="text-xs font-semibold text-slate-900">
+            {format(new Date(record.next_visit_date), "MM-dd-yyyy")}
+            {record.next_visit_note ? ` — ${record.next_visit_note}` : ""}
+          </p>
+        </div>
+      )}
+
       {/* Signatures */}
       <div className="mt-auto flex justify-between gap-10 border-t border-slate-200 pt-3 pb-10">
         <div className="w-56">
