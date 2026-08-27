@@ -20,6 +20,7 @@ jobs:
         # refuses to work around. Bump the "-18" below if Neon moves to a
         # newer major version.
         run: |
+          set -euo pipefail
           sudo install -d /usr/share/postgresql-common/pgdg
           sudo curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
             -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
@@ -31,6 +32,10 @@ jobs:
           # ordering — point PATH at the v18 binaries explicitly rather than
           # hoping the right one gets picked up.
           echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
+          # Prove it's actually there, in this step's own log — with
+          # set -euo pipefail above, a failed apt-get install now fails this
+          # step loudly instead of silently falling through to the echo.
+          /usr/lib/postgresql/18/bin/pg_dump --version
 
       - name: Dump database
         env:
