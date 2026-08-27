@@ -51,29 +51,30 @@ jobs:
           [ -s "dump/$FILE" ] || { echo "::error::pg_dump produced an empty file"; exit 1; }
           echo "DUMP_FILE=$FILE" >> "$GITHUB_ENV"
 
-      - name: Configure storage credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.BACKUP_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.BACKUP_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.BACKUP_AWS_REGION || 'us-east-1' }}
-
       - name: Upload backup
+        # Cloudflare R2 speaks the S3 API, so the pre-installed `aws` CLI works
+        # against it directly — no AWS account, IAM role, or AWS-specific
+        # action needed. It reads credentials from these standard env var
+        # names on its own; "auto" is Cloudflare's documented region value
+        # for R2 (R2 buckets aren't region-scoped the way S3 buckets are).
         env:
-          BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
-          # Only needed for an S3-compatible provider that isn't AWS (e.g.
-          # Cloudflare R2) — leave the BACKUP_S3_ENDPOINT secret unset for AWS S3.
-          ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          AWS_ACCESS_KEY_ID:     ${{ secrets.BACKUP_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION:    auto
+          ENDPOINT:              ${{ secrets.BACKUP_R2_ENDPOINT }}
+          BUCKET:                ${{ secrets.BACKUP_R2_BUCKET }}
         run: |
           set -euo pipefail
-          ARGS=()
-          [ -n "$ENDPOINT" ] && ARGS+=(--endpoint-url "$ENDPOINT")
+          : "${AWS_ACCESS_KEY_ID:?BACKUP_R2_ACCESS_KEY_ID secret is not set or empty}"
+          : "${AWS_SECRET_ACCESS_KEY:?BACKUP_R2_SECRET_ACCESS_KEY secret is not set or empty}"
+          : "${ENDPOINT:?BACKUP_R2_ENDPOINT secret is not set or empty}"
+          : "${BUCKET:?BACKUP_R2_BUCKET secret is not set or empty}"
 
-          aws s3 cp "dump/$DUMP_FILE" "s3://$BUCKET/db-backups/daily/$DUMP_FILE" "${ARGS[@]}"
+          aws s3 cp "dump/$DUMP_FILE" "s3://$BUCKET/db-backups/daily/$DUMP_FILE" --endpoint-url "$ENDPOINT"
 
           # Keep an indefinite monthly snapshot alongside the daily rotation.
-          # The daily/ prefix expires on its own via a bucket lifecycle rule
-          # (configured on the bucket, not here) — no delete logic to maintain.
+          # The daily/ prefix expires on its own via an R2 object lifecycle
+          # rule (configured on the bucket, not here) — no delete logic to maintain.
           if [ "$(date -u +'%d')" = "01" ]; then
-            aws s3 cp "dump/$DUMP_FILE" "s3://$BUCKET/db-backups/monthly/$DUMP_FILE" "${ARGS[@]}"
+            aws s3 cp "dump/$DUMP_FILE" "s3://$BUCKET/db-backups/monthly/$DUMP_FILE" --endpoint-url "$ENDPOINT"
           fi
