@@ -3,6 +3,7 @@ import type { ThemeColorSlug } from "@pawcare/shared";
 import { useClinic } from "./use-clinic";
 import { useTheme } from "../context/theme";
 import { THEME_PRESETS } from "../lib/theme-presets";
+import { setClinicFavicon, resetFavicon } from "../lib/favicon";
 
 const CSS_VAR_MAP = {
   primary: "--primary",
@@ -46,6 +47,7 @@ export function useClinicTheme() {
     for (const [shade, hex] of Object.entries(preset.brand)) {
       root.setProperty(`--brand-${shade}`, hex);
     }
+    setClinicFavicon(preset.brand["600"]);
 
     return () => {
       for (const cssVar of Object.values(CSS_VAR_MAP)) {
@@ -57,6 +59,7 @@ export function useClinicTheme() {
       for (const shade of Object.keys(preset.brand)) {
         root.removeProperty(`--brand-${shade}`);
       }
+      resetFavicon();
     };
   }, [clinic?.theme_color, resolvedTheme]);
 }
