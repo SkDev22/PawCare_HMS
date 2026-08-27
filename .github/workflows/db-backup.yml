@@ -14,9 +14,18 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Install postgresql-client
+        # Ubuntu's own apt repos lag behind Postgres's latest major release,
+        # but Neon always runs current — pulling from PGDG (Postgres's own
+        # apt repo) instead avoids the "server version mismatch" pg_dump
+        # refuses to work around. Bump the "-18" below if Neon moves to a
+        # newer major version.
         run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
           sudo apt-get update -y
-          sudo apt-get install -y postgresql-client
+          sudo apt-get install -y postgresql-client-18
 
       - name: Dump database
         env:
