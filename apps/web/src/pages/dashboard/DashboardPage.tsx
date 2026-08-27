@@ -25,8 +25,11 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import type { ThemeColorSlug } from "@pawcare/shared";
 import { useAuthStore } from "@/stores/auth.store";
+import { useClinic } from "@/hooks/use-clinic";
 import { useDashboardSummary } from "@/hooks/use-dashboard";
+import { THEME_PRESETS } from "@/lib/theme-presets";
 import {
   Card,
   CardContent,
@@ -56,15 +59,20 @@ const STATUS_CONFIG: Record<
   NO_SHOW: { label: "No Show", variant: "destructive" },
 };
 
-const SPECIES_COLORS: Record<string, string> = {
-  DOG: "#16a34a",
-  CAT: "#22c55e",
-  BIRD: "#4ade80",
-  RABBIT: "#86efac",
-  REPTILE: "#bbf7d0",
-  SMALL_MAMMAL: "#dcfce7",
-  OTHER: "#f0fdf4",
-};
+// Built from the clinic's brand scale at render time (see `speciesColors`
+// below) instead of a fixed hex map, so the chart follows the selected
+// theme color.
+function getSpeciesColors(brand: Record<string, string>): Record<string, string> {
+  return {
+    DOG: brand["600"],
+    CAT: brand["500"],
+    BIRD: brand["400"],
+    RABBIT: brand["300"],
+    REPTILE: brand["200"],
+    SMALL_MAMMAL: brand["100"],
+    OTHER: brand["50"],
+  };
+}
 
 const SPECIES_LABELS: Record<string, string> = {
   DOG: "Dogs",
@@ -99,6 +107,10 @@ function formatTime(iso: string) {
 export function DashboardPage() {
   const user = useAuthStore((s) => s.user);
   const { data, isLoading, isError } = useDashboardSummary();
+  const { data: clinic } = useClinic();
+  const themeSlug = (clinic?.theme_color as ThemeColorSlug | undefined) ?? "green";
+  const brand = (THEME_PRESETS[themeSlug] ?? THEME_PRESETS.green).brand;
+  const speciesColors = getSpeciesColors(brand);
 
   const stats = data
     ? [
@@ -267,8 +279,8 @@ export function DashboardPage() {
                       x2="0"
                       y2="1"
                     >
-                      <stop offset="5%" stopColor="#16a34a" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#16a34a" stopOpacity={0} />
+                      <stop offset="5%" stopColor={brand["600"]} stopOpacity={0.2} />
+                      <stop offset="95%" stopColor={brand["600"]} stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid
@@ -293,7 +305,7 @@ export function DashboardPage() {
                   <Area
                     type="monotone"
                     dataKey="visits"
-                    stroke="#16a34a"
+                    stroke={brand["600"]}
                     strokeWidth={2}
                     fill="url(#visitGradient)"
                   />
@@ -328,7 +340,7 @@ export function DashboardPage() {
                       {data.speciesDistribution.map((entry) => (
                         <Cell
                           key={entry.name}
-                          fill={SPECIES_COLORS[entry.name] ?? "#a1a1aa"}
+                          fill={speciesColors[entry.name] ?? "#a1a1aa"}
                         />
                       ))}
                     </Pie>
@@ -344,7 +356,7 @@ export function DashboardPage() {
                       <span
                         className="size-2.5 shrink-0 rounded-full"
                         style={{
-                          background: SPECIES_COLORS[name] ?? "#a1a1aa",
+                          background: speciesColors[name] ?? "#a1a1aa",
                         }}
                       />
                       <span className="text-xs text-muted-foreground flex-1">

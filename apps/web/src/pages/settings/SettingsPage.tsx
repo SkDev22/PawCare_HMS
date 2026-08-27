@@ -12,6 +12,7 @@ import { useAuthStore } from "@/stores/auth.store";
 import { hasPermission } from "@/lib/permissions";
 import { hasFeature } from "@/lib/features";
 import { ClinicInformationForm } from "./components/ClinicInformationForm";
+import { ThemeColorForm } from "./components/ThemeColorForm";
 import { SubscriptionCard } from "./components/SubscriptionCard";
 import { BusinessHoursForm } from "./components/BusinessHoursForm";
 import { DataExportCard } from "./components/DataExportCard";
@@ -101,6 +102,8 @@ export function SettingsPage() {
         <SubscriptionCard />
 
         {canEditClinicInfo && <ClinicInformationForm />}
+
+        {canEditClinicInfo && <ThemeColorForm />}
 
         {canEditClinicInfo && <BusinessHoursForm />}
 

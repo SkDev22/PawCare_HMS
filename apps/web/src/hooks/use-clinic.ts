@@ -12,6 +12,7 @@ export interface ClinicProfile {
   logo_url: string | null;
   timezone: string;
   currency: string;
+  theme_color: string;
   plan: string;
   trial_ends_at: string | null;
   tax_rate: string;

@@ -2,12 +2,15 @@ import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from './sidebar/app-sidebar';
 import { SiteHeader } from './header';
 import { TrialBanner } from './TrialBanner';
+import { useClinicTheme } from '@/hooks/use-clinic-theme';
 
 interface Props {
   children: React.ReactNode;
 }
 
 export function DashboardLayout({ children }: Props) {
+  useClinicTheme();
+
   return (
     <SidebarProvider defaultOpen={true}>
       <AppSidebar variant="inset" />

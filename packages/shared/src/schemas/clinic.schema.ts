@@ -5,6 +5,12 @@ import { z } from 'zod';
 // and extra_features are managed separately (see clinic:create / clinic:upgrade
 // scripts), never through this staff-facing endpoint.
 
+// Preset slugs for the per-clinic accent color. Kept here (not just in the
+// frontend's THEME_PRESETS registry) so the API validates against the same
+// curated list the UI offers — adding a color means updating both in tandem.
+export const THEME_COLOR_SLUGS = ['green', 'blue', 'orange', 'purple', 'red', 'teal'] as const;
+export type ThemeColorSlug = (typeof THEME_COLOR_SLUGS)[number];
+
 export const UpdateClinicSchema = z.object({
   name:                z.string().min(1, 'Clinic name is required').max(200).optional(),
   address:             z.string().max(500).optional(),
@@ -12,6 +18,7 @@ export const UpdateClinicSchema = z.object({
   email:               z.string().email('Invalid email address').optional(),
   timezone:            z.string().max(100).optional(),
   currency:            z.string().max(10).optional(),
+  theme_color:         z.enum(THEME_COLOR_SLUGS).optional(),
   tax_rate:            z.coerce.number().min(0).max(100, 'Tax rate must be a percentage between 0 and 100').optional(),
   invoice_prefix:      z.string().max(20).optional(),
   invoice_due_days:    z.coerce.number().int().min(0).max(365).optional(),

@@ -26,6 +26,10 @@ model Clinic {
   logo_url      String?
   timezone      String     @default("UTC")
   currency      String     @default("LKR")
+  // Preset slug (e.g. "green", "blue") selected from the frontend's
+  // THEME_PRESETS registry — controls the app's accent color for this
+  // clinic. Not a raw hex value, so the palette stays curated.
+  theme_color   String     @default("green")
   is_active     Boolean    @default(true)
   plan          ClinicPlan @default(TRIAL)
   trial_ends_at DateTime?
