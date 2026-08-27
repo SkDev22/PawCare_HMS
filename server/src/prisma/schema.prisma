@@ -356,6 +356,28 @@ model MedicalRecord {
   @@map("medical_records")
 }
 
+// Before/after trail for every mutation reachable from a medical record
+// (the record itself, its SOAP note, vitals, diagnoses, prescriptions, and
+// charges) — see emr.service.ts and lib/audit-log.ts. medical_record_id is
+// denormalized onto every row, even for a Diagnosis/Charge whose own id is
+// in entity_id, so a record's whole trail is one indexed query. Never
+// purged — an audit trail that deletes itself defeats the point.
+model AuditLog {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clinic_id         String   @db.Uuid
+  medical_record_id String   @db.Uuid
+  entity_type       String
+  entity_id         String   @db.Uuid
+  action            String
+  before            Json?
+  after             Json?
+  performed_by      String   @db.Uuid
+  created_at        DateTime @default(now())
+
+  @@index([clinic_id, medical_record_id, created_at])
+  @@map("audit_logs")
+}
+
 model SoapNote {
   id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   medical_record_id String   @unique @db.Uuid

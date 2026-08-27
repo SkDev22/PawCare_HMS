@@ -4,6 +4,7 @@ import { AppError } from '../../lib/errors';
 import { clampZero } from '../billing/billing.service';
 import { applyStockChangeTx, resolveBatchForSaleTx } from '../inventory/inventory.service';
 import { notifyRole } from '../notifications/notifications.service';
+import { recordAuditLog } from '../../lib/audit-log';
 import type {
   CreateMedicalRecordInput,
   UpdateMedicalRecordInput,
@@ -192,21 +193,32 @@ export async function createRecord(
 export async function updateRecord(
   id: string,
   clinicId: string,
+  staffId: string,
   data: UpdateMedicalRecordInput,
 ) {
-  await assertRecordInClinic(id, clinicId);
+  return prisma.$transaction(async (tx) => {
+    const before = await tx.medicalRecord.findFirst({ where: { id, pet: { owner: { clinic_id: clinicId } } } });
+    if (!before) throw new AppError('NOT_FOUND', 'Medical record not found', 404);
 
-  return prisma.medicalRecord.update({
-    where: { id },
-    data: {
-      ...(data.chief_complaint !== undefined ? { chief_complaint: data.chief_complaint } : {}),
-      ...(data.visit_date      !== undefined ? { visit_date: new Date(data.visit_date) } : {}),
-      ...(data.next_visit_date !== undefined
-        ? { next_visit_date: data.next_visit_date ? new Date(data.next_visit_date) : null }
-        : {}),
-      ...(data.next_visit_note !== undefined ? { next_visit_note: data.next_visit_note || null } : {}),
-    },
-    include: recordFullIncludes,
+    const record = await tx.medicalRecord.update({
+      where: { id },
+      data: {
+        ...(data.chief_complaint !== undefined ? { chief_complaint: data.chief_complaint } : {}),
+        ...(data.visit_date      !== undefined ? { visit_date: new Date(data.visit_date) } : {}),
+        ...(data.next_visit_date !== undefined
+          ? { next_visit_date: data.next_visit_date ? new Date(data.next_visit_date) : null }
+          : {}),
+        ...(data.next_visit_note !== undefined ? { next_visit_note: data.next_visit_note || null } : {}),
+      },
+      include: recordFullIncludes,
+    });
+
+    await recordAuditLog(tx, {
+      clinicId, medicalRecordId: id, entityType: 'MedicalRecord', entityId: id,
+      action: 'UPDATE', before, after: record, performedBy: staffId,
+    });
+
+    return record;
   });
 }
 
@@ -218,21 +230,31 @@ export async function upsertSoapNote(
   vetId: string,
   data: UpsertSoapNoteInput,
 ) {
-  await assertRecordInClinic(recordId, clinicId);
+  return prisma.$transaction(async (tx) => {
+    await assertRecordInClinic(recordId, clinicId, tx);
+    const before = await tx.soapNote.findUnique({ where: { medical_record_id: recordId } });
 
-  return prisma.soapNote.upsert({
-    where: { medical_record_id: recordId },
-    create: {
-      medical_record_id: recordId,
-      vet_id: vetId,
-      note: data.note ?? null,
-    },
-    update: {
-      ...(data.note !== undefined ? { note: data.note } : {}),
-    },
-    include: {
-      vet: { select: { id: true, first_name: true, last_name: true } },
-    },
+    const note = await tx.soapNote.upsert({
+      where: { medical_record_id: recordId },
+      create: {
+        medical_record_id: recordId,
+        vet_id: vetId,
+        note: data.note ?? null,
+      },
+      update: {
+        ...(data.note !== undefined ? { note: data.note } : {}),
+      },
+      include: {
+        vet: { select: { id: true, first_name: true, last_name: true } },
+      },
+    });
+
+    await recordAuditLog(tx, {
+      clinicId, medicalRecordId: recordId, entityType: 'SoapNote', entityId: note.id,
+      action: before ? 'UPDATE' : 'CREATE', before: before ?? undefined, after: note, performedBy: vetId,
+    });
+
+    return note;
   });
 }
 
@@ -241,30 +263,41 @@ export async function upsertSoapNote(
 export async function upsertVitals(
   recordId: string,
   clinicId: string,
+  staffId: string,
   data: UpsertVitalsInput,
 ) {
-  await assertRecordInClinic(recordId, clinicId);
+  return prisma.$transaction(async (tx) => {
+    await assertRecordInClinic(recordId, clinicId, tx);
+    const before = await tx.vitals.findUnique({ where: { medical_record_id: recordId } });
 
-  const sharedVitalsData = {
-    weight_kg:            data.weight_kg    !== undefined ? new Decimal(data.weight_kg)    : null,
-    temperature_c:        data.temperature_c !== undefined ? new Decimal(data.temperature_c) : null,
-    heart_rate_bpm:       data.heart_rate_bpm       ?? null,
-    respiratory_rate:     data.respiratory_rate     ?? null,
-    blood_pressure:       data.blood_pressure       ?? null,
-    body_condition_score: data.body_condition_score ?? null,
-  };
+    const sharedVitalsData = {
+      weight_kg:            data.weight_kg    !== undefined ? new Decimal(data.weight_kg)    : null,
+      temperature_c:        data.temperature_c !== undefined ? new Decimal(data.temperature_c) : null,
+      heart_rate_bpm:       data.heart_rate_bpm       ?? null,
+      respiratory_rate:     data.respiratory_rate     ?? null,
+      blood_pressure:       data.blood_pressure       ?? null,
+      body_condition_score: data.body_condition_score ?? null,
+    };
 
-  return prisma.vitals.upsert({
-    where:  { medical_record_id: recordId },
-    create: { medical_record_id: recordId, ...sharedVitalsData },
-    update: {
-      ...(data.weight_kg    !== undefined ? { weight_kg:    new Decimal(data.weight_kg) }    : {}),
-      ...(data.temperature_c !== undefined ? { temperature_c: new Decimal(data.temperature_c) } : {}),
-      ...(data.heart_rate_bpm       !== undefined ? { heart_rate_bpm:       data.heart_rate_bpm }       : {}),
-      ...(data.respiratory_rate     !== undefined ? { respiratory_rate:     data.respiratory_rate }     : {}),
-      ...(data.blood_pressure       !== undefined ? { blood_pressure:       data.blood_pressure }       : {}),
-      ...(data.body_condition_score !== undefined ? { body_condition_score: data.body_condition_score } : {}),
-    },
+    const vitals = await tx.vitals.upsert({
+      where:  { medical_record_id: recordId },
+      create: { medical_record_id: recordId, ...sharedVitalsData },
+      update: {
+        ...(data.weight_kg    !== undefined ? { weight_kg:    new Decimal(data.weight_kg) }    : {}),
+        ...(data.temperature_c !== undefined ? { temperature_c: new Decimal(data.temperature_c) } : {}),
+        ...(data.heart_rate_bpm       !== undefined ? { heart_rate_bpm:       data.heart_rate_bpm }       : {}),
+        ...(data.respiratory_rate     !== undefined ? { respiratory_rate:     data.respiratory_rate }     : {}),
+        ...(data.blood_pressure       !== undefined ? { blood_pressure:       data.blood_pressure }       : {}),
+        ...(data.body_condition_score !== undefined ? { body_condition_score: data.body_condition_score } : {}),
+      },
+    });
+
+    await recordAuditLog(tx, {
+      clinicId, medicalRecordId: recordId, entityType: 'Vitals', entityId: vitals.id,
+      action: before ? 'UPDATE' : 'CREATE', before: before ?? undefined, after: vitals, performedBy: staffId,
+    });
+
+    return vitals;
   });
 }
 
@@ -273,18 +306,28 @@ export async function upsertVitals(
 export async function addDiagnosis(
   recordId: string,
   clinicId: string,
+  staffId: string,
   data: CreateDiagnosisInput,
 ) {
-  await assertRecordInClinic(recordId, clinicId);
+  return prisma.$transaction(async (tx) => {
+    await assertRecordInClinic(recordId, clinicId, tx);
 
-  return prisma.diagnosis.create({
-    data: {
-      medical_record_id: recordId,
-      code:       data.code  ?? null,
-      name:       data.name,
-      is_primary: data.is_primary,
-      notes:      data.notes ?? null,
-    },
+    const dx = await tx.diagnosis.create({
+      data: {
+        medical_record_id: recordId,
+        code:       data.code  ?? null,
+        name:       data.name,
+        is_primary: data.is_primary,
+        notes:      data.notes ?? null,
+      },
+    });
+
+    await recordAuditLog(tx, {
+      clinicId, medicalRecordId: recordId, entityType: 'Diagnosis', entityId: dx.id,
+      action: 'CREATE', after: dx, performedBy: staffId,
+    });
+
+    return dx;
   });
 }
 
@@ -292,16 +335,23 @@ export async function removeDiagnosis(
   recordId: string,
   diagnosisId: string,
   clinicId: string,
+  staffId: string,
 ) {
-  await assertRecordInClinic(recordId, clinicId);
+  return prisma.$transaction(async (tx) => {
+    await assertRecordInClinic(recordId, clinicId, tx);
 
-  const dx = await prisma.diagnosis.findFirst({
-    where: { id: diagnosisId, medical_record_id: recordId },
-    select: { id: true },
+    const dx = await tx.diagnosis.findFirst({
+      where: { id: diagnosisId, medical_record_id: recordId },
+    });
+    if (!dx) throw new AppError('NOT_FOUND', 'Diagnosis not found', 404);
+
+    await tx.diagnosis.delete({ where: { id: diagnosisId } });
+
+    await recordAuditLog(tx, {
+      clinicId, medicalRecordId: recordId, entityType: 'Diagnosis', entityId: diagnosisId,
+      action: 'DELETE', before: dx, performedBy: staffId,
+    });
   });
-  if (!dx) throw new AppError('NOT_FOUND', 'Diagnosis not found', 404);
-
-  await prisma.diagnosis.delete({ where: { id: diagnosisId } });
 }
 
 // ── Prescriptions ──────────────────────────────────────────────────────────────
@@ -392,6 +442,11 @@ export async function addPrescription(
       );
     }
 
+    await recordAuditLog(tx, {
+      clinicId, medicalRecordId: recordId, entityType: 'Prescription', entityId: rx.id,
+      action: 'CREATE', after: rx, performedBy: prescribedBy,
+    });
+
     return rx;
   });
 }
@@ -399,32 +454,43 @@ export async function addPrescription(
 export async function updatePrescription(
   rxId: string,
   clinicId: string,
+  staffId: string,
   data: UpdatePrescriptionInput,
 ) {
-  const rx = await prisma.prescription.findFirst({
-    where: { id: rxId, pet: { owner: { clinic_id: clinicId } } },
-    select: { id: true },
-  });
-  if (!rx) throw new AppError('NOT_FOUND', 'Prescription not found', 404);
+  return prisma.$transaction(async (tx) => {
+    const before = await tx.prescription.findFirst({
+      where: { id: rxId, pet: { owner: { clinic_id: clinicId } } },
+    });
+    if (!before) throw new AppError('NOT_FOUND', 'Prescription not found', 404);
 
-  return prisma.prescription.update({
-    where: { id: rxId },
-    data: {
-      ...(data.drug_name         !== undefined ? { drug_name:         data.drug_name }         : {}),
-      ...(data.dosage            !== undefined ? { dosage:            data.dosage }             : {}),
-      ...(data.frequency         !== undefined ? { frequency:         data.frequency }          : {}),
-      ...(data.duration_days     !== undefined ? { duration_days:     data.duration_days }      : {}),
-      ...(data.quantity          !== undefined ? { quantity:          data.quantity }            : {}),
-      ...(data.refills_remaining !== undefined ? { refills_remaining: data.refills_remaining }  : {}),
-      ...(data.instructions      !== undefined ? { instructions:      data.instructions }        : {}),
-      ...(data.is_active         !== undefined ? { is_active:         data.is_active }           : {}),
-      ...(data.dispensed_at !== undefined
-        ? { dispensed_at: data.dispensed_at ? new Date(data.dispensed_at) : null }
-        : {}),
-      ...(data.expires_at !== undefined
-        ? { expires_at: data.expires_at ? new Date(data.expires_at) : null }
-        : {}),
-    },
+    const rx = await tx.prescription.update({
+      where: { id: rxId },
+      data: {
+        ...(data.drug_name         !== undefined ? { drug_name:         data.drug_name }         : {}),
+        ...(data.dosage            !== undefined ? { dosage:            data.dosage }             : {}),
+        ...(data.frequency         !== undefined ? { frequency:         data.frequency }          : {}),
+        ...(data.duration_days     !== undefined ? { duration_days:     data.duration_days }      : {}),
+        ...(data.quantity          !== undefined ? { quantity:          data.quantity }            : {}),
+        ...(data.refills_remaining !== undefined ? { refills_remaining: data.refills_remaining }  : {}),
+        ...(data.instructions      !== undefined ? { instructions:      data.instructions }        : {}),
+        ...(data.is_active         !== undefined ? { is_active:         data.is_active }           : {}),
+        ...(data.dispensed_at !== undefined
+          ? { dispensed_at: data.dispensed_at ? new Date(data.dispensed_at) : null }
+          : {}),
+        ...(data.expires_at !== undefined
+          ? { expires_at: data.expires_at ? new Date(data.expires_at) : null }
+          : {}),
+      },
+    });
+
+    if (before.medical_record_id) {
+      await recordAuditLog(tx, {
+        clinicId, medicalRecordId: before.medical_record_id, entityType: 'Prescription', entityId: rxId,
+        action: 'UPDATE', before, after: rx, performedBy: staffId,
+      });
+    }
+
+    return rx;
   });
 }
 
@@ -432,7 +498,6 @@ export async function deactivatePrescription(rxId: string, clinicId: string, sta
   return prisma.$transaction(async (tx) => {
     const rx = await tx.prescription.findFirst({
       where: { id: rxId, pet: { owner: { clinic_id: clinicId } } },
-      select: { id: true, medical_record_id: true, charge_id: true },
     });
     if (!rx) throw new AppError('NOT_FOUND', 'Prescription not found', 404);
 
@@ -440,6 +505,13 @@ export async function deactivatePrescription(rxId: string, clinicId: string, sta
       where: { id: rxId },
       data: { is_active: false },
     });
+
+    if (rx.medical_record_id) {
+      await recordAuditLog(tx, {
+        clinicId, medicalRecordId: rx.medical_record_id, entityType: 'Prescription', entityId: rxId,
+        action: 'DELETE', before: rx, after: { is_active: false }, performedBy: staffId,
+      });
+    }
 
     // If this Rx was dispensed from clinic stock, reverse the billing/stock effects too —
     // but only while the invoice is still editable (never touch a paid/finalized invoice).
@@ -729,6 +801,11 @@ async function createChargeTx(
     });
   }
 
+  await recordAuditLog(tx, {
+    clinicId, medicalRecordId: recordId, entityType: 'MedicalRecordCharge', entityId: charge.id,
+    action: 'CREATE', after: charge, performedBy: staffId,
+  });
+
   return charge;
 }
 
@@ -783,8 +860,39 @@ async function removeChargeTx(
       notes: `Reversed charge for visit ${recordId}`,
     });
   }
+
+  await recordAuditLog(tx, {
+    clinicId, medicalRecordId: recordId, entityType: 'MedicalRecordCharge', entityId: chargeId,
+    action: 'DELETE', before: charge, performedBy: staffId,
+  });
 }
 
 export async function removeCharge(recordId: string, chargeId: string, clinicId: string, staffId: string) {
   return prisma.$transaction((tx) => removeChargeTx(tx, recordId, chargeId, clinicId, staffId));
+}
+
+// ── Audit Log ────────────────────────────────────────────────────────────────
+
+export async function listAuditLog(recordId: string, clinicId: string) {
+  await assertRecordInClinic(recordId, clinicId);
+
+  const entries = await prisma.auditLog.findMany({
+    where:   { medical_record_id: recordId },
+    orderBy: { created_at: 'desc' },
+  });
+
+  const staffIds = [...new Set(entries.map((e) => e.performed_by))];
+  const staff =
+    staffIds.length > 0
+      ? await prisma.staffUser.findMany({
+          where:  { id: { in: staffIds } },
+          select: { id: true, first_name: true, last_name: true },
+        })
+      : [];
+  const staffMap = new Map(staff.map((s) => [s.id, s]));
+
+  return entries.map((e) => ({
+    ...e,
+    performed_by_staff: staffMap.get(e.performed_by) ?? null,
+  }));
 }

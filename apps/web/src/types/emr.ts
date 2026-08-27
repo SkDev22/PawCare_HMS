@@ -83,6 +83,20 @@ export type ControlledApproval = {
   item: { id: string; name: string; unit: string };
 };
 
+export type AuditLogEntry = {
+  id: string;
+  clinic_id: string;
+  medical_record_id: string;
+  entity_type: "MedicalRecord" | "SoapNote" | "Vitals" | "Diagnosis" | "Prescription" | "MedicalRecordCharge";
+  entity_id: string;
+  action: "CREATE" | "UPDATE" | "DELETE";
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  performed_by: string;
+  performed_by_staff: { id: string; first_name: string; last_name: string } | null;
+  created_at: string;
+};
+
 export type LabResult = {
   id: string;
   test_name: string;

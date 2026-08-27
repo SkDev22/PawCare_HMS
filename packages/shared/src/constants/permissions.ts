@@ -9,6 +9,8 @@ export const PERMISSIONS = {
   MEDICAL_RECORD_READ:  ['ADMIN', 'VETERINARIAN', 'NURSE'] as const,
   MEDICAL_RECORD_WRITE: ['ADMIN', 'VETERINARIAN'] as const,
   SOAP_NOTE_WRITE:      ['ADMIN', 'VETERINARIAN'] as const,
+  // Before/after edit history — deliberately narrower than MEDICAL_RECORD_READ.
+  AUDIT_LOG_READ:       ['ADMIN'] as const,
 
   // Appointments
   APPOINTMENT_READ:     ['ADMIN', 'VETERINARIAN', 'NURSE', 'RECEPTIONIST'] as const,

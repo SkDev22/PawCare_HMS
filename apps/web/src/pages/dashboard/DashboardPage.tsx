@@ -62,7 +62,9 @@ const STATUS_CONFIG: Record<
 // Built from the clinic's brand scale at render time (see `speciesColors`
 // below) instead of a fixed hex map, so the chart follows the selected
 // theme color.
-function getSpeciesColors(brand: Record<string, string>): Record<string, string> {
+function getSpeciesColors(
+  brand: Record<string, string>,
+): Record<string, string> {
   return {
     DOG: brand["600"],
     CAT: brand["500"],
@@ -108,7 +110,8 @@ export function DashboardPage() {
   const user = useAuthStore((s) => s.user);
   const { data, isLoading, isError } = useDashboardSummary();
   const { data: clinic } = useClinic();
-  const themeSlug = (clinic?.theme_color as ThemeColorSlug | undefined) ?? "green";
+  const themeSlug =
+    (clinic?.theme_color as ThemeColorSlug | undefined) ?? "green";
   const brand = (THEME_PRESETS[themeSlug] ?? THEME_PRESETS.green).brand;
   const speciesColors = getSpeciesColors(brand);
 
@@ -141,7 +144,9 @@ export function DashboardPage() {
         },
         {
           label: "Monthly Revenue",
-          value: formatCurrency(data.stats.monthlyRevenue.amount, { maximumFractionDigits: 0 }),
+          value: formatCurrency(data.stats.monthlyRevenue.amount, {
+            maximumFractionDigits: 0,
+          }),
           sub: `${data.stats.monthlyRevenue.outstandingInvoicesCount} outstanding invoices`,
           trend: `${data.stats.monthlyRevenue.trend >= 0 ? "+" : ""}${data.stats.monthlyRevenue.trend.toFixed(1)}% vs last month`,
           up: data.stats.monthlyRevenue.trend >= 0,
@@ -264,7 +269,7 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <Skeleton className="h-[200px] w-full rounded-lg" />
+              <Skeleton className="h-50 w-full rounded-lg" />
             ) : (
               <ResponsiveContainer width="100%" height={200}>
                 <AreaChart
@@ -279,8 +284,16 @@ export function DashboardPage() {
                       x2="0"
                       y2="1"
                     >
-                      <stop offset="5%" stopColor={brand["600"]} stopOpacity={0.2} />
-                      <stop offset="95%" stopColor={brand["600"]} stopOpacity={0} />
+                      <stop
+                        offset="5%"
+                        stopColor={brand["600"]}
+                        stopOpacity={0.2}
+                      />
+                      <stop
+                        offset="95%"
+                        stopColor={brand["600"]}
+                        stopOpacity={0}
+                      />
                     </linearGradient>
                   </defs>
                   <CartesianGrid
@@ -323,7 +336,7 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             {isLoading ? (
-              <Skeleton className="h-[140px] w-full rounded-lg" />
+              <Skeleton className="h-35 w-full rounded-lg" />
             ) : data && data.speciesDistribution.length > 0 ? (
               <>
                 <ResponsiveContainer width="100%" height={140}>

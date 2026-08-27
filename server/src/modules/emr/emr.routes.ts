@@ -124,7 +124,8 @@ emrRouter.put(
   validate({ body: UpdateMedicalRecordSchema }),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const record = await svc.updateRecord(req.params.id, authed(req).user.clinic_id, req.body);
+      const user = authed(req).user;
+      const record = await svc.updateRecord(req.params.id, user.clinic_id, user.id, req.body);
       res.json(record);
     } catch (err) { next(err); }
   },
@@ -155,7 +156,8 @@ emrRouter.put(
   validate({ body: UpsertVitalsSchema }),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const vitals = await svc.upsertVitals(req.params.id, authed(req).user.clinic_id, req.body);
+      const user = authed(req).user;
+      const vitals = await svc.upsertVitals(req.params.id, user.clinic_id, user.id, req.body);
       res.json(vitals);
     } catch (err) { next(err); }
   },
@@ -170,7 +172,8 @@ emrRouter.post(
   validate({ body: CreateDiagnosisSchema }),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const dx = await svc.addDiagnosis(req.params.id, authed(req).user.clinic_id, req.body);
+      const user = authed(req).user;
+      const dx = await svc.addDiagnosis(req.params.id, user.clinic_id, user.id, req.body);
       res.status(201).json(dx);
     } catch (err) { next(err); }
   },
@@ -182,7 +185,8 @@ emrRouter.delete(
   authorize('MEDICAL_RECORD_WRITE'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await svc.removeDiagnosis(req.params.id, req.params.diagId, authed(req).user.clinic_id);
+      const user = authed(req).user;
+      await svc.removeDiagnosis(req.params.id, req.params.diagId, user.clinic_id, user.id);
       res.status(204).end();
     } catch (err) { next(err); }
   },
@@ -211,7 +215,8 @@ emrRouter.put(
   validate({ body: UpdatePrescriptionSchema }),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const rx = await svc.updatePrescription(req.params.rxId, authed(req).user.clinic_id, req.body);
+      const user = authed(req).user;
+      const rx = await svc.updatePrescription(req.params.rxId, user.clinic_id, user.id, req.body);
       res.json(rx);
     } catch (err) { next(err); }
   },
@@ -267,6 +272,20 @@ emrRouter.delete(
       const user = authed(req).user;
       await svc.removeCharge(req.params.id, req.params.chargeId, user.clinic_id, user.id);
       res.status(204).end();
+    } catch (err) { next(err); }
+  },
+);
+
+// ── Audit Log ────────────────────────────────────────────────────────────────
+
+emrRouter.get(
+  '/:id/audit-log',
+  authenticate,
+  authorize('AUDIT_LOG_READ'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const entries = await svc.listAuditLog(req.params.id, authed(req).user.clinic_id);
+      res.json(entries);
     } catch (err) { next(err); }
   },
 );
