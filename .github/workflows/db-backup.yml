@@ -26,6 +26,11 @@ jobs:
           sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
           sudo apt-get update -y
           sudo apt-get install -y postgresql-client-18
+          # ubuntu-latest ships its own (older) pg_dump on PATH already, and
+          # installing a second version via apt doesn't reliably win that
+          # ordering — point PATH at the v18 binaries explicitly rather than
+          # hoping the right one gets picked up.
+          echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
 
       - name: Dump database
         env:
@@ -33,6 +38,7 @@ jobs:
         run: |
           set -euo pipefail
           : "${DATABASE_URL:?NEON_DATABASE_URL secret is not set or empty}"
+          echo "Using $(command -v pg_dump): $(pg_dump --version)"
           mkdir -p dump
           FILE="pawcare-$(date -u +'%Y-%m-%d_%H%M%S').dump"
           pg_dump "$DATABASE_URL" --format=custom --no-owner --no-privileges --file="dump/$FILE"
