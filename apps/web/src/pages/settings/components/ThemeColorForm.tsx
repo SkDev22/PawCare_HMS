@@ -16,7 +16,9 @@ function getServerErrorMessage(err: unknown): string {
     "data" in err.response
   ) {
     const data = err.response.data as { error?: { message?: string } };
-    return data?.error?.message ?? "Failed to update theme color. Please try again.";
+    return (
+      data?.error?.message ?? "Failed to update theme color. Please try again."
+    );
   }
   return "Unable to connect to the server. Check your network.";
 }
@@ -24,7 +26,8 @@ function getServerErrorMessage(err: unknown): string {
 export function ThemeColorForm() {
   const { data: clinic, isLoading } = useClinic();
   const updateClinic = useUpdateClinic();
-  const activeSlug = (clinic?.theme_color as ThemeColorSlug | undefined) ?? "green";
+  const activeSlug =
+    (clinic?.theme_color as ThemeColorSlug | undefined) ?? "green";
 
   const onSelect = async (slug: ThemeColorSlug) => {
     if (slug === activeSlug || updateClinic.isPending) return;
@@ -56,35 +59,42 @@ export function ThemeColorForm() {
           </div>
         ) : (
           <div className="flex flex-wrap gap-3">
-            {(Object.entries(THEME_PRESETS) as [ThemeColorSlug, (typeof THEME_PRESETS)[ThemeColorSlug]][]).map(
-              ([slug, preset]) => {
-                const isActive = slug === activeSlug;
-                return (
-                  <button
-                    key={slug}
-                    type="button"
-                    aria-label={preset.label}
-                    aria-pressed={isActive}
-                    disabled={updateClinic.isPending}
-                    onClick={() => onSelect(slug)}
-                    className="flex flex-col items-center gap-1.5"
+            {(
+              Object.entries(THEME_PRESETS) as [
+                ThemeColorSlug,
+                (typeof THEME_PRESETS)[ThemeColorSlug],
+              ][]
+            ).map(([slug, preset]) => {
+              const isActive = slug === activeSlug;
+              return (
+                <button
+                  key={slug}
+                  type="button"
+                  aria-label={preset.label}
+                  aria-pressed={isActive}
+                  disabled={updateClinic.isPending}
+                  onClick={() => onSelect(slug)}
+                  className="flex flex-col items-center gap-1.5"
+                >
+                  <span
+                    className="flex h-8 w-8 items-center justify-center rounded-full border transition-shadow"
+                    style={{
+                      backgroundColor: preset.swatch,
+                      boxShadow: isActive
+                        ? `0 0 0 2px hsl(var(--background)), 0 0 0 4px ${preset.swatch}`
+                        : undefined,
+                    }}
                   >
-                    <span
-                      className="flex h-10 w-10 items-center justify-center rounded-full border transition-shadow"
-                      style={{
-                        backgroundColor: preset.swatch,
-                        boxShadow: isActive
-                          ? `0 0 0 2px hsl(var(--background)), 0 0 0 4px ${preset.swatch}`
-                          : undefined,
-                      }}
-                    >
-                      {isActive && <Check className="h-5 w-5 text-white drop-shadow" />}
-                    </span>
-                    <span className="text-xs text-muted-foreground">{preset.label}</span>
-                  </button>
-                );
-              },
-            )}
+                    {isActive && (
+                      <Check className="h-4 w-4 text-white drop-shadow" />
+                    )}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {preset.label}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
       </CardContent>

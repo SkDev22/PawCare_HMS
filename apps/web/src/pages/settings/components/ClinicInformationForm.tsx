@@ -98,18 +98,30 @@ export function ClinicInformationForm() {
             ))}
           </div>
         ) : (
-          <form className="space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
+          <form
+            className="space-y-4"
+            onSubmit={handleSubmit(onSubmit)}
+            noValidate
+          >
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="clinic-name">Clinic name</Label>
                 <Input id="clinic-name" {...register("name")} />
-                {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+                {errors.name && (
+                  <p className="text-xs text-destructive">
+                    {errors.name.message}
+                  </p>
+                )}
               </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="clinic-phone">Phone</Label>
                 <Input id="clinic-phone" type="tel" {...register("phone")} />
-                {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
+                {errors.phone && (
+                  <p className="text-xs text-destructive">
+                    {errors.phone.message}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -117,14 +129,24 @@ export function ClinicInformationForm() {
               <div className="grid gap-2">
                 <Label htmlFor="clinic-email">Contact email</Label>
                 <Input id="clinic-email" type="email" {...register("email")} />
-                {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+                {errors.email && (
+                  <p className="text-xs text-destructive">
+                    {errors.email.message}
+                  </p>
+                )}
               </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="clinic-currency">Currency</Label>
-                <Input id="clinic-currency" placeholder="LKR" {...register("currency")} />
+                <Input
+                  id="clinic-currency"
+                  placeholder="LKR"
+                  {...register("currency")}
+                />
                 {errors.currency && (
-                  <p className="text-xs text-destructive">{errors.currency.message}</p>
+                  <p className="text-xs text-destructive">
+                    {errors.currency.message}
+                  </p>
                 )}
               </div>
             </div>
@@ -132,14 +154,24 @@ export function ClinicInformationForm() {
             <div className="grid gap-2">
               <Label htmlFor="clinic-address">Address</Label>
               <Textarea id="clinic-address" rows={2} {...register("address")} />
-              {errors.address && <p className="text-xs text-destructive">{errors.address.message}</p>}
+              {errors.address && (
+                <p className="text-xs text-destructive">
+                  {errors.address.message}
+                </p>
+              )}
             </div>
 
             <div className="grid gap-2 sm:w-1/2">
               <Label htmlFor="clinic-timezone">Timezone</Label>
-              <Input id="clinic-timezone" placeholder="Asia/Colombo" {...register("timezone")} />
+              <Input
+                id="clinic-timezone"
+                placeholder="Asia/Colombo"
+                {...register("timezone")}
+              />
               {errors.timezone && (
-                <p className="text-xs text-destructive">{errors.timezone.message}</p>
+                <p className="text-xs text-destructive">
+                  {errors.timezone.message}
+                </p>
               )}
             </div>
 
@@ -165,15 +197,23 @@ export function ClinicInformationForm() {
                     Auto-applied to new invoices until manually edited.
                   </p>
                   {errors.tax_rate && (
-                    <p className="text-xs text-destructive">{errors.tax_rate.message}</p>
+                    <p className="text-xs text-destructive">
+                      {errors.tax_rate.message}
+                    </p>
                   )}
                 </div>
 
                 <div className="grid gap-2">
                   <Label htmlFor="clinic-invoice-prefix">Invoice prefix</Label>
-                  <Input id="clinic-invoice-prefix" placeholder="INV-" {...register("invoice_prefix")} />
+                  <Input
+                    id="clinic-invoice-prefix"
+                    placeholder="INV-"
+                    {...register("invoice_prefix")}
+                  />
                   {errors.invoice_prefix && (
-                    <p className="text-xs text-destructive">{errors.invoice_prefix.message}</p>
+                    <p className="text-xs text-destructive">
+                      {errors.invoice_prefix.message}
+                    </p>
                   )}
                 </div>
 
@@ -188,13 +228,17 @@ export function ClinicInformationForm() {
                     {...register("invoice_due_days")}
                   />
                   {errors.invoice_due_days && (
-                    <p className="text-xs text-destructive">{errors.invoice_due_days.message}</p>
+                    <p className="text-xs text-destructive">
+                      {errors.invoice_due_days.message}
+                    </p>
                   )}
                 </div>
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="clinic-invoice-footer">Invoice footer text</Label>
+                <Label htmlFor="clinic-invoice-footer">
+                  Invoice footer text
+                </Label>
                 <Textarea
                   id="clinic-invoice-footer"
                   rows={2}
@@ -202,7 +246,9 @@ export function ClinicInformationForm() {
                   {...register("invoice_footer_text")}
                 />
                 {errors.invoice_footer_text && (
-                  <p className="text-xs text-destructive">{errors.invoice_footer_text.message}</p>
+                  <p className="text-xs text-destructive">
+                    {errors.invoice_footer_text.message}
+                  </p>
                 )}
               </div>
             </div>

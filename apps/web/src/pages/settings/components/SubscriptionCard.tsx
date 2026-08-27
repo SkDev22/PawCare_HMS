@@ -1,5 +1,9 @@
 import { CreditCard, CheckCircle2 } from "lucide-react";
-import { getEffectiveFeatures, getClinicFeatures, type FeatureKey } from "@pawcare/shared";
+import {
+  getEffectiveFeatures,
+  getClinicFeatures,
+  type FeatureKey,
+} from "@pawcare/shared";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuthStore } from "@/stores/auth.store";
@@ -36,15 +40,17 @@ export function SubscriptionCard() {
   const { plan, trial_ends_at, extra_features } = user;
   const baseFeatures = getClinicFeatures(plan);
   const effectiveFeatures = getEffectiveFeatures(plan, extra_features);
-  const addOns = extra_features.filter((f) => !baseFeatures.includes(f as FeatureKey));
+  const addOns = extra_features.filter(
+    (f) => !baseFeatures.includes(f as FeatureKey),
+  );
 
   const isTrial = plan === "TRIAL" && trial_ends_at !== null;
   const daysLeft = isTrial ? daysRemaining(trial_ends_at) : null;
   const trialExpired = daysLeft !== null && daysLeft < 0;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+    <div>
+      <CardHeader className="flex flex-row items-start justify-start space-y-0">
         <div className="flex items-center gap-3">
           <CreditCard className="h-5 w-5 text-muted-foreground shrink-0" />
           <div>
@@ -60,7 +66,9 @@ export function SubscriptionCard() {
       </CardHeader>
       <CardContent className="space-y-4">
         {isTrial && (
-          <p className={`text-sm ${trialExpired ? "text-destructive" : "text-muted-foreground"}`}>
+          <p
+            className={`text-sm ${trialExpired ? "text-destructive" : "text-muted-foreground"}`}
+          >
             {trialExpired
               ? "Your trial has ended. Contact us to upgrade and restore full access."
               : `Trial ends ${new Date(trial_ends_at).toLocaleDateString()} (${daysLeft} day${daysLeft === 1 ? "" : "s"} left)`}
@@ -81,6 +89,6 @@ export function SubscriptionCard() {
           ))}
         </div>
       </CardContent>
-    </Card>
+    </div>
   );
 }
