@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { clampZero } from '../billing/billing.service';
 import { applyStockChangeTx, resolveBatchForSaleTx } from '../inventory/inventory.service';
+import { notifyRole } from '../notifications/notifications.service';
 import type {
   CreateMedicalRecordInput,
   UpdateMedicalRecordInput,
@@ -96,6 +97,7 @@ const recordFullIncludes = {
     include: {
       item:   { select: { id: true, name: true } },
       charge: { select: { id: true, total: true } },
+      controlled_substance_approval: { select: { id: true, status: true } },
     },
   },
   lab_results: {
@@ -316,18 +318,33 @@ export async function addPrescription(
     // When the drug is dispensed from clinic stock (item_id given), also create the
     // matching billing charge + stock deduction in the same transaction, so the Rx
     // and the bill can never drift apart. Pharmacy-fulfilled drugs (no item_id) are
-    // documentation-only — nothing is billed or deducted.
+    // documentation-only — nothing is billed or deducted. A *controlled* item is a
+    // third case: the charge/stock deduction is deferred until a different staff
+    // member signs off (see approveControlledDispense below) — nothing is billed
+    // or dispensed yet, so there's nothing to reverse if it's rejected.
     let chargeId: string | null = null;
+    let controlledItem: { id: string } | null = null;
+
     if (data.item_id) {
-      const charge = await createChargeTx(tx, recordId, clinicId, prescribedBy, {
-        item_id: data.item_id,
-        quantity: data.quantity ?? 1,
-        description: data.drug_name,
+      const item = await tx.inventoryItem.findFirst({
+        where:  { id: data.item_id, clinic_id: clinicId },
+        select: { id: true, is_controlled: true },
       });
-      chargeId = charge.id;
+      if (!item) throw new AppError('NOT_FOUND', 'Inventory item not found', 404);
+
+      if (item.is_controlled) {
+        controlledItem = item;
+      } else {
+        const charge = await createChargeTx(tx, recordId, clinicId, prescribedBy, {
+          item_id: data.item_id,
+          quantity: data.quantity ?? 1,
+          description: data.drug_name,
+        });
+        chargeId = charge.id;
+      }
     }
 
-    return tx.prescription.create({
+    const rx = await tx.prescription.create({
       data: {
         pet_id:            record.pet_id,
         medical_record_id: recordId,
@@ -347,8 +364,35 @@ export async function addPrescription(
       include: {
         item:   { select: { id: true, name: true } },
         charge: { select: { id: true, total: true } },
+        controlled_substance_approval: { select: { id: true, status: true } },
       },
     });
+
+    if (controlledItem) {
+      await tx.controlledSubstanceApproval.create({
+        data: {
+          clinic_id:       clinicId,
+          prescription_id: rx.id,
+          item_id:         controlledItem.id,
+          quantity:        data.quantity ?? 1,
+          requested_by:    prescribedBy,
+        },
+      });
+
+      await notifyRole(
+        tx,
+        clinicId,
+        ['ADMIN', 'NURSE', 'LAB_TECHNICIAN'],
+        {
+          type:    'controlled_substance_pending_approval',
+          subject: 'Controlled Substance Approval Needed',
+          body:    `${data.drug_name} (qty ${data.quantity ?? 1}) needs a second sign-off before it can be dispensed.`,
+        },
+        prescribedBy,
+      );
+    }
+
+    return rx;
   });
 }
 
@@ -409,6 +453,133 @@ export async function deactivatePrescription(rxId: string, clinicId: string, sta
         await removeChargeTx(tx, rx.medical_record_id, rx.charge_id, clinicId, staffId);
       }
     }
+
+    // A controlled item with no charge yet means dispensing is still awaiting
+    // dual sign-off — cancel that request too, so it doesn't sit in the
+    // approval queue for a drug that's no longer being requested.
+    if (!rx.charge_id) {
+      await tx.controlledSubstanceApproval.updateMany({
+        where: { prescription_id: rxId, status: 'PENDING' },
+        data: {
+          status:           'REJECTED',
+          decided_at:       new Date(),
+          rejection_reason: 'Prescription deactivated by prescriber',
+        },
+      });
+    }
+  });
+}
+
+// ── Controlled Substance Approvals ──────────────────────────────────────────
+
+const controlledApprovalIncludes = {
+  prescription: {
+    select: {
+      id:        true,
+      drug_name: true,
+      dosage:    true,
+      frequency: true,
+      pet:       { select: { id: true, name: true } },
+    },
+  },
+  item: { select: { id: true, name: true, unit: true } },
+} as const;
+
+export async function listControlledApprovals(clinicId: string) {
+  const approvals = await prisma.controlledSubstanceApproval.findMany({
+    where:   { clinic_id: clinicId, status: 'PENDING' },
+    include: controlledApprovalIncludes,
+    orderBy: { created_at: 'asc' },
+  });
+
+  const requesterIds = [...new Set(approvals.map((a) => a.requested_by))];
+  const requesters =
+    requesterIds.length > 0
+      ? await prisma.staffUser.findMany({
+          where:  { id: { in: requesterIds } },
+          select: { id: true, first_name: true, last_name: true },
+        })
+      : [];
+  const requesterMap = new Map(requesters.map((r) => [r.id, r]));
+
+  return approvals.map((a) => ({
+    ...a,
+    requested_by_staff: requesterMap.get(a.requested_by) ?? null,
+  }));
+}
+
+export async function approveControlledDispense(
+  approvalId: string,
+  clinicId: string,
+  approverId: string,
+) {
+  return prisma.$transaction(async (tx) => {
+    const approval = await tx.controlledSubstanceApproval.findFirst({
+      where:   { id: approvalId, clinic_id: clinicId },
+      include: { prescription: true },
+    });
+    if (!approval) throw new AppError('NOT_FOUND', 'Approval request not found', 404);
+    if (approval.status !== 'PENDING') {
+      throw new AppError('CONFLICT', 'This request has already been decided', 409);
+    }
+    if (approval.requested_by === approverId) {
+      throw new AppError('FORBIDDEN', 'A different staff member must approve this dispense', 403);
+    }
+    if (!approval.prescription.medical_record_id) {
+      throw new AppError('BAD_REQUEST', 'Prescription is not linked to a medical record', 400);
+    }
+
+    const charge = await createChargeTx(
+      tx,
+      approval.prescription.medical_record_id,
+      clinicId,
+      approverId,
+      {
+        item_id:     approval.item_id,
+        quantity:    approval.quantity,
+        description: approval.prescription.drug_name,
+      },
+    );
+
+    await tx.prescription.update({
+      where: { id: approval.prescription_id },
+      data:  { charge_id: charge.id },
+    });
+
+    return tx.controlledSubstanceApproval.update({
+      where:   { id: approvalId },
+      data:    { status: 'APPROVED', approved_by: approverId, decided_at: new Date() },
+      include: controlledApprovalIncludes,
+    });
+  });
+}
+
+export async function rejectControlledDispense(
+  approvalId: string,
+  clinicId: string,
+  approverId: string,
+  reason?: string,
+) {
+  const approval = await prisma.controlledSubstanceApproval.findFirst({
+    where: { id: approvalId, clinic_id: clinicId },
+  });
+  if (!approval) throw new AppError('NOT_FOUND', 'Approval request not found', 404);
+  if (approval.status !== 'PENDING') {
+    throw new AppError('CONFLICT', 'This request has already been decided', 409);
+  }
+  if (approval.requested_by === approverId) {
+    throw new AppError('FORBIDDEN', 'A different staff member must approve this dispense', 403);
+  }
+
+  return prisma.controlledSubstanceApproval.update({
+    where:   { id: approvalId },
+    data: {
+      status:           'REJECTED',
+      approved_by:      approverId,
+      decided_at:       new Date(),
+      rejection_reason: reason ?? null,
+    },
+    include: controlledApprovalIncludes,
   });
 }
 

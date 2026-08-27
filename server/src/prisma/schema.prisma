@@ -465,8 +465,43 @@ model Prescription {
   medical_record MedicalRecord?       @relation(fields: [medical_record_id], references: [id])
   item           InventoryItem?       @relation(fields: [item_id], references: [id])
   charge         MedicalRecordCharge? @relation(fields: [charge_id], references: [id])
+  controlled_substance_approval ControlledSubstanceApproval?
 
   @@map("prescriptions")
+}
+
+// ─────────────────────────────────────────
+// CONTROLLED SUBSTANCE DUAL APPROVAL
+// ─────────────────────────────────────────
+// A controlled item's prescription defers its charge/stock deduction until a
+// *different* staff member signs off — see emr.service.ts:addPrescription.
+// Nothing else is created for a rejected request, so there's nothing to
+// reverse: unlike a normal prescription, charge_id stays null until approved.
+
+enum ControlledDispenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model ControlledSubstanceApproval {
+  id               String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clinic_id        String                   @db.Uuid
+  prescription_id  String                   @unique @db.Uuid
+  item_id          String                   @db.Uuid
+  quantity         Int
+  requested_by     String                   @db.Uuid
+  status           ControlledDispenseStatus @default(PENDING)
+  approved_by      String?                  @db.Uuid
+  decided_at       DateTime?
+  rejection_reason String?
+  created_at       DateTime                 @default(now())
+
+  prescription Prescription  @relation(fields: [prescription_id], references: [id])
+  item         InventoryItem @relation(fields: [item_id], references: [id])
+
+  @@index([clinic_id, status])
+  @@map("controlled_substance_approvals")
 }
 
 // ─────────────────────────────────────────
@@ -613,6 +648,7 @@ model InventoryItem {
   prescriptions      Prescription[]
   batches            StockBatch[]
   grn_items          GoodsReceivedNoteItem[]
+  controlled_approvals ControlledSubstanceApproval[]
 
   @@map("inventory_items")
 }

@@ -9,6 +9,7 @@ import type {
   Diagnosis,
   Prescription,
   Charge,
+  ControlledApproval,
 } from '../types/emr';
 
 type ApiError = { response?: { data?: { error?: { message?: string } } } };
@@ -207,5 +208,47 @@ export function useRemoveCharge(recordId: string) {
       toast.success('Charge removed');
     },
     onError: (err: ApiError) => toast.error(errMsg(err, 'Failed to remove charge')),
+  });
+}
+
+// ── Controlled Substance Approvals ───────────────────────────────────────────
+
+export function useControlledApprovals() {
+  return useQuery<ControlledApproval[]>({
+    queryKey: ['medical-records', 'controlled-approvals'],
+    queryFn: () => api.get('/medical-records/controlled-approvals').then((r) => r.data),
+  });
+}
+
+export function useApproveControlledDispense() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (approvalId: string) =>
+      api
+        .post(`/medical-records/controlled-approvals/${approvalId}/approve`)
+        .then((r) => r.data as ControlledApproval),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['medical-records', 'controlled-approvals'] });
+      qc.invalidateQueries({ queryKey: ['inventory'] });
+      qc.invalidateQueries({ queryKey: ['medical-records'] });
+      toast.success('Dispense approved');
+    },
+    onError: (err: ApiError) => toast.error(errMsg(err, 'Failed to approve dispense')),
+  });
+}
+
+export function useRejectControlledDispense() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ approvalId, reason }: { approvalId: string; reason?: string }) =>
+      api
+        .post(`/medical-records/controlled-approvals/${approvalId}/reject`, { reason })
+        .then((r) => r.data as ControlledApproval),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['medical-records', 'controlled-approvals'] });
+      qc.invalidateQueries({ queryKey: ['medical-records'] });
+      toast.success('Dispense rejected');
+    },
+    onError: (err: ApiError) => toast.error(errMsg(err, 'Failed to reject dispense')),
   });
 }

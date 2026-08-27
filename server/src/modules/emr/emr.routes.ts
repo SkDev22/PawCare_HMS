@@ -12,6 +12,7 @@ import {
   CreatePrescriptionSchema,
   UpdatePrescriptionSchema,
   CreateChargeSchema,
+  RejectControlledDispenseSchema,
 } from '@pawcare/shared';
 import type { MedicalRecordQueryInput } from '@pawcare/shared';
 import * as svc from './emr.service';
@@ -50,6 +51,54 @@ emrRouter.post(
       const user = authed(req).user;
       const record = await svc.createRecord(user.clinic_id, user.id, req.body);
       res.status(201).json(record);
+    } catch (err) { next(err); }
+  },
+);
+
+// ── Controlled Substance Approvals ───────────────────────────────────────────
+// Registered before the generic /:id routes below, or Express would treat
+// "controlled-approvals" as an :id.
+
+emrRouter.get(
+  '/controlled-approvals',
+  authenticate,
+  authorize('CONTROLLED_SUBSTANCE_APPROVE'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const items = await svc.listControlledApprovals(authed(req).user.clinic_id);
+      res.json(items);
+    } catch (err) { next(err); }
+  },
+);
+
+emrRouter.post(
+  '/controlled-approvals/:id/approve',
+  authenticate,
+  authorize('CONTROLLED_SUBSTANCE_APPROVE'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = authed(req).user;
+      const approval = await svc.approveControlledDispense(req.params.id, user.clinic_id, user.id);
+      res.json(approval);
+    } catch (err) { next(err); }
+  },
+);
+
+emrRouter.post(
+  '/controlled-approvals/:id/reject',
+  authenticate,
+  authorize('CONTROLLED_SUBSTANCE_APPROVE'),
+  validate({ body: RejectControlledDispenseSchema }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = authed(req).user;
+      const approval = await svc.rejectControlledDispense(
+        req.params.id,
+        user.clinic_id,
+        user.id,
+        req.body.reason,
+      );
+      res.json(approval);
     } catch (err) { next(err); }
   },
 );

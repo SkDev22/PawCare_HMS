@@ -84,6 +84,10 @@ export const CreateChargeSchema = z
     path: ['item_id'],
   });
 
+export const RejectControlledDispenseSchema = z.object({
+  reason: z.string().max(500).optional(),
+});
+
 export type CreateMedicalRecordInput = z.infer<typeof CreateMedicalRecordSchema>;
 export type UpdateMedicalRecordInput = z.infer<typeof UpdateMedicalRecordSchema>;
 export type MedicalRecordQueryInput = z.infer<typeof MedicalRecordQuerySchema>;
@@ -93,3 +97,4 @@ export type CreateDiagnosisInput = z.infer<typeof CreateDiagnosisSchema>;
 export type CreatePrescriptionInput = z.infer<typeof CreatePrescriptionSchema>;
 export type UpdatePrescriptionInput = z.infer<typeof UpdatePrescriptionSchema>;
 export type CreateChargeInput = z.infer<typeof CreateChargeSchema>;
+export type RejectControlledDispenseInput = z.infer<typeof RejectControlledDispenseSchema>;

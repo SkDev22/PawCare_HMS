@@ -13,6 +13,7 @@ export const NOTIFICATION_TYPES = [
   { type: 'payment_voided', label: 'Payment voided' },
   { type: 'low_stock', label: 'Low stock alert' },
   { type: 'controlled_substance_dispensed', label: 'Controlled substance dispensed' },
+  { type: 'controlled_substance_pending_approval', label: 'Controlled substance awaiting approval' },
   { type: 'lab_result_abnormal', label: 'Abnormal lab result' },
   { type: 'invoice_overdue', label: 'Invoice overdue (daily alert)' },
   { type: 'daily_digest', label: 'Daily digest summary' },

@@ -26,6 +26,10 @@ export const PERMISSIONS = {
   // Inventory
   INVENTORY_READ:       ['ADMIN', 'VETERINARIAN', 'NURSE', 'RECEPTIONIST'] as const,
   INVENTORY_WRITE:      ['ADMIN', 'NURSE', 'LAB_TECHNICIAN', 'RECEPTIONIST'] as const,
+  // Second sign-off on a controlled-substance dispense — narrower than
+  // INVENTORY_WRITE (excludes RECEPTIONIST) since this is a clinical
+  // judgment call, not a stock/billing one.
+  CONTROLLED_SUBSTANCE_APPROVE: ['ADMIN', 'NURSE', 'LAB_TECHNICIAN'] as const,
 
   // Staff management
   STAFF_READ:           ['ADMIN'] as const,

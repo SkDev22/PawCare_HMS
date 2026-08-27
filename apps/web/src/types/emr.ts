@@ -55,8 +55,32 @@ export type Prescription = {
   charge_id: string | null;
   item: { id: string; name: string } | null;
   charge: { id: string; total: string } | null;
+  controlled_substance_approval: { id: string; status: "PENDING" | "APPROVED" | "REJECTED" } | null;
   created_at: string;
   updated_at: string;
+};
+
+export type ControlledApproval = {
+  id: string;
+  clinic_id: string;
+  prescription_id: string;
+  item_id: string;
+  quantity: number;
+  requested_by: string;
+  requested_by_staff: { id: string; first_name: string; last_name: string } | null;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  approved_by: string | null;
+  decided_at: string | null;
+  rejection_reason: string | null;
+  created_at: string;
+  prescription: {
+    id: string;
+    drug_name: string;
+    dosage: string;
+    frequency: string;
+    pet: { id: string; name: string };
+  };
+  item: { id: string; name: string; unit: string };
 };
 
 export type LabResult = {

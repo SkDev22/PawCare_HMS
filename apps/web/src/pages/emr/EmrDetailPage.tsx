@@ -1041,6 +1041,14 @@ function PrescriptionsTab({
                       <Badge variant="success" className="text-xs">
                         Clinic · {formatCurrency(rx.charge.total)}
                       </Badge>
+                    ) : rx.controlled_substance_approval?.status === "PENDING" ? (
+                      <Badge variant="warning" className="text-xs">
+                        Pending Dual Sign-off
+                      </Badge>
+                    ) : rx.controlled_substance_approval?.status === "REJECTED" ? (
+                      <Badge variant="destructive" className="text-xs">
+                        Dispense Rejected
+                      </Badge>
                     ) : (
                       <Badge variant="outline" className="text-xs">
                         Pharmacy
