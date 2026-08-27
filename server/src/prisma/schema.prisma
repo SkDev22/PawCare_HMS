@@ -896,6 +896,7 @@ model Notification {
   created_at   DateTime           @default(now())
 
   @@unique([staff_id, type, reference_id])
+  @@unique([owner_id, type, reference_id])
   @@index([status, scheduled_at])
   @@index([staff_id, read_at])
   @@map("notifications")

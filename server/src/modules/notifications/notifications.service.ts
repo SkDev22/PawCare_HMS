@@ -1,6 +1,7 @@
 import { Prisma, StaffRole } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { emitToStaff } from '../../lib/socket';
+import { sendEmail } from '../../services/sendgrid';
 import { NOTIFICATION_TYPES } from '@pawcare/shared';
 import type { NotificationQuery } from '@pawcare/shared';
 
@@ -185,4 +186,79 @@ export async function notifyRole(
       }
     }),
   );
+}
+
+// ── Owner-facing (email) ─────────────────────────────────────────────────────
+// Unlike notifyStaff/notifyRole (in-app only), this actually attempts delivery
+// — currently email via SendGrid, since that's the only wired-up channel.
+// Respects Owner.preferred_contact: an owner who asked for sms/phone gets a
+// SKIPPED row rather than an email we weren't asked to send.
+
+const SEND_RETRY_DELAYS_MS = [500, 1500, 4000];
+
+async function sendWithRetry(
+  fn: () => Promise<void>,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= SEND_RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      await fn();
+      return { ok: true };
+    } catch (err) {
+      lastError = err;
+      const delay = SEND_RETRY_DELAYS_MS[attempt];
+      if (delay === undefined) break;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  const message = lastError instanceof Error ? lastError.message : 'Unknown error';
+  return { ok: false, error: message.slice(0, 500) };
+}
+
+export async function notifyOwner(
+  tx: TxClient | typeof prisma,
+  params: { owner_id: string; type: string; subject: string; body: string; reference_id: string },
+) {
+  const owner = await tx.owner.findUnique({
+    where:  { id: params.owner_id },
+    select: { email: true, preferred_contact: true },
+  });
+  if (!owner) return null;
+
+  const canEmail = owner.preferred_contact === 'email' && !!owner.email;
+
+  let notif;
+  try {
+    notif = await tx.notification.create({
+      data: {
+        owner_id:     params.owner_id,
+        type:         params.type,
+        channel:      canEmail ? 'email' : owner.preferred_contact,
+        subject:      params.subject,
+        body:         params.body,
+        status:       canEmail ? 'PENDING' : 'SKIPPED',
+        reference_id: params.reference_id,
+      },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return null; // already sent this reference_id to this owner — expected on job re-runs
+    }
+    throw err;
+  }
+
+  if (!canEmail) return notif;
+
+  const result = await sendWithRetry(() =>
+    sendEmail({ to: owner.email as string, subject: params.subject, html: params.body }),
+  );
+
+  return tx.notification.update({
+    where: { id: notif.id },
+    data: result.ok
+      ? { status: 'SENT' as const, sent_at: new Date() }
+      : { status: 'FAILED' as const, error_msg: result.error },
+  });
 }
