@@ -17,6 +17,7 @@ export const FEATURES = [
   'WARD',
   'NOTIFICATIONS',
   'REPORTS',
+  'THEME_CUSTOMIZATION',
 ] as const;
 export type FeatureKey = (typeof FEATURES)[number];
 
@@ -25,7 +26,7 @@ export type FeatureKey = (typeof FEATURES)[number];
 export const PLAN_FEATURES: Record<ClinicPlanType, readonly FeatureKey[]> = {
   TRIAL: FEATURES,
   BASIC: ['PATIENTS', 'APPOINTMENTS', 'EMR', 'BILLING', 'STAFF', 'NOTIFICATIONS'],
-  PRO: ['PATIENTS', 'APPOINTMENTS', 'EMR', 'BILLING', 'INVENTORY', 'STAFF', 'LABORATORY', 'NOTIFICATIONS', 'REPORTS'],
+  PRO: ['PATIENTS', 'APPOINTMENTS', 'EMR', 'BILLING', 'INVENTORY', 'STAFF', 'LABORATORY', 'NOTIFICATIONS', 'REPORTS', 'THEME_CUSTOMIZATION'],
   ENTERPRISE: FEATURES,
 };
 

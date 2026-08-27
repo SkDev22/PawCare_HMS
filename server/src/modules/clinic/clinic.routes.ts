@@ -34,7 +34,8 @@ clinicRouter.put(
   validate({ body: UpdateClinicSchema }),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const clinic = await svc.updateClinic(authed(req).user.clinic_id, req.body);
+      const { clinic_id, plan, extra_features } = authed(req).user;
+      const clinic = await svc.updateClinic(clinic_id, req.body, plan, extra_features);
       res.json(clinic);
     } catch (err) { next(err); }
   },

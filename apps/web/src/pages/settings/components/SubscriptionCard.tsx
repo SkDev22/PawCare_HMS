@@ -26,6 +26,7 @@ const FEATURE_LABELS: Record<FeatureKey, string> = {
   WARD: "Ward & Hospitalization",
   NOTIFICATIONS: "Notifications",
   REPORTS: "Reports & Analytics",
+  THEME_CUSTOMIZATION: "Theme Customization",
 };
 
 function daysRemaining(trialEndsAt: string): number {

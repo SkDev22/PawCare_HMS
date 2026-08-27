@@ -1,6 +1,7 @@
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
-import type { UpdateClinicInput, UpsertClinicHoursInput } from '@pawcare/shared';
+import { clinicHasFeature } from '@pawcare/shared';
+import type { UpdateClinicInput, UpsertClinicHoursInput, ClinicPlanType } from '@pawcare/shared';
 
 const CLINIC_FIELDS = {
   id:                  true,
@@ -31,7 +32,16 @@ export async function getClinic(clinicId: string) {
   return clinic;
 }
 
-export async function updateClinic(clinicId: string, data: UpdateClinicInput) {
+export async function updateClinic(
+  clinicId: string,
+  data: UpdateClinicInput,
+  plan: ClinicPlanType,
+  extraFeatures: readonly string[],
+) {
+  if (data.theme_color !== undefined && !clinicHasFeature(plan, 'THEME_CUSTOMIZATION', extraFeatures)) {
+    throw new AppError('FEATURE_NOT_ENABLED', 'Theme customization is not included in your plan', 403);
+  }
+
   return prisma.clinic.update({
     where: { id: clinicId },
     data: {
