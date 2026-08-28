@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { notifyStaff } from '../notifications/notifications.service';
+import { getSeatLimit } from '@pawcare/shared';
 import type {
   CreateStaffInput,
   UpdateStaffInput,
@@ -74,6 +75,33 @@ async function countActiveAdmins(clinicId: string, excludeId?: string) {
   });
 }
 
+// Called wherever an action would increase the clinic's active-staff count
+// (creating a new staff member, or reactivating a deactivated one) — not on
+// plain profile edits or on deactivation itself. Reads the plan fresh from
+// the DB rather than trusting the JWT's (up to ~15-minute-stale) claim,
+// since this is an actual business limit being enforced, not a cosmetic gate.
+async function assertSeatAvailable(clinicId: string) {
+  const clinic = await prisma.clinic.findUnique({
+    where:  { id: clinicId },
+    select: { plan: true, seat_limit_override: true },
+  });
+  if (!clinic) throw new AppError('NOT_FOUND', 'Clinic not found', 404);
+
+  const limit = getSeatLimit(clinic.plan, clinic.seat_limit_override);
+  if (limit === null) return;
+
+  const activeCount = await prisma.staffUser.count({
+    where: { clinic_id: clinicId, is_active: true, deleted_at: null },
+  });
+  if (activeCount >= limit) {
+    throw new AppError(
+      'SEAT_LIMIT_REACHED',
+      `Your ${clinic.plan} plan includes up to ${limit} staff seats, and all are in use. Deactivate a staff member or upgrade your plan to add more.`,
+      403,
+    );
+  }
+}
+
 // ── Service functions ──────────────────────────────────────────────────────────
 
 export async function listStaff(clinicId: string, params: StaffQueryInput) {
@@ -122,6 +150,8 @@ export async function getStaff(id: string, clinicId: string) {
 }
 
 export async function createStaff(clinicId: string, data: CreateStaffInput) {
+  await assertSeatAvailable(clinicId);
+
   const existing = await prisma.staffUser.findFirst({
     where: { email: data.email, deleted_at: null },
     select: { id: true },
@@ -150,6 +180,12 @@ export async function createStaff(clinicId: string, data: CreateStaffInput) {
 
 export async function updateStaff(id: string, clinicId: string, data: UpdateStaffInput) {
   const current = await assertStaff(id, clinicId);
+
+  // Reactivating someone increases the active-staff count just like creating
+  // a new one does — enforce the same seat limit here.
+  if (data.is_active === true && !current.is_active) {
+    await assertSeatAvailable(clinicId);
+  }
 
   // Guard: cannot downgrade the last active admin
   if (data.role && data.role !== 'ADMIN' && current.role === 'ADMIN') {

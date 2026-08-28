@@ -1,4 +1,4 @@
-import { CreditCard, CheckCircle2 } from "lucide-react";
+import { CreditCard, CheckCircle2, Users } from "lucide-react";
 import {
   getEffectiveFeatures,
   getClinicFeatures,
@@ -7,6 +7,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuthStore } from "@/stores/auth.store";
+import { useClinic } from "@/hooks/use-clinic";
 
 const PLAN_LABELS: Record<string, string> = {
   TRIAL: "Trial",
@@ -36,9 +37,12 @@ function daysRemaining(trialEndsAt: string): number {
 
 export function SubscriptionCard() {
   const user = useAuthStore((s) => s.user);
+  const { data: clinic } = useClinic();
   if (!user) return null;
 
   const { plan, trial_ends_at, extra_features } = user;
+  const seatUsage = clinic?.seat_usage;
+  const atSeatLimit = seatUsage?.limit !== null && seatUsage !== undefined && seatUsage.used >= seatUsage.limit;
   const baseFeatures = getClinicFeatures(plan);
   const effectiveFeatures = getEffectiveFeatures(plan, extra_features);
   const addOns = extra_features.filter(
@@ -74,6 +78,20 @@ export function SubscriptionCard() {
               ? "Your trial has ended. Contact us to upgrade and restore full access."
               : `Trial ends ${new Date(trial_ends_at).toLocaleDateString()} (${daysLeft} day${daysLeft === 1 ? "" : "s"} left)`}
           </p>
+        )}
+
+        {seatUsage && (
+          <div className="flex items-center gap-2 text-sm">
+            <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className={atSeatLimit ? "text-destructive font-medium" : undefined}>
+              Staff Seats: {seatUsage.used} / {seatUsage.limit ?? "Unlimited"} used
+            </span>
+            {atSeatLimit && (
+              <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                Limit reached
+              </Badge>
+            )}
+          </div>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

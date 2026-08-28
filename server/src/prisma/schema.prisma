@@ -37,6 +37,10 @@ model Clinic {
   // e.g. one clinic buying a module that isn't part of its plan tier, without
   // changing what any other clinic on that same plan sees (see ADR-04).
   extra_features String[] @default([])
+  // Ops-set escape hatch beyond the plan's default staff seat count (see
+  // PLAN_SEAT_LIMITS) — null means "use the plan default". Set via
+  // clinic:upgrade --seat-limit-override, same as extra_features.
+  seat_limit_override Int?
   // Percentage (e.g. 8.5 = 8.5%). Auto-applied to new invoices' tax_amount
   // as line items are added/removed, until a staff member manually edits an
   // invoice's tax amount — see Invoice.tax_auto.

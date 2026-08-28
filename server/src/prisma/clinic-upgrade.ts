@@ -19,6 +19,13 @@
 //   pnpm --filter server clinic:upgrade -- --email admin@theirclinic.com --clear-trial
 //   pnpm --filter server clinic:upgrade -- --email admin@theirclinic.com --extend-trial 7
 //
+// Override the plan's default staff seat count for this one clinic (see
+// PLAN_SEAT_LIMITS in packages/shared) — e.g. a BASIC clinic that negotiated
+// a few extra seats without moving to PRO:
+//
+//   pnpm --filter server clinic:upgrade -- --email admin@theirclinic.com --seat-limit-override 5
+//   pnpm --filter server clinic:upgrade -- --email admin@theirclinic.com --clear-seat-override
+//
 // Flags combine freely in one call, e.g. converting a trial to paid:
 //   --plan PRO --clear-trial
 
@@ -36,8 +43,8 @@ function parseArgs(): Record<string, string> {
   const raw = process.argv.slice(2);
   for (let i = 0; i < raw.length; i++) {
     const token = raw[i];
-    if (token === '--clear-trial') {
-      args['clear-trial'] = 'true';
+    if (token === '--clear-trial' || token === '--clear-seat-override') {
+      args[token.slice(2)] = 'true';
       continue;
     }
     if (token?.startsWith('--')) {
@@ -74,6 +81,7 @@ async function main() {
     plan?: Plan;
     trial_ends_at?: Date | null;
     extra_features?: string[];
+    seat_limit_override?: number | null;
   } = {};
 
   if (args['plan']) {
@@ -112,8 +120,19 @@ async function main() {
     data.extra_features = [...extraFeatures];
   }
 
+  if (args['clear-seat-override']) {
+    data.seat_limit_override = null;
+  } else if (args['seat-limit-override']) {
+    const seats = Number(args['seat-limit-override']);
+    if (!Number.isFinite(seats) || seats <= 0 || !Number.isInteger(seats)) {
+      console.error('❌ --seat-limit-override must be a positive whole number');
+      process.exit(1);
+    }
+    data.seat_limit_override = seats;
+  }
+
   if (Object.keys(data).length === 0) {
-    console.error('❌ Nothing to change — pass at least one of --plan, --add-feature, --remove-feature, --clear-trial, --extend-trial');
+    console.error('❌ Nothing to change — pass at least one of --plan, --add-feature, --remove-feature, --clear-trial, --extend-trial, --seat-limit-override, --clear-seat-override');
     process.exit(1);
   }
 
@@ -124,6 +143,7 @@ async function main() {
   console.log(`   Plan:           ${updated.plan}`);
   console.log(`   Trial ends at:  ${updated.trial_ends_at ? updated.trial_ends_at.toISOString().slice(0, 10) : '— (no trial limit)'}`);
   console.log(`   Extra features: ${updated.extra_features.length > 0 ? updated.extra_features.join(', ') : '(none)'}`);
+  console.log(`   Seat override:  ${updated.seat_limit_override ?? '(none — using plan default)'}`);
   console.log('   Takes effect on their next login or token refresh (within ~15 minutes).');
 }
 

@@ -19,6 +19,7 @@ export interface ClinicProfile {
   invoice_prefix: string;
   invoice_due_days: number;
   invoice_footer_text: string | null;
+  seat_usage: { used: number; limit: number | null };
   created_at: string;
   updated_at: string;
 }

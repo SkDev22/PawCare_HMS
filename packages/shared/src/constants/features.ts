@@ -59,3 +59,21 @@ export function clinicHasFeature(
 export function isTrialExpired(plan: ClinicPlanType, trialEndsAt: string | null): boolean {
   return plan === 'TRIAL' && trialEndsAt !== null && new Date(trialEndsAt) < new Date();
 }
+
+// Included active-staff seats per plan — null means unlimited. A "seat" is
+// any active StaffUser regardless of role, ADMIN included.
+export const PLAN_SEAT_LIMITS: Record<ClinicPlanType, number | null> = {
+  TRIAL: null,
+  BASIC: 3,
+  PRO: 12,
+  ENTERPRISE: null,
+};
+
+// An explicit per-clinic override (Clinic.seat_limit_override, set via the
+// clinic:upgrade script) always wins over the plan's default.
+export function getSeatLimit(
+  plan: ClinicPlanType,
+  seatLimitOverride?: number | null,
+): number | null {
+  return seatLimitOverride ?? PLAN_SEAT_LIMITS[plan];
+}

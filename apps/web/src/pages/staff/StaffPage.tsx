@@ -13,8 +13,10 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '../../components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip';
 import { Skeleton } from '../../components/ui/skeleton';
 import { useStaffList } from '../../hooks/use-staff';
+import { useClinic } from '../../hooks/use-clinic';
 import { useDebounce } from '../../hooks/use-debounce';
 import { StaffForm } from './components/StaffForm';
 import type { StaffRole, StaffMember } from '../../types/staff';
@@ -73,6 +75,10 @@ export function StaffPage() {
     ...(showInactive       ? {}                             : { is_active: true }),
   });
 
+  const { data: clinic } = useClinic();
+  const seatUsage = clinic?.seat_usage;
+  const atSeatLimit = !!seatUsage && seatUsage.limit !== null && seatUsage.used >= seatUsage.limit;
+
   const members = data?.items ?? [];
 
   return (
@@ -83,12 +89,23 @@ export function StaffPage() {
           <p className="text-sm text-muted-foreground">Manage clinic staff and schedules</p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Staff Member
-            </Button>
-          </DialogTrigger>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span tabIndex={atSeatLimit ? 0 : -1}>
+                <DialogTrigger asChild>
+                  <Button disabled={atSeatLimit}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Staff Member
+                  </Button>
+                </DialogTrigger>
+              </span>
+            </TooltipTrigger>
+            {atSeatLimit && (
+              <TooltipContent>
+                Seat limit reached — upgrade your plan or deactivate someone first.
+              </TooltipContent>
+            )}
+          </Tooltip>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>Add Staff Member</DialogTitle>

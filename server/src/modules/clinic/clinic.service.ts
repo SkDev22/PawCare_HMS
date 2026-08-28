@@ -1,6 +1,6 @@
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
-import { clinicHasFeature } from '@pawcare/shared';
+import { clinicHasFeature, getSeatLimit } from '@pawcare/shared';
 import type { UpdateClinicInput, UpsertClinicHoursInput, ClinicPlanType } from '@pawcare/shared';
 
 const CLINIC_FIELDS = {
@@ -23,13 +23,29 @@ const CLINIC_FIELDS = {
   updated_at:          true,
 } as const;
 
+async function withSeatUsage<T extends { plan: ClinicPlanType; seat_limit_override: number | null }>(
+  clinicId: string,
+  clinic: T,
+) {
+  const { seat_limit_override, ...fields } = clinic;
+  const used = await prisma.staffUser.count({
+    where: { clinic_id: clinicId, is_active: true, deleted_at: null },
+  });
+
+  return {
+    ...fields,
+    seat_usage: { used, limit: getSeatLimit(clinic.plan, seat_limit_override) },
+  };
+}
+
 export async function getClinic(clinicId: string) {
   const clinic = await prisma.clinic.findUnique({
     where: { id: clinicId },
-    select: CLINIC_FIELDS,
+    select: { ...CLINIC_FIELDS, seat_limit_override: true },
   });
   if (!clinic) throw new AppError('NOT_FOUND', 'Clinic not found', 404);
-  return clinic;
+
+  return withSeatUsage(clinicId, clinic);
 }
 
 export async function updateClinic(
@@ -42,7 +58,7 @@ export async function updateClinic(
     throw new AppError('FEATURE_NOT_ENABLED', 'Theme customization is not included in your plan', 403);
   }
 
-  return prisma.clinic.update({
+  const clinic = await prisma.clinic.update({
     where: { id: clinicId },
     data: {
       ...(data.name                !== undefined ? { name:                data.name }                : {}),
@@ -57,8 +73,10 @@ export async function updateClinic(
       ...(data.invoice_due_days    !== undefined ? { invoice_due_days:    data.invoice_due_days }    : {}),
       ...(data.invoice_footer_text !== undefined ? { invoice_footer_text: data.invoice_footer_text } : {}),
     },
-    select: CLINIC_FIELDS,
+    select: { ...CLINIC_FIELDS, seat_limit_override: true },
   });
+
+  return withSeatUsage(clinicId, clinic);
 }
 
 // ── Business Hours ────────────────────────────────────────────────────────────
