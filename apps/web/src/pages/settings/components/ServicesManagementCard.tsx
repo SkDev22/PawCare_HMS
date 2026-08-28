@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Stethoscope, Plus, Pencil } from "lucide-react";
+import { Stethoscope, Plus, Pencil, Search } from "lucide-react";
 import { CreateServiceSchema, type CreateServiceInput } from "@pawcare/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -209,6 +209,16 @@ export function ServicesManagementCard() {
   const updateService = useUpdateService();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
+  const [search, setSearch] = useState("");
+
+  const filteredServices = services.filter((s) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    const categoryLabel = CATEGORY_LABEL[s.category] ?? s.category;
+    return (
+      s.name.toLowerCase().includes(q) || categoryLabel.toLowerCase().includes(q)
+    );
+  });
 
   function openCreate() {
     setEditing(null);
@@ -260,46 +270,64 @@ export function ServicesManagementCard() {
             No services yet — add your first one above.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
-                  <TableHead>Taxable</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-10" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {services.map((s) => (
-                  <TableRow key={s.id} className={!s.is_active ? "opacity-60" : undefined}>
-                    <TableCell className="font-medium">{s.name}</TableCell>
-                    <TableCell>{CATEGORY_LABEL[s.category] ?? s.category}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(s.price)}</TableCell>
-                    <TableCell>{s.is_taxable ? "Yes" : "No"}</TableCell>
-                    <TableCell>
-                      <button type="button" onClick={() => toggleActive(s)}>
-                        <Badge variant={s.is_active ? "success" : "secondary"} className="cursor-pointer">
-                          {s.is_active ? "Active" : "Inactive"}
-                        </Badge>
-                      </button>
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                        onClick={() => openEdit(s)}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <div className="space-y-3">
+            <div className="relative sm:w-64">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search services…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+
+            {filteredServices.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                No services match "{search}".
+              </p>
+            ) : (
+              <div className="max-h-96 overflow-y-auto overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader className="sticky top-0 z-10 bg-background">
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead className="text-right">Price</TableHead>
+                      <TableHead>Taxable</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="w-10" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredServices.map((s) => (
+                      <TableRow key={s.id} className={!s.is_active ? "opacity-60" : undefined}>
+                        <TableCell className="font-medium">{s.name}</TableCell>
+                        <TableCell>{CATEGORY_LABEL[s.category] ?? s.category}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(s.price)}</TableCell>
+                        <TableCell>{s.is_taxable ? "Yes" : "No"}</TableCell>
+                        <TableCell>
+                          <button type="button" onClick={() => toggleActive(s)}>
+                            <Badge variant={s.is_active ? "success" : "secondary"} className="cursor-pointer">
+                              {s.is_active ? "Active" : "Inactive"}
+                            </Badge>
+                          </button>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={() => openEdit(s)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
