@@ -3,21 +3,21 @@
 // the frontend (hiding nav/routes) and the backend (authorizeFeature
 // middleware) can gate on it without an extra DB round trip per request.
 
-export const CLINIC_PLANS = ['TRIAL', 'BASIC', 'PRO', 'ENTERPRISE'] as const;
+export const CLINIC_PLANS = ["TRIAL", "BASIC", "PRO", "ENTERPRISE"] as const;
 export type ClinicPlanType = (typeof CLINIC_PLANS)[number];
 
 export const FEATURES = [
-  'PATIENTS',
-  'APPOINTMENTS',
-  'EMR',
-  'BILLING',
-  'INVENTORY',
-  'STAFF',
-  'LABORATORY',
-  'WARD',
-  'NOTIFICATIONS',
-  'REPORTS',
-  'THEME_CUSTOMIZATION',
+  "PATIENTS",
+  "APPOINTMENTS",
+  "EMR",
+  "BILLING",
+  "INVENTORY",
+  "STAFF",
+  "LABORATORY",
+  "WARD",
+  "NOTIFICATIONS",
+  "REPORTS",
+  "THEME_CUSTOMIZATION",
 ] as const;
 export type FeatureKey = (typeof FEATURES)[number];
 
@@ -25,8 +25,27 @@ export type FeatureKey = (typeof FEATURES)[number];
 // so the mechanism actually does something — tune freely per real pricing.
 export const PLAN_FEATURES: Record<ClinicPlanType, readonly FeatureKey[]> = {
   TRIAL: FEATURES,
-  BASIC: ['PATIENTS', 'APPOINTMENTS', 'EMR', 'BILLING', 'STAFF', 'NOTIFICATIONS'],
-  PRO: ['PATIENTS', 'APPOINTMENTS', 'EMR', 'BILLING', 'INVENTORY', 'STAFF', 'LABORATORY', 'NOTIFICATIONS', 'REPORTS', 'THEME_CUSTOMIZATION'],
+  BASIC: [
+    "PATIENTS",
+    "APPOINTMENTS",
+    "EMR",
+    "BILLING",
+    "STAFF",
+    "NOTIFICATIONS",
+    "REPORTS", // Customize
+  ], // In app notifications only
+  PRO: [
+    "PATIENTS",
+    "APPOINTMENTS",
+    "EMR",
+    "BILLING",
+    "INVENTORY",
+    "STAFF",
+    "LABORATORY",
+    "NOTIFICATIONS",
+    "REPORTS",
+    "THEME_CUSTOMIZATION",
+  ],
   ENTERPRISE: FEATURES,
 };
 
@@ -42,7 +61,9 @@ export function getEffectiveFeatures(
   plan: ClinicPlanType,
   extraFeatures: readonly string[] = [],
 ): FeatureKey[] {
-  return [...new Set([...getClinicFeatures(plan), ...extraFeatures])] as FeatureKey[];
+  return [
+    ...new Set([...getClinicFeatures(plan), ...extraFeatures]),
+  ] as FeatureKey[];
 }
 
 export function clinicHasFeature(
@@ -56,8 +77,15 @@ export function clinicHasFeature(
 // A TRIAL clinic past its trial_ends_at date loses access entirely until
 // converted to a paid plan — checked from the JWT's plan/trial_ends_at claims,
 // so it self-corrects on the next token refresh without a background job.
-export function isTrialExpired(plan: ClinicPlanType, trialEndsAt: string | null): boolean {
-  return plan === 'TRIAL' && trialEndsAt !== null && new Date(trialEndsAt) < new Date();
+export function isTrialExpired(
+  plan: ClinicPlanType,
+  trialEndsAt: string | null,
+): boolean {
+  return (
+    plan === "TRIAL" &&
+    trialEndsAt !== null &&
+    new Date(trialEndsAt) < new Date()
+  );
 }
 
 // Included active-staff seats per plan — null means unlimited. A "seat" is
