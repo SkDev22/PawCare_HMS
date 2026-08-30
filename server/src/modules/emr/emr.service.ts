@@ -213,9 +213,14 @@ export async function updateRecord(
       include: recordFullIncludes,
     });
 
+    // Audit `after` must stay the same plain shape as `before` (no relations) —
+    // `record` above is include-heavy because that's what the API response
+    // needs, not because it belongs in the diff.
+    const after = await tx.medicalRecord.findUniqueOrThrow({ where: { id } });
+
     await recordAuditLog(tx, {
       clinicId, medicalRecordId: id, entityType: 'MedicalRecord', entityId: id,
-      action: 'UPDATE', before, after: record, performedBy: staffId,
+      action: 'UPDATE', before, after, performedBy: staffId,
     });
 
     return record;
@@ -249,9 +254,13 @@ export async function upsertSoapNote(
       },
     });
 
+    // Same reasoning as updateRecord: keep the audit snapshot relation-free,
+    // separate from `note` (which the API response needs the vet include on).
+    const after = await tx.soapNote.findUniqueOrThrow({ where: { medical_record_id: recordId } });
+
     await recordAuditLog(tx, {
       clinicId, medicalRecordId: recordId, entityType: 'SoapNote', entityId: note.id,
-      action: before ? 'UPDATE' : 'CREATE', before: before ?? undefined, after: note, performedBy: vetId,
+      action: before ? 'UPDATE' : 'CREATE', before: before ?? undefined, after, performedBy: vetId,
     });
 
     return note;

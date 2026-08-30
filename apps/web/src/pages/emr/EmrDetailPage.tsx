@@ -1606,11 +1606,21 @@ function diffFields(
     if (DIFF_SKIP_KEYS.has(key)) continue;
     const from = before[key];
     const to = after[key];
+    // Every real column on these entities is a primitive (string/number/
+    // boolean/date-string/null) — an object or array here means a relation
+    // slipped into the audit snapshot (a backend bug, not a real field
+    // change), so it's never useful to show and would otherwise dump raw
+    // JSON into the history. Skip rather than render it.
+    if (isPlainObjectOrArray(from) || isPlainObjectOrArray(to)) continue;
     if (JSON.stringify(from) !== JSON.stringify(to)) {
       changes.push({ field: key, from, to });
     }
   }
   return changes;
+}
+
+function isPlainObjectOrArray(value: unknown): boolean {
+  return typeof value === "object" && value !== null;
 }
 
 function formatDiffValue(value: unknown): string {
