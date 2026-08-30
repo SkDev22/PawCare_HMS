@@ -15,6 +15,7 @@ const CLINIC_FIELDS = {
   theme_color:         true,
   plan:                true,
   trial_ends_at:       true,
+  next_payment_due_at: true,
   tax_rate:            true,
   invoice_prefix:      true,
   invoice_due_days:    true,

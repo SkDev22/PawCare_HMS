@@ -33,6 +33,11 @@ model Clinic {
   is_active     Boolean    @default(true)
   plan          ClinicPlan @default(TRIAL)
   trial_ends_at DateTime?
+  // Manual-payment plans (BASIC/PRO/ENTERPRISE) have no auto-billing — this
+  // is set by ops each time a payment comes in (clinic:upgrade
+  // --set-payment-due) and drives the in-app reminder banner + email.
+  // Never used for TRIAL clinics (see trial_ends_at/isTrialExpired for that).
+  next_payment_due_at DateTime?
   // Individually-granted add-on features beyond the plan's normal bundle —
   // e.g. one clinic buying a module that isn't part of its plan tier, without
   // changing what any other clinic on that same plan sees (see ADR-04).

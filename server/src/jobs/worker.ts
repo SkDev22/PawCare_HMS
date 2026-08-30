@@ -6,6 +6,7 @@ import { runNotificationRetention } from './notification-retention.job';
 import { runTrialExpiryReminder } from './trial-expiry.job';
 import { runAppointmentReminders } from './appointment-reminder.job';
 import { runVaccineDueReminders } from './vaccine-due-reminder.job';
+import { runSubscriptionPaymentReminder } from './subscription-payment-reminder.job';
 
 // Fixed UTC schedules — no per-clinic timezone awareness at the cron level;
 // each job checks its own clinics' quiet hours internally (see quiet-hours.ts).
@@ -23,6 +24,7 @@ const JOBS: Record<string, { cron: string; fn: () => Promise<void> }> = {
   'trial-expiry-reminder':  { cron: DAILY_CRON, fn: runTrialExpiryReminder },
   'vaccine-due-reminder':   { cron: DAILY_CRON, fn: runVaccineDueReminders },
   'appointment-reminder':   { cron: HOURLY_CRON, fn: runAppointmentReminders },
+  'subscription-payment-reminder': { cron: DAILY_CRON, fn: runSubscriptionPaymentReminder },
 };
 
 let tasks: ScheduledTask[] = [];

@@ -2,6 +2,7 @@ import { CreditCard, CheckCircle2, Users } from "lucide-react";
 import {
   getEffectiveFeatures,
   getClinicFeatures,
+  getPaymentReminderStatus,
   type FeatureKey,
 } from "@pawcare/shared";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +56,9 @@ export function SubscriptionCard() {
   const daysLeft = isTrial ? daysRemaining(trial_ends_at) : null;
   const trialExpired = daysLeft !== null && daysLeft < 0;
 
+  const paymentDueAt = !isTrial ? clinic?.next_payment_due_at : null;
+  const paymentStatus = paymentDueAt ? getPaymentReminderStatus(paymentDueAt) : null;
+
   return (
     <div>
       <CardHeader className="flex flex-row items-start justify-start space-y-0">
@@ -80,6 +84,28 @@ export function SubscriptionCard() {
               ? "Your trial has ended. Contact us to upgrade and restore full access."
               : `Trial ends ${new Date(trial_ends_at).toLocaleDateString()} (${daysLeft} day${daysLeft === 1 ? "" : "s"} left)`}
           </p>
+        )}
+
+        {paymentDueAt && (
+          <div className="flex items-center gap-2 text-sm">
+            <CreditCard className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span
+              className={
+                paymentStatus?.overdue
+                  ? "text-destructive font-medium"
+                  : paymentStatus
+                    ? "text-amber-700 dark:text-amber-500 font-medium"
+                    : undefined
+              }
+            >
+              Next payment due: {new Date(paymentDueAt).toLocaleDateString()}
+            </span>
+            {paymentStatus?.overdue && (
+              <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                Overdue
+              </Badge>
+            )}
+          </div>
         )}
 
         {seatUsage && (

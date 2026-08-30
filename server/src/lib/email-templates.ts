@@ -59,6 +59,37 @@ export function vaccineDueReminderEmail(params: {
   };
 }
 
+export function subscriptionPaymentReminderEmail(params: {
+  clinicName: string;
+  adminFirstName: string;
+  dueAt: Date;
+  daysUntilDue: number;
+  overdue: boolean;
+}): EmailContent {
+  const { clinicName, adminFirstName, dueAt, daysUntilDue, overdue } = params;
+  const formatted = dueAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const daysOverdue = Math.abs(daysUntilDue);
+
+  return {
+    subject: overdue
+      ? `Payment overdue for ${clinicName}`
+      : `Payment due soon for ${clinicName}`,
+    html: wrap(clinicName, overdue
+      ? `
+        <p>Hi ${adminFirstName},</p>
+        <p>Your clinic's subscription payment was due on <b>${formatted}</b> and is now
+        <b>${daysOverdue} day${daysOverdue === 1 ? '' : 's'} overdue</b>.</p>
+        <p>Please arrange payment as soon as possible to avoid any interruption to your service.</p>
+      `
+      : `
+        <p>Hi ${adminFirstName},</p>
+        <p>This is a reminder that your clinic's subscription payment is due on
+        <b>${formatted}</b> (${daysUntilDue} day${daysUntilDue === 1 ? '' : 's'} from now).</p>
+        <p>Please arrange payment by then to keep your subscription active.</p>
+      `),
+  };
+}
+
 export function invoiceOverdueEmail(params: {
   clinicName: string;
   ownerFirstName: string;

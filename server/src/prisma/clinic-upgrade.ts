@@ -26,6 +26,13 @@
 //   pnpm --filter server clinic:upgrade -- --email admin@theirclinic.com --seat-limit-override 5
 //   pnpm --filter server clinic:upgrade -- --email admin@theirclinic.com --clear-seat-override
 //
+// Record a manual payment (BASIC/PRO/ENTERPRISE have no auto-billing) — set
+// this to the clinic's *next* due date each time a payment comes in. Drives
+// the in-app reminder banner + email once within 7 days of that date:
+//
+//   pnpm --filter server clinic:upgrade -- --email admin@theirclinic.com --set-payment-due 2026-10-05
+//   pnpm --filter server clinic:upgrade -- --email admin@theirclinic.com --clear-payment-due
+//
 // Flags combine freely in one call, e.g. converting a trial to paid:
 //   --plan PRO --clear-trial
 
@@ -43,7 +50,11 @@ function parseArgs(): Record<string, string> {
   const raw = process.argv.slice(2);
   for (let i = 0; i < raw.length; i++) {
     const token = raw[i];
-    if (token === '--clear-trial' || token === '--clear-seat-override') {
+    if (
+      token === '--clear-trial' ||
+      token === '--clear-seat-override' ||
+      token === '--clear-payment-due'
+    ) {
       args[token.slice(2)] = 'true';
       continue;
     }
@@ -82,6 +93,7 @@ async function main() {
     trial_ends_at?: Date | null;
     extra_features?: string[];
     seat_limit_override?: number | null;
+    next_payment_due_at?: Date | null;
   } = {};
 
   if (args['plan']) {
@@ -131,8 +143,19 @@ async function main() {
     data.seat_limit_override = seats;
   }
 
+  if (args['clear-payment-due']) {
+    data.next_payment_due_at = null;
+  } else if (args['set-payment-due']) {
+    const dueDate = new Date(`${args['set-payment-due']}T00:00:00.000Z`);
+    if (Number.isNaN(dueDate.getTime())) {
+      console.error('❌ --set-payment-due must be a valid date (YYYY-MM-DD)');
+      process.exit(1);
+    }
+    data.next_payment_due_at = dueDate;
+  }
+
   if (Object.keys(data).length === 0) {
-    console.error('❌ Nothing to change — pass at least one of --plan, --add-feature, --remove-feature, --clear-trial, --extend-trial, --seat-limit-override, --clear-seat-override');
+    console.error('❌ Nothing to change — pass at least one of --plan, --add-feature, --remove-feature, --clear-trial, --extend-trial, --seat-limit-override, --clear-seat-override, --set-payment-due, --clear-payment-due');
     process.exit(1);
   }
 
@@ -144,7 +167,8 @@ async function main() {
   console.log(`   Trial ends at:  ${updated.trial_ends_at ? updated.trial_ends_at.toISOString().slice(0, 10) : '— (no trial limit)'}`);
   console.log(`   Extra features: ${updated.extra_features.length > 0 ? updated.extra_features.join(', ') : '(none)'}`);
   console.log(`   Seat override:  ${updated.seat_limit_override ?? '(none — using plan default)'}`);
-  console.log('   Takes effect on their next login or token refresh (within ~15 minutes).');
+  console.log(`   Payment due:    ${updated.next_payment_due_at ? updated.next_payment_due_at.toISOString().slice(0, 10) : '(none)'}`);
+  console.log('   Plan/feature/seat changes take effect on their next login or token refresh (within ~15 minutes); payment due date takes effect immediately.');
 }
 
 main()

@@ -15,6 +15,7 @@ export interface ClinicProfile {
   theme_color: string;
   plan: string;
   trial_ends_at: string | null;
+  next_payment_due_at: string | null;
   tax_rate: string;
   invoice_prefix: string;
   invoice_due_days: number;

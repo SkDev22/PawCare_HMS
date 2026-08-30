@@ -18,6 +18,7 @@ export const NOTIFICATION_TYPES = [
   { type: 'invoice_overdue', label: 'Invoice overdue (daily alert)' },
   { type: 'daily_digest', label: 'Daily digest summary' },
   { type: 'trial_expiring', label: 'Trial ending soon' },
+  { type: 'subscription_payment_reminder', label: 'Subscription payment due/overdue' },
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number]['type'];
