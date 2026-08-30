@@ -147,6 +147,7 @@ export function useAddPrescription(recordId: string) {
       instructions?: string;
       expires_at?: string;
       item_id?: string;
+      batch_id?: string;
     }) =>
       api
         .post(`/medical-records/${recordId}/prescriptions`, data)
@@ -187,8 +188,13 @@ export function useCharges(recordId: string | undefined) {
 export function useAddCharge(recordId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { item_id?: string; service_id?: string; quantity: number; description?: string }) =>
-      api.post(`/medical-records/${recordId}/charges`, data).then((r) => r.data as Charge),
+    mutationFn: (data: {
+      item_id?: string;
+      service_id?: string;
+      quantity: number;
+      description?: string;
+      batch_id?: string;
+    }) => api.post(`/medical-records/${recordId}/charges`, data).then((r) => r.data as Charge),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['medical-records', recordId, 'charges'] });
       qc.invalidateQueries({ queryKey: ['inventory'] });

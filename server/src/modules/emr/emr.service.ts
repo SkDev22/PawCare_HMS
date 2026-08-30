@@ -389,6 +389,7 @@ export async function addPrescription(
           item_id: data.item_id,
           quantity: data.quantity ?? 1,
           description: data.drug_name,
+          ...(data.batch_id ? { batch_id: data.batch_id } : {}),
         });
         chargeId = charge.id;
       }
@@ -426,6 +427,7 @@ export async function addPrescription(
           item_id:         controlledItem.id,
           quantity:        data.quantity ?? 1,
           requested_by:    prescribedBy,
+          ...(data.batch_id ? { batch_id: data.batch_id } : {}),
         },
       });
 
@@ -610,6 +612,7 @@ export async function approveControlledDispense(
         item_id:     approval.item_id,
         quantity:    approval.quantity,
         description: approval.prescription.drug_name,
+        ...(approval.batch_id ? { batch_id: approval.batch_id } : {}),
       },
     );
 
@@ -700,7 +703,13 @@ async function createChargeTx(
     });
     if (!item) throw new AppError('NOT_FOUND', 'Inventory item not found', 404);
 
-    const { batch, unitPrice: batchPrice } = await resolveBatchForSaleTx(tx, item.id, clinicId, data.quantity);
+    const { batch, unitPrice: batchPrice } = await resolveBatchForSaleTx(
+      tx,
+      item.id,
+      clinicId,
+      data.quantity,
+      data.batch_id,
+    );
     unitPrice = batchPrice;
     description = data.description ?? item.name;
     resolvedItemId = item.id;

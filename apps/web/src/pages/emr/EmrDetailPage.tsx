@@ -81,7 +81,8 @@ import {
   useRemoveCharge,
   useAuditLog,
 } from "../../hooks/use-emr";
-import { useInventoryItems } from "../../hooks/use-inventory";
+import { useInventoryItems, useItemBatches } from "../../hooks/use-inventory";
+import type { StockBatch } from "../../types/inventory";
 import { useServices } from "../../hooks/use-billing";
 import { useDebounce } from "../../hooks/use-debounce";
 import { formatCurrency } from "../../lib/currency";
@@ -682,6 +683,55 @@ const PrescriptionSchema = z.object({
   expires_at: z.string().optional(),
 });
 
+// ── Batch selection (dispensing from a specific batch instead of FIFO) ─────────
+
+const AUTO_BATCH = "__auto__";
+
+function batchEffectivePrice(batch: StockBatch): number {
+  return Number(batch.selling_price) * (1 - Number(batch.discount_percent) / 100);
+}
+
+function BatchSelect({
+  batches,
+  isLoading,
+  value,
+  onChange,
+}: {
+  batches: StockBatch[];
+  isLoading: boolean;
+  value: string | undefined;
+  onChange: (batchId: string | undefined) => void;
+}) {
+  const openBatches = batches.filter((b) => !b.is_closed);
+
+  return (
+    <div className="grid gap-1.5">
+      <label className="text-xs font-medium text-muted-foreground block">
+        Batch
+      </label>
+      <Select
+        value={value ?? AUTO_BATCH}
+        onValueChange={(v) => onChange(v === AUTO_BATCH ? undefined : v)}
+        disabled={isLoading}
+      >
+        <SelectTrigger className="h-9">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={AUTO_BATCH}>Auto (oldest batch first)</SelectItem>
+          {openBatches.map((b) => (
+            <SelectItem key={b.id} value={b.id}>
+              {b.batch_no ?? b.id.slice(0, 8).toUpperCase()} ·{" "}
+              {b.quantity_remaining} left ·{" "}
+              {formatCurrency(batchEffectivePrice(b))}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 function AddPrescriptionDialog({
   recordId,
   open,
@@ -705,6 +755,12 @@ function AddPrescriptionDialog({
     name: string;
     selling_price: string;
   } | null>(null);
+  const [selectedBatchId, setSelectedBatchId] = useState<string | undefined>(
+    undefined,
+  );
+  const { data: itemBatches, isLoading: batchesLoading } = useItemBatches(
+    selectedItem?.id,
+  );
   const defaultValues = {
     drug_name: "",
     dosage: "",
@@ -721,11 +777,18 @@ function AddPrescriptionDialog({
   const resetFulfillment = () => {
     setFulfillment("pharmacy");
     setSelectedItem(null);
+    setSelectedBatchId(undefined);
   };
   const quantity = form.watch("quantity");
   const canSubmit =
     fulfillment === "pharmacy" ||
     (!!selectedItem && !!quantity && quantity > 0);
+  const selectedBatch = itemBatches?.find((b) => b.id === selectedBatchId);
+  const unitPrice = selectedBatch
+    ? batchEffectivePrice(selectedBatch)
+    : selectedItem
+      ? Number(selectedItem.selling_price)
+      : 0;
 
   const onSubmit = (values: z.infer<typeof PrescriptionSchema>) => {
     addRx.mutate(
@@ -742,6 +805,9 @@ function AddPrescriptionDialog({
         ...(values.expires_at ? { expires_at: values.expires_at } : {}),
         ...(fulfillment === "clinic" && selectedItem
           ? { item_id: selectedItem.id }
+          : {}),
+        ...(fulfillment === "clinic" && selectedBatchId
+          ? { batch_id: selectedBatchId }
           : {}),
       },
       {
@@ -916,6 +982,7 @@ function AddPrescriptionDialog({
                     onClick={() => {
                       setFulfillment("pharmacy");
                       setSelectedItem(null);
+                      setSelectedBatchId(undefined);
                     }}
                   >
                     Pharmacy
@@ -935,7 +1002,10 @@ function AddPrescriptionDialog({
                     <span className="flex-1 truncate">{selectedItem.name}</span>
                     <button
                       type="button"
-                      onClick={() => setSelectedItem(null)}
+                      onClick={() => {
+                        setSelectedItem(null);
+                        setSelectedBatchId(undefined);
+                      }}
                       className="text-muted-foreground hover:text-foreground"
                     >
                       <X className="size-3.5" />
@@ -945,12 +1015,17 @@ function AddPrescriptionDialog({
                   <ItemSearch onSelect={setSelectedItem} />
                 )}
                 {selectedItem && (
+                  <BatchSelect
+                    batches={itemBatches ?? []}
+                    isLoading={batchesLoading}
+                    value={selectedBatchId}
+                    onChange={setSelectedBatchId}
+                  />
+                )}
+                {selectedItem && (
                   <p className="text-xs text-muted-foreground">
-                    Will bill{" "}
-                    {formatCurrency(
-                      Number(selectedItem.selling_price) * (quantity || 0),
-                    )}{" "}
-                    and deduct {quantity || 0} from stock.
+                    Will bill {formatCurrency(unitPrice * (quantity || 0))} and
+                    deduct {quantity || 0} from stock.
                   </p>
                 )}
               </div>
@@ -1212,12 +1287,19 @@ function AddChargeDialog({
     name: string;
     selling_price: string;
   } | null>(null);
+  const [selectedBatchId, setSelectedBatchId] = useState<string | undefined>(
+    undefined,
+  );
+  const { data: itemBatches, isLoading: batchesLoading } = useItemBatches(
+    selectedItem?.id,
+  );
   const [serviceId, setServiceId] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [addedCount, setAddedCount] = useState(0);
 
   const resetSelection = () => {
     setSelectedItem(null);
+    setSelectedBatchId(undefined);
     setServiceId("");
     setQuantity(1);
   };
@@ -1229,8 +1311,13 @@ function AddChargeDialog({
 
   const canSubmit = mode === "item" ? !!selectedItem : !!serviceId;
   const selectedService = services.find((s) => s.id === serviceId);
+  const selectedBatch = itemBatches?.find((b) => b.id === selectedBatchId);
   const unitPrice =
-    mode === "item" ? selectedItem?.selling_price : selectedService?.price;
+    mode === "item"
+      ? selectedBatch
+        ? batchEffectivePrice(selectedBatch)
+        : selectedItem?.selling_price
+      : selectedService?.price;
 
   const onSubmit = () => {
     addCharge.mutate(
@@ -1239,6 +1326,9 @@ function AddChargeDialog({
         ...(mode === "item"
           ? { item_id: selectedItem!.id }
           : { service_id: serviceId }),
+        ...(mode === "item" && selectedBatchId
+          ? { batch_id: selectedBatchId }
+          : {}),
       },
       {
         onSuccess: () => {
@@ -1269,7 +1359,10 @@ function AddChargeDialog({
                 type="button"
                 size="sm"
                 variant={mode === "item" ? "default" : "outline"}
-                onClick={() => setMode("item")}
+                onClick={() => {
+                  setMode("item");
+                  setServiceId("");
+                }}
               >
                 Drug / Equipment
               </Button>
@@ -1277,7 +1370,11 @@ function AddChargeDialog({
                 type="button"
                 size="sm"
                 variant={mode === "service" ? "default" : "outline"}
-                onClick={() => setMode("service")}
+                onClick={() => {
+                  setMode("service");
+                  setSelectedItem(null);
+                  setSelectedBatchId(undefined);
+                }}
               >
                 Service
               </Button>
@@ -1285,21 +1382,34 @@ function AddChargeDialog({
           )}
 
           {mode === "item" ? (
-            selectedItem ? (
-              <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-background text-sm">
-                <Package className="size-3.5 text-muted-foreground shrink-0" />
-                <span className="flex-1 truncate">{selectedItem.name}</span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedItem(null)}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <X className="size-3.5" />
-                </button>
-              </div>
-            ) : (
-              <ItemSearch onSelect={setSelectedItem} />
-            )
+            <div className="space-y-2">
+              {selectedItem ? (
+                <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-background text-sm">
+                  <Package className="size-3.5 text-muted-foreground shrink-0" />
+                  <span className="flex-1 truncate">{selectedItem.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedItem(null);
+                      setSelectedBatchId(undefined);
+                    }}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <ItemSearch onSelect={setSelectedItem} />
+              )}
+              {selectedItem && (
+                <BatchSelect
+                  batches={itemBatches ?? []}
+                  isLoading={batchesLoading}
+                  value={selectedBatchId}
+                  onChange={setSelectedBatchId}
+                />
+              )}
+            </div>
           ) : (
             <Select value={serviceId} onValueChange={setServiceId}>
               <SelectTrigger>

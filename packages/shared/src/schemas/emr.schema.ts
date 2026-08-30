@@ -61,6 +61,10 @@ const PrescriptionBaseSchema = z.object({
   // catalog and auto-creates the matching bill + stock deduction. Omitted means
   // the owner fills it at an outside pharmacy (documentation only).
   item_id: z.string().uuid('Invalid item ID').optional(),
+  // Dispense from this exact batch instead of the default oldest-first (FIFO)
+  // pick — e.g. a batch that's already open, or a deliberate pricing choice.
+  // Ignored unless item_id is also set.
+  batch_id: z.string().uuid('Invalid batch ID').optional(),
 });
 
 export const CreatePrescriptionSchema = PrescriptionBaseSchema.refine(
@@ -78,6 +82,9 @@ export const CreateChargeSchema = z
     service_id: z.string().uuid('Invalid service ID').optional(),
     quantity: z.coerce.number().int().positive().default(1),
     description: z.string().max(500).optional(),
+    // Same override as prescriptions: pick a specific batch instead of the
+    // default oldest-first pick. Only meaningful alongside item_id.
+    batch_id: z.string().uuid('Invalid batch ID').optional(),
   })
   .refine((d) => !!d.item_id !== !!d.service_id, {
     message: 'Provide exactly one of item_id or service_id',

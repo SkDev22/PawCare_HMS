@@ -520,6 +520,11 @@ model ControlledSubstanceApproval {
   clinic_id        String                   @db.Uuid
   prescription_id  String                   @unique @db.Uuid
   item_id          String                   @db.Uuid
+  // Carries forward the prescriber's batch choice (if any) to whenever this
+  // gets approved — otherwise a deliberate batch pick would be silently
+  // lost and fall back to FIFO at approval time. Null means "use FIFO",
+  // same as everywhere else this pattern appears.
+  batch_id         String?                  @db.Uuid
   quantity         Int
   requested_by     String                   @db.Uuid
   status           ControlledDispenseStatus @default(PENDING)

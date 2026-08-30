@@ -230,31 +230,42 @@ export async function listBatches(itemId: string, clinicId: string) {
 }
 
 /**
- * Picks the batch a sale/dispense should draw its price from (oldest active
- * batch, FIFO order) and asserts it can cover the whole requested quantity.
- * Selling across a batch boundary would mean one invoice line billed at two
- * different prices, so instead of blending prices we ask the caller to split
- * the sale into two line items once a batch runs out.
+ * Picks the batch a sale/dispense should draw its price from — oldest active
+ * batch (FIFO order) by default, or a caller-chosen batch when `batchId` is
+ * given (e.g. one that's already open, or a deliberate pricing choice) —
+ * and asserts it can cover the whole requested quantity. Selling across a
+ * batch boundary would mean one invoice line billed at two different
+ * prices, so instead of blending prices we ask the caller to split the sale
+ * into two line items once a batch runs out.
  */
 export async function resolveBatchForSaleTx(
   tx: TxClient,
   itemId: string,
   clinicId: string,
   quantity: number,
+  batchId?: string,
 ) {
   const item = await tx.inventoryItem.findFirst({ where: { id: itemId, clinic_id: clinicId } });
   if (!item) throw new AppError('NOT_FOUND', 'Item not found', 404);
 
-  const batch = await tx.stockBatch.findFirst({
-    where:   activeBatchWhere(itemId),
-    orderBy: FIFO_ORDER,
-  });
-  if (!batch) throw new AppError('BAD_REQUEST', `No stock available for "${item.name}"`, 400);
+  const batch = batchId
+    ? await tx.stockBatch.findFirst({ where: { id: batchId, item_id: itemId, is_closed: false } })
+    : await tx.stockBatch.findFirst({
+        where:   activeBatchWhere(itemId),
+        orderBy: FIFO_ORDER,
+      });
+  if (!batch) {
+    throw new AppError(
+      'BAD_REQUEST',
+      batchId ? `Selected batch is not available for "${item.name}"` : `No stock available for "${item.name}"`,
+      400,
+    );
+  }
 
   if (batch.quantity_remaining < quantity) {
     throw new AppError(
       'BAD_REQUEST',
-      `Only ${batch.quantity_remaining} unit(s) of "${item.name}" left at the current price — bill the remainder as a separate line item.`,
+      `Only ${batch.quantity_remaining} unit(s) of "${item.name}" left ${batchId ? 'in the selected batch' : 'at the current price'} — bill the remainder as a separate line item.`,
       400,
     );
   }
