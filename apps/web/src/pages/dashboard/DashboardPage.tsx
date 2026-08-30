@@ -30,6 +30,7 @@ import { useAuthStore } from "@/stores/auth.store";
 import { useClinic } from "@/hooks/use-clinic";
 import { useDashboardSummary } from "@/hooks/use-dashboard";
 import { THEME_PRESETS } from "@/lib/theme-presets";
+import { hasFeature } from "@/lib/features";
 import {
   Card,
   CardContent,
@@ -115,22 +116,31 @@ export function DashboardPage() {
   const brand = (THEME_PRESETS[themeSlug] ?? THEME_PRESETS.green).brand;
   const speciesColors = getSpeciesColors(brand);
 
+  // "Today's Appointments" and "Ward Status/Occupancy" are PRO+/ENTERPRISE-only
+  // dashboard tiles per the subscription plan — BASIC doesn't see either.
+  const canSeeTodayAppointments = hasFeature(user, "DASHBOARD_TODAY_APPOINTMENTS");
+  const canSeeWard = hasFeature(user, "WARD");
+
   const stats = data
     ? [
-        {
-          label: "Today's Appointments",
-          value: String(data.stats.todayAppointments.total),
-          sub: `${data.stats.todayAppointments.completed} completed · ${data.stats.todayAppointments.remaining} remaining`,
-          trend: `${data.stats.todayAppointments.trend >= 0 ? "+" : ""}${data.stats.todayAppointments.trend} vs yesterday`,
-          up: data.stats.todayAppointments.trend >= 0,
-          icon: CalendarDays,
-          color: "text-blue-600",
-          bg: "bg-blue-50 dark:bg-blue-950",
-          // cardBg: "bg-violet-50 dark:bg-violet-950/40",
-          // cardBg: "bg-black dark:bg-white",
-          cardBg: "bg-gray-100 dark:bg-gray-800",
-          textColor: "text-black dark:text-white",
-        },
+        ...(canSeeTodayAppointments
+          ? [
+              {
+                label: "Today's Appointments",
+                value: String(data.stats.todayAppointments.total),
+                sub: `${data.stats.todayAppointments.completed} completed · ${data.stats.todayAppointments.remaining} remaining`,
+                trend: `${data.stats.todayAppointments.trend >= 0 ? "+" : ""}${data.stats.todayAppointments.trend} vs yesterday`,
+                up: data.stats.todayAppointments.trend >= 0,
+                icon: CalendarDays,
+                color: "text-blue-600",
+                bg: "bg-blue-50 dark:bg-blue-950",
+                // cardBg: "bg-violet-50 dark:bg-violet-950/40",
+                // cardBg: "bg-black dark:bg-white",
+                cardBg: "bg-gray-100 dark:bg-gray-800",
+                textColor: "text-black dark:text-white",
+              },
+            ]
+          : []),
         {
           label: "Active Patients",
           value: String(data.stats.activePatients.total),
@@ -158,17 +168,21 @@ export function DashboardPage() {
           cardBg: "bg-gray-100 dark:bg-gray-800",
           textColor: "text-black dark:text-white",
         },
-        {
-          label: "Ward Occupancy",
-          value: `${data.stats.wardOccupancy.occupied} / ${data.stats.wardOccupancy.total}`,
-          sub: `${data.stats.wardOccupancy.total - data.stats.wardOccupancy.occupied} kennels available`,
-          trend: `${data.stats.wardOccupancy.trend >= 0 ? "+" : ""}${data.stats.wardOccupancy.trend} from yesterday`,
-          up: data.stats.wardOccupancy.trend >= 0,
-          icon: BedDouble,
-          color: "text-amber-600",
-          bg: "bg-amber-50 dark:bg-amber-950",
-          // cardBg: "bg-amber-50 dark:bg-amber-950/40",
-        },
+        ...(canSeeWard
+          ? [
+              {
+                label: "Ward Occupancy",
+                value: `${data.stats.wardOccupancy.occupied} / ${data.stats.wardOccupancy.total}`,
+                sub: `${data.stats.wardOccupancy.total - data.stats.wardOccupancy.occupied} kennels available`,
+                trend: `${data.stats.wardOccupancy.trend >= 0 ? "+" : ""}${data.stats.wardOccupancy.trend} from yesterday`,
+                up: data.stats.wardOccupancy.trend >= 0,
+                icon: BedDouble,
+                color: "text-amber-600",
+                bg: "bg-amber-50 dark:bg-amber-950",
+                // cardBg: "bg-amber-50 dark:bg-amber-950/40",
+              },
+            ]
+          : []),
       ]
     : [];
 
@@ -392,6 +406,7 @@ export function DashboardPage() {
       {/* Bottom row */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Today's appointments */}
+        {canSeeTodayAppointments && (
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
@@ -464,10 +479,12 @@ export function DashboardPage() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Ward + alerts */}
-        <div className="flex flex-col gap-4">
+        <div className={`flex flex-col gap-4 ${!canSeeTodayAppointments ? "lg:col-span-3" : ""}`}>
           {/* Ward status */}
+          {canSeeWard && (
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Ward Status</CardTitle>
@@ -509,6 +526,7 @@ export function DashboardPage() {
               )}
             </CardContent>
           </Card>
+          )}
 
           {/* Alerts */}
           <Card>

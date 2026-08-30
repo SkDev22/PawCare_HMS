@@ -54,6 +54,7 @@ export async function runInvoiceOverdueAlert(): Promise<void> {
         try {
           await notifyOwner(prisma, {
             owner_id:     inv.owner.id,
+            clinic_id:    clinic.id,
             type:         'invoice_overdue',
             subject,
             body:         html,

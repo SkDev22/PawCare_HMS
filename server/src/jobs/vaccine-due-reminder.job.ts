@@ -65,6 +65,7 @@ export async function runVaccineDueReminders(): Promise<void> {
         try {
           await notifyOwner(prisma, {
             owner_id:     vax.pet.owner.id,
+            clinic_id:    clinic.id,
             type:         `vaccine_due_reminder_${label}`,
             subject,
             body:         html,

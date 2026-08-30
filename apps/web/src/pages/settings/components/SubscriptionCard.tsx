@@ -28,6 +28,8 @@ const FEATURE_LABELS: Record<FeatureKey, string> = {
   NOTIFICATIONS: "Notifications",
   REPORTS: "Reports & Analytics",
   THEME_CUSTOMIZATION: "Theme Customization",
+  EMAIL_NOTIFICATIONS: "Email Reminders",
+  DASHBOARD_TODAY_APPOINTMENTS: "Dashboard: Today's Appointments",
 };
 
 function daysRemaining(trialEndsAt: string): number {

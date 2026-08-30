@@ -19,7 +19,8 @@ dashboardRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { date } = req.query as { date?: string };
-      const data = await svc.getDashboardSummary(authed(req).user.clinic_id, date);
+      const user = authed(req).user;
+      const data = await svc.getDashboardSummary(user.clinic_id, user.plan, user.extra_features, date);
       res.json(data);
     } catch (err) { next(err); }
   },

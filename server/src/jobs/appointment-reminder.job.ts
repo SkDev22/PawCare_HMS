@@ -56,6 +56,7 @@ export async function runAppointmentReminders(): Promise<void> {
         try {
           await notifyOwner(prisma, {
             owner_id:     appt.pet.owner.id,
+            clinic_id:    clinic.id,
             type:         `appointment_reminder_${label}`,
             subject,
             body:         html,

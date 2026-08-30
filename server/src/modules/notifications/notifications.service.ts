@@ -2,7 +2,7 @@ import { Prisma, StaffRole } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { emitToStaff } from '../../lib/socket';
 import { sendEmail } from '../../services/sendgrid';
-import { NOTIFICATION_TYPES } from '@pawcare/shared';
+import { NOTIFICATION_TYPES, clinicHasFeature } from '@pawcare/shared';
 import type { NotificationQuery } from '@pawcare/shared';
 
 type TxClient = Prisma.TransactionClient;
@@ -219,15 +219,33 @@ async function sendWithRetry(
 
 export async function notifyOwner(
   tx: TxClient | typeof prisma,
-  params: { owner_id: string; type: string; subject: string; body: string; reference_id: string },
+  params: {
+    owner_id: string;
+    clinic_id: string;
+    type: string;
+    subject: string;
+    body: string;
+    reference_id: string;
+  },
 ) {
-  const owner = await tx.owner.findUnique({
-    where:  { id: params.owner_id },
-    select: { email: true, preferred_contact: true },
-  });
-  if (!owner) return null;
+  const [owner, clinic] = await Promise.all([
+    tx.owner.findUnique({
+      where:  { id: params.owner_id },
+      select: { email: true, preferred_contact: true },
+    }),
+    tx.clinic.findUnique({
+      where:  { id: params.clinic_id },
+      select: { plan: true, extra_features: true },
+    }),
+  ]);
+  if (!owner || !clinic) return null;
 
-  const canEmail = owner.preferred_contact === 'email' && !!owner.email;
+  // BASIC clinics only get in-app notifications — email is a PRO+/ENTERPRISE
+  // channel entitlement, independent of what the owner asked to be
+  // contacted on. Treated the same as "can't honor preferred_contact" below,
+  // not an error: the row still records the attempt as SKIPPED.
+  const emailEntitled = clinicHasFeature(clinic.plan, 'EMAIL_NOTIFICATIONS', clinic.extra_features);
+  const canEmail = emailEntitled && owner.preferred_contact === 'email' && !!owner.email;
 
   let notif;
   try {

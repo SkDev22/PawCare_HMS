@@ -18,6 +18,14 @@ export const FEATURES = [
   "NOTIFICATIONS",
   "REPORTS",
   "THEME_CUSTOMIZATION",
+  // Email channel for owner-facing automated reminders (appointment,
+  // vaccine-due, overdue-invoice) — BASIC stays in-app only, matching the
+  // subscription plan chart. SMS gets its own key once that channel exists.
+  "EMAIL_NOTIFICATIONS",
+  // The "Today's Appointments" dashboard widget specifically — decoupled
+  // from the APPOINTMENTS module itself (which BASIC does have) since the
+  // subscription chart gates the dashboard tile separately from the module.
+  "DASHBOARD_TODAY_APPOINTMENTS",
 ] as const;
 export type FeatureKey = (typeof FEATURES)[number];
 
@@ -45,6 +53,8 @@ export const PLAN_FEATURES: Record<ClinicPlanType, readonly FeatureKey[]> = {
     "NOTIFICATIONS",
     "REPORTS",
     "THEME_CUSTOMIZATION",
+    "EMAIL_NOTIFICATIONS",
+    "DASHBOARD_TODAY_APPOINTMENTS",
   ],
   ENTERPRISE: FEATURES,
 };

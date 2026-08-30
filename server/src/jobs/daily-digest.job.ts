@@ -4,11 +4,16 @@ import { notifyRole } from '../modules/notifications/notifications.service';
 
 // Morning summary for ADMIN staff, once per clinic per day.
 export async function runDailyDigest(): Promise<void> {
-  const clinics = await prisma.clinic.findMany({ where: { is_active: true }, select: { id: true } });
+  const clinics = await prisma.clinic.findMany({
+    where:  { is_active: true },
+    select: { id: true, plan: true, extra_features: true },
+  });
   const todayStr = new Date().toISOString().slice(0, 10);
 
   for (const clinic of clinics) {
-    const summary = await getDashboardSummary(clinic.id);
+    // The digest is an internal ADMIN-only summary, not a plan-gated
+    // dashboard tile — always uses the real counts regardless of plan.
+    const summary = await getDashboardSummary(clinic.id, clinic.plan, clinic.extra_features);
 
     const parts = [
       `${summary.stats.todayAppointments.completed}/${summary.stats.todayAppointments.total} appointments completed today.`,

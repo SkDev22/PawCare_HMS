@@ -1,6 +1,8 @@
 import { prisma } from '../../lib/prisma';
 import { getRevenueReport } from '../reports/reports.service';
 import { getAlerts } from '../inventory/inventory.service';
+import { clinicHasFeature } from '@pawcare/shared';
+import type { ClinicPlanType } from '@pawcare/shared';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -229,9 +231,21 @@ async function getAbnormalLabResults(clinicId: string) {
 
 // ─── Summary ──────────────────────────────────────────────────────────────────
 
-export async function getDashboardSummary(clinicId: string, date?: string) {
+export async function getDashboardSummary(
+  clinicId: string,
+  plan: ClinicPlanType,
+  extraFeatures: readonly string[],
+  date?: string,
+) {
   const today = date ? new Date(`${date}T00:00:00.000Z`) : new Date(`${toDateStr(new Date())}T00:00:00.000Z`);
   const yesterday = addDays(today, -1);
+
+  // The aggregate counts below (stats.todayAppointments/wardOccupancy) stay
+  // computed for every plan — they're just numbers, not named records. The
+  // detailed lists are what actually carry pet/owner names, so those are
+  // what's withheld per the subscription chart, not the summary tiles.
+  const canSeeTodayAppointments = clinicHasFeature(plan, 'DASHBOARD_TODAY_APPOINTMENTS', extraFeatures);
+  const canSeeWard = clinicHasFeature(plan, 'WARD', extraFeatures);
 
   const [
     todayAppointments,
@@ -251,8 +265,8 @@ export async function getDashboardSummary(clinicId: string, date?: string) {
     getWardOccupancyStat(clinicId, yesterday),
     getMonthlyVisits(clinicId, today),
     getSpeciesDistribution(clinicId),
-    getTodaysAppointmentsList(clinicId, today),
-    getWardStatusList(clinicId),
+    canSeeTodayAppointments ? getTodaysAppointmentsList(clinicId, today) : Promise.resolve([]),
+    canSeeWard ? getWardStatusList(clinicId) : Promise.resolve([]),
     getAlerts(clinicId),
     getAbnormalLabResults(clinicId),
   ]);
