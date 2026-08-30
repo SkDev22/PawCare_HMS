@@ -42,10 +42,16 @@ api.interceptors.response.use(
 
     // The refresh call itself must never trigger another refresh attempt —
     // doing so recurses into the queueing logic below and deadlocks forever.
+    // A failed login attempt is also excluded: a wrong password is a genuine
+    // 401 from a request that was never authenticated in the first place,
+    // not an expired session — silently "refreshing" it just replaces the
+    // real "invalid email or password" error with a redirect to /login,
+    // wiping the error banner before the user ever sees it.
     if (
       error.response?.status !== 401 ||
       original._retry ||
-      original.url?.includes('/auth/refresh')
+      original.url?.includes('/auth/refresh') ||
+      original.url?.includes('/auth/login')
     ) {
       return Promise.reject(error);
     }
