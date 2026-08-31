@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ArrowLeft, Pencil, UserX, Calendar } from 'lucide-react';
+import { ArrowLeft, Pencil, UserX, Calendar, Lock, LockOpen } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -12,7 +12,7 @@ import {
 } from '../../components/ui/dialog';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
-import { useStaffMember, useDeactivateStaff, useUpsertSchedule } from '../../hooks/use-staff';
+import { useStaffMember, useDeactivateStaff, useUnlockStaff, useUpsertSchedule } from '../../hooks/use-staff';
 import { StaffForm } from './components/StaffForm';
 import type { StaffRole, StaffScheduleEntry } from '../../types/staff';
 
@@ -170,6 +170,7 @@ export function StaffDetailPage() {
 
   const { data: member, isLoading } = useStaffMember(id);
   const deactivate = useDeactivateStaff();
+  const unlock = useUnlockStaff();
 
   const [editOpen,       setEditOpen]       = useState(false);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
@@ -197,6 +198,8 @@ export function StaffDetailPage() {
     );
   }
 
+  const isLocked = !!member.locked_until && new Date(member.locked_until) > new Date();
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -215,11 +218,28 @@ export function StaffDetailPage() {
         {!member.is_active && (
           <Badge variant="secondary" className="text-xs">Inactive</Badge>
         )}
+        {isLocked && (
+          <Badge variant="destructive" className="text-xs">
+            <Lock className="h-3 w-3 mr-1" />
+            Locked until {format(new Date(member.locked_until!), 'MMM d, h:mm a')}
+          </Badge>
+        )}
         <div className="ml-auto flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
             <Pencil className="h-4 w-4 mr-1" />
             Edit
           </Button>
+          {isLocked && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => unlock.mutate(member.id)}
+              disabled={unlock.isPending}
+            >
+              <LockOpen className="h-4 w-4 mr-1" />
+              {unlock.isPending ? 'Unlocking…' : 'Unlock'}
+            </Button>
+          )}
           {member.is_active && (
             <Button
               size="sm"

@@ -26,6 +26,7 @@ const SAFE_FIELDS = {
   avatar_url:     true,
   is_active:      true,
   last_login_at:  true,
+  locked_until:   true,
   created_at:     true,
   updated_at:     true,
   deleted_at:     true,
@@ -277,6 +278,22 @@ export async function deactivateStaff(id: string, clinicId: string) {
       data:  { is_active: false, deleted_at: new Date() },
     }),
   ]);
+}
+
+// Manual override for the 24h auto-unlock — a locked-out staff member
+// otherwise has no recourse until the lockout period passes on its own.
+export async function unlockStaff(id: string, clinicId: string) {
+  await assertStaff(id, clinicId);
+
+  return prisma.staffUser.update({
+    where: { id },
+    data: {
+      failed_login_attempts: 0,
+      last_failed_login_at:  null,
+      locked_until:           null,
+    },
+    select: { ...SAFE_FIELDS, ...staffDetailIncludes },
+  });
 }
 
 export async function getSchedule(id: string, clinicId: string) {

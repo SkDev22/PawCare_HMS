@@ -107,6 +107,18 @@ staffRouter.delete(
   },
 );
 
+staffRouter.post(
+  '/:id/unlock',
+  authenticate,
+  authorize('STAFF_WRITE'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const staff = await svc.unlockStaff(req.params.id, authed(req).user.clinic_id);
+      res.json(staff);
+    } catch (err) { next(err); }
+  },
+);
+
 // ── Schedule ──────────────────────────────────────────────────────────────────
 
 staffRouter.get(

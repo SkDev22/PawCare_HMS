@@ -98,6 +98,20 @@ export function useDeactivateStaff() {
   });
 }
 
+export function useUnlockStaff() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/staff/${id}/unlock`).then((r) => r.data as StaffMember),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['staff'] });
+      toast.success('Account unlocked');
+    },
+    onError: (err: { response?: { data?: { error?: { message?: string } } } }) => {
+      toast.error(err?.response?.data?.error?.message ?? 'Failed to unlock account');
+    },
+  });
+}
+
 export function useUpsertSchedule(id: string) {
   const qc = useQueryClient();
   return useMutation({

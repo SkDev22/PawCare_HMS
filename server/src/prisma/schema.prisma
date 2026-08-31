@@ -114,6 +114,12 @@ model StaffUser {
   avatar_url     String?
   is_active      Boolean   @default(true)
   last_login_at  DateTime?
+  // Sliding-window lockout: 10 failed attempts within 1 hour of each other
+  // locks the account for 24 hours (see auth.service.ts:recordFailedLogin).
+  // All reset to defaults on a successful login.
+  failed_login_attempts Int       @default(0)
+  last_failed_login_at  DateTime?
+  locked_until          DateTime?
   created_at     DateTime  @default(now())
   updated_at     DateTime  @updatedAt
   deleted_at     DateTime?
