@@ -96,8 +96,9 @@ const recordFullIncludes = {
     where: { is_active: true },
     orderBy: { created_at: 'desc' as const },
     include: {
-      item:   { select: { id: true, name: true } },
-      charge: { select: { id: true, total: true } },
+      item:    { select: { id: true, name: true } },
+      service: { select: { id: true, name: true } },
+      charge:  { select: { id: true, total: true } },
       controlled_substance_approval: { select: { id: true, status: true } },
     },
   },
@@ -402,6 +403,15 @@ export async function addPrescription(
         });
         chargeId = charge.id;
       }
+    } else if (data.service_id) {
+      // Services aren't stock-tracked, so there's no controlled-substance
+      // concept here — bill immediately, same as a plain charge.
+      const charge = await createChargeTx(tx, recordId, clinicId, prescribedBy, {
+        service_id: data.service_id,
+        quantity: data.quantity ?? 1,
+        description: data.drug_name,
+      });
+      chargeId = charge.id;
     }
 
     const rx = await tx.prescription.create({
@@ -418,12 +428,14 @@ export async function addPrescription(
         instructions:      data.instructions     ?? null,
         dispensed_at:      data.dispensed_at ? new Date(data.dispensed_at) : null,
         expires_at:        data.expires_at   ? new Date(data.expires_at)   : null,
-        ...(data.item_id ? { item_id: data.item_id } : {}),
-        ...(chargeId    ? { charge_id: chargeId }    : {}),
+        ...(data.item_id    ? { item_id: data.item_id }       : {}),
+        ...(data.service_id ? { service_id: data.service_id } : {}),
+        ...(chargeId        ? { charge_id: chargeId }         : {}),
       },
       include: {
-        item:   { select: { id: true, name: true } },
-        charge: { select: { id: true, total: true } },
+        item:    { select: { id: true, name: true } },
+        service: { select: { id: true, name: true } },
+        charge:  { select: { id: true, total: true } },
         controlled_substance_approval: { select: { id: true, status: true } },
       },
     });

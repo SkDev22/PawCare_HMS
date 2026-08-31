@@ -65,12 +65,21 @@ const PrescriptionBaseSchema = z.object({
   // pick — e.g. a batch that's already open, or a deliberate pricing choice.
   // Ignored unless item_id is also set.
   batch_id: z.string().uuid('Invalid batch ID').optional(),
+  // Alternative to item_id for clinics without the INVENTORY feature (e.g.
+  // BASIC plan) — bills against the plain Service catalog instead of a
+  // stock-tracked item. Mutually exclusive with item_id.
+  service_id: z.string().uuid('Invalid service ID').optional(),
 });
 
-export const CreatePrescriptionSchema = PrescriptionBaseSchema.refine(
-  (d) => !d.item_id || (d.quantity !== undefined && d.quantity > 0),
-  { message: 'Quantity is required when dispensing from clinic stock', path: ['quantity'] },
-);
+export const CreatePrescriptionSchema = PrescriptionBaseSchema
+  .refine((d) => !(d.item_id && d.service_id), {
+    message: 'Provide at most one of item_id or service_id',
+    path: ['service_id'],
+  })
+  .refine((d) => !(d.item_id || d.service_id) || (d.quantity !== undefined && d.quantity > 0), {
+    message: 'Quantity is required when billing from clinic stock or a service',
+    path: ['quantity'],
+  });
 
 export const UpdatePrescriptionSchema = PrescriptionBaseSchema.partial().extend({
   is_active: z.boolean().optional(),

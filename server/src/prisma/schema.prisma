@@ -488,6 +488,10 @@ model Prescription {
   expires_at        DateTime?
   is_active         Boolean   @default(true)
   item_id           String?   @db.Uuid
+  // Alternative to item_id for clinics without the INVENTORY feature (e.g.
+  // BASIC plan) — bills against the plain Service catalog instead of a
+  // stock-tracked item. Mutually exclusive with item_id.
+  service_id        String?   @db.Uuid
   charge_id         String?   @unique @db.Uuid
   created_at        DateTime  @default(now())
   updated_at        DateTime  @updatedAt
@@ -495,6 +499,7 @@ model Prescription {
   pet            Pet                  @relation(fields: [pet_id], references: [id])
   medical_record MedicalRecord?       @relation(fields: [medical_record_id], references: [id])
   item           InventoryItem?       @relation(fields: [item_id], references: [id])
+  service        Service?             @relation(fields: [service_id], references: [id])
   charge         MedicalRecordCharge? @relation(fields: [charge_id], references: [id])
   controlled_substance_approval ControlledSubstanceApproval?
 
@@ -816,6 +821,7 @@ model Service {
   clinic             Clinic            @relation(fields: [clinic_id], references: [id])
   invoice_line_items InvoiceLineItem[]
   charges            MedicalRecordCharge[]
+  prescriptions      Prescription[]
 
   @@map("services")
 }

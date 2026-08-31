@@ -148,6 +148,7 @@ export function useAddPrescription(recordId: string) {
       expires_at?: string;
       item_id?: string;
       batch_id?: string;
+      service_id?: string;
     }) =>
       api
         .post(`/medical-records/${recordId}/prescriptions`, data)

@@ -84,6 +84,7 @@ import {
 import { useInventoryItems, useItemBatches } from "../../hooks/use-inventory";
 import type { StockBatch } from "../../types/inventory";
 import { useServices } from "../../hooks/use-billing";
+import type { Service } from "../../types/billing";
 import { useDebounce } from "../../hooks/use-debounce";
 import { formatCurrency } from "../../lib/currency";
 import { hasFeature } from "../../lib/features";
@@ -761,6 +762,15 @@ function AddPrescriptionDialog({
   const { data: itemBatches, isLoading: batchesLoading } = useItemBatches(
     selectedItem?.id,
   );
+  // Clinics without INVENTORY (e.g. BASIC) bill prescriptions against the
+  // plain Service catalog instead — same "Clinic" fulfillment slot, just a
+  // different catalog underneath.
+  const { data: services = [] } = useServices();
+  const [selectedService, setSelectedService] = useState<{
+    id: string;
+    name: string;
+    price: string;
+  } | null>(null);
   const defaultValues = {
     drug_name: "",
     dosage: "",
@@ -778,16 +788,22 @@ function AddPrescriptionDialog({
     setFulfillment("pharmacy");
     setSelectedItem(null);
     setSelectedBatchId(undefined);
+    setSelectedService(null);
   };
   const quantity = form.watch("quantity");
+  const clinicSelectionMade = hasInventory ? !!selectedItem : !!selectedService;
   const canSubmit =
     fulfillment === "pharmacy" ||
-    (!!selectedItem && !!quantity && quantity > 0);
+    (clinicSelectionMade && !!quantity && quantity > 0);
   const selectedBatch = itemBatches?.find((b) => b.id === selectedBatchId);
-  const unitPrice = selectedBatch
-    ? batchEffectivePrice(selectedBatch)
-    : selectedItem
-      ? Number(selectedItem.selling_price)
+  const unitPrice = hasInventory
+    ? selectedBatch
+      ? batchEffectivePrice(selectedBatch)
+      : selectedItem
+        ? Number(selectedItem.selling_price)
+        : 0
+    : selectedService
+      ? Number(selectedService.price)
       : 0;
 
   const onSubmit = (values: z.infer<typeof PrescriptionSchema>) => {
@@ -803,11 +819,14 @@ function AddPrescriptionDialog({
         ...(values.quantity !== undefined ? { quantity: values.quantity } : {}),
         ...(values.instructions ? { instructions: values.instructions } : {}),
         ...(values.expires_at ? { expires_at: values.expires_at } : {}),
-        ...(fulfillment === "clinic" && selectedItem
+        ...(fulfillment === "clinic" && hasInventory && selectedItem
           ? { item_id: selectedItem.id }
           : {}),
-        ...(fulfillment === "clinic" && selectedBatchId
+        ...(fulfillment === "clinic" && hasInventory && selectedBatchId
           ? { batch_id: selectedBatchId }
+          : {}),
+        ...(fulfillment === "clinic" && !hasInventory && selectedService
+          ? { service_id: selectedService.id }
           : {}),
       },
       {
@@ -961,37 +980,36 @@ function AddPrescriptionDialog({
               /> */}
             </div>
 
-            {hasInventory && (
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">
-                  Fulfilled by
-                </label>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={fulfillment === "clinic" ? "default" : "outline"}
-                    onClick={() => setFulfillment("clinic")}
-                  >
-                    Clinic stock
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={fulfillment === "pharmacy" ? "default" : "outline"}
-                    onClick={() => {
-                      setFulfillment("pharmacy");
-                      setSelectedItem(null);
-                      setSelectedBatchId(undefined);
-                    }}
-                  >
-                    Pharmacy
-                  </Button>
-                </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">
+                Fulfilled by
+              </label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={fulfillment === "clinic" ? "default" : "outline"}
+                  onClick={() => setFulfillment("clinic")}
+                >
+                  {hasInventory ? "Clinic stock" : "Clinic service"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={fulfillment === "pharmacy" ? "default" : "outline"}
+                  onClick={() => {
+                    setFulfillment("pharmacy");
+                    setSelectedItem(null);
+                    setSelectedBatchId(undefined);
+                    setSelectedService(null);
+                  }}
+                >
+                  Pharmacy
+                </Button>
               </div>
-            )}
+            </div>
 
-            {hasInventory && fulfillment === "clinic" && (
+            {fulfillment === "clinic" && hasInventory && (
               <div className="space-y-2 rounded-md border border-border p-3 bg-muted/30">
                 <label className="text-xs font-medium text-muted-foreground block">
                   Match to inventory item
@@ -1026,6 +1044,34 @@ function AddPrescriptionDialog({
                   <p className="text-xs text-muted-foreground">
                     Will bill {formatCurrency(unitPrice * (quantity || 0))} and
                     deduct {quantity || 0} from stock.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {fulfillment === "clinic" && !hasInventory && (
+              <div className="space-y-2 rounded-md border border-border p-3 bg-muted/30">
+                <label className="text-xs font-medium text-muted-foreground block">
+                  Match to billable service
+                </label>
+                {selectedService ? (
+                  <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-background text-sm">
+                    <Receipt className="size-3.5 text-muted-foreground shrink-0" />
+                    <span className="flex-1 truncate">{selectedService.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedService(null)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <ServiceSearch services={services} onSelect={setSelectedService} />
+                )}
+                {selectedService && (
+                  <p className="text-xs text-muted-foreground">
+                    Will bill {formatCurrency(unitPrice * (quantity || 0))}.
                   </p>
                 )}
               </div>
@@ -1254,6 +1300,71 @@ function ItemSearch({
                 </div>
                 <span className="text-xs text-muted-foreground shrink-0">
                   {formatCurrency(item.current_price!)} / {item.unit}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Client-filtered against the already-fetched active Services list — unlike
+// ItemSearch's inventory catalog, a clinic's service list is small enough
+// that a server round-trip per keystroke isn't worth it.
+function ServiceSearch({
+  services,
+  onSelect,
+}: {
+  services: Service[];
+  onSelect: (service: { id: string; name: string; price: string }) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const q = query.trim().toLowerCase();
+  const results = q ? services.filter((s) => s.name.toLowerCase().includes(q)) : services;
+
+  return (
+    <div className="relative">
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+      <Input
+        className="pl-8"
+        placeholder="Search billable services…"
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+      />
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md max-h-52 overflow-y-auto">
+          {!results.length ? (
+            <p className="px-3 py-4 text-center text-sm text-muted-foreground">
+              {services.length === 0
+                ? "No services configured yet — add one in Settings → Billable Services."
+                : "No matching services."}
+            </p>
+          ) : (
+            results.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onMouseDown={() => {
+                  onSelect({ id: s.id, name: s.name, price: s.price });
+                  setQuery("");
+                  setOpen(false);
+                }}
+                className="w-full flex items-center justify-between gap-2.5 px-3 py-2.5 text-left hover:bg-accent transition-colors"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Receipt className="size-3.5 text-primary shrink-0" />
+                  <span className="text-sm truncate">{s.name}</span>
+                </div>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {formatCurrency(s.price)}
                 </span>
               </button>
             ))

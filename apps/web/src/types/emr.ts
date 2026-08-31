@@ -52,8 +52,10 @@ export type Prescription = {
   expires_at: string | null;
   is_active: boolean;
   item_id: string | null;
+  service_id: string | null;
   charge_id: string | null;
   item: { id: string; name: string } | null;
+  service: { id: string; name: string } | null;
   charge: { id: string; total: string } | null;
   controlled_substance_approval: { id: string; status: "PENDING" | "APPROVED" | "REJECTED" } | null;
   created_at: string;
