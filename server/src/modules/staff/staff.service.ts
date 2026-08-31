@@ -1,7 +1,9 @@
 import bcrypt from 'bcryptjs';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { notifyStaff } from '../notifications/notifications.service';
+import { recordAuditLog } from '../../lib/audit-log';
 import { getSeatLimit } from '@pawcare/shared';
 import type {
   CreateStaffInput,
@@ -26,6 +28,7 @@ const SAFE_FIELDS = {
   avatar_url:     true,
   is_active:      true,
   last_login_at:  true,
+  locked_until:   true,
   created_at:     true,
   updated_at:     true,
   deleted_at:     true,
@@ -54,8 +57,10 @@ const staffDetailIncludes = {
   },
 } as const;
 
-async function assertStaff(id: string, clinicId: string) {
-  const staff = await prisma.staffUser.findFirst({
+type Db = typeof prisma | Prisma.TransactionClient;
+
+async function assertStaff(id: string, clinicId: string, db: Db = prisma) {
+  const staff = await db.staffUser.findFirst({
     where: { id, clinic_id: clinicId, deleted_at: null },
     select: { id: true, role: true, is_active: true },
   });
@@ -63,8 +68,8 @@ async function assertStaff(id: string, clinicId: string) {
   return staff;
 }
 
-async function countActiveAdmins(clinicId: string, excludeId?: string) {
-  return prisma.staffUser.count({
+async function countActiveAdmins(clinicId: string, excludeId?: string, db: Db = prisma) {
+  return db.staffUser.count({
     where: {
       clinic_id:  clinicId,
       role:       'ADMIN',
@@ -178,57 +183,76 @@ export async function createStaff(clinicId: string, data: CreateStaffInput) {
   return staff;
 }
 
-export async function updateStaff(id: string, clinicId: string, data: UpdateStaffInput) {
-  const current = await assertStaff(id, clinicId);
+export async function updateStaff(
+  id: string,
+  clinicId: string,
+  data: UpdateStaffInput,
+  performedBy: string,
+) {
+  return prisma.$transaction(async (tx) => {
+    const current = await assertStaff(id, clinicId, tx);
 
-  // Reactivating someone increases the active-staff count just like creating
-  // a new one does — enforce the same seat limit here.
-  if (data.is_active === true && !current.is_active) {
-    await assertSeatAvailable(clinicId);
-  }
-
-  // Guard: cannot downgrade the last active admin
-  if (data.role && data.role !== 'ADMIN' && current.role === 'ADMIN') {
-    const remainingAdmins = await countActiveAdmins(clinicId, id);
-    if (remainingAdmins === 0) {
-      throw new AppError('CONFLICT', 'Cannot change role: this is the last active admin', 409);
+    // Reactivating someone increases the active-staff count just like creating
+    // a new one does — enforce the same seat limit here.
+    if (data.is_active === true && !current.is_active) {
+      await assertSeatAvailable(clinicId);
     }
-  }
 
-  // Guard: cannot deactivate the last active admin via is_active=false
-  if (data.is_active === false && current.role === 'ADMIN') {
-    const remainingAdmins = await countActiveAdmins(clinicId, id);
-    if (remainingAdmins === 0) {
-      throw new AppError('CONFLICT', 'Cannot deactivate the last active admin', 409);
+    // Guard: cannot downgrade the last active admin
+    if (data.role && data.role !== 'ADMIN' && current.role === 'ADMIN') {
+      const remainingAdmins = await countActiveAdmins(clinicId, id, tx);
+      if (remainingAdmins === 0) {
+        throw new AppError('CONFLICT', 'Cannot change role: this is the last active admin', 409);
+      }
     }
-  }
 
-  // Check email uniqueness if changing email
-  if (data.email && data.email !== (await prisma.staffUser.findUnique({ where: { id }, select: { email: true } }))?.email) {
-    const conflict = await prisma.staffUser.findFirst({
-      where: { email: data.email, deleted_at: null },
-      select: { id: true },
+    // Guard: cannot deactivate the last active admin via is_active=false
+    if (data.is_active === false && current.role === 'ADMIN') {
+      const remainingAdmins = await countActiveAdmins(clinicId, id, tx);
+      if (remainingAdmins === 0) {
+        throw new AppError('CONFLICT', 'Cannot deactivate the last active admin', 409);
+      }
+    }
+
+    // Check email uniqueness if changing email
+    if (data.email && data.email !== (await tx.staffUser.findUnique({ where: { id }, select: { email: true } }))?.email) {
+      const conflict = await tx.staffUser.findFirst({
+        where: { email: data.email, deleted_at: null },
+        select: { id: true },
+      });
+      if (conflict) throw new AppError('CONFLICT', 'Email address is already in use', 409);
+    }
+
+    const updated = await tx.staffUser.update({
+      where: { id },
+      data: {
+        ...(data.first_name     !== undefined ? { first_name:     data.first_name }     : {}),
+        ...(data.last_name      !== undefined ? { last_name:      data.last_name }      : {}),
+        ...(data.email          !== undefined ? { email:          data.email }          : {}),
+        ...(data.role           !== undefined ? { role:           data.role }           : {}),
+        ...(data.specialization !== undefined ? { specialization: data.specialization } : {}),
+        ...(data.license_number !== undefined ? { license_number: data.license_number } : {}),
+        ...(data.phone          !== undefined ? { phone:          data.phone }          : {}),
+        ...(data.avatar_url     !== undefined ? { avatar_url:     data.avatar_url }     : {}),
+        ...(data.is_active      !== undefined ? { is_active:      data.is_active }      : {}),
+      },
+      select: { ...SAFE_FIELDS, ...staffDetailIncludes },
     });
-    if (conflict) throw new AppError('CONFLICT', 'Email address is already in use', 409);
-  }
 
-  const updated = await prisma.staffUser.update({
-    where: { id },
-    data: {
-      ...(data.first_name     !== undefined ? { first_name:     data.first_name }     : {}),
-      ...(data.last_name      !== undefined ? { last_name:      data.last_name }      : {}),
-      ...(data.email          !== undefined ? { email:          data.email }          : {}),
-      ...(data.role           !== undefined ? { role:           data.role }           : {}),
-      ...(data.specialization !== undefined ? { specialization: data.specialization } : {}),
-      ...(data.license_number !== undefined ? { license_number: data.license_number } : {}),
-      ...(data.phone          !== undefined ? { phone:          data.phone }          : {}),
-      ...(data.avatar_url     !== undefined ? { avatar_url:     data.avatar_url }     : {}),
-      ...(data.is_active      !== undefined ? { is_active:      data.is_active }      : {}),
-    },
-    select: { ...SAFE_FIELDS, ...staffDetailIncludes },
+    if (data.role !== undefined && data.role !== current.role) {
+      await recordAuditLog(tx, {
+        clinicId,
+        entityType:  'StaffUser',
+        entityId:    id,
+        action:      'UPDATE',
+        before:      { role: current.role },
+        after:       { role: updated.role },
+        performedBy,
+      });
+    }
+
+    return updated;
   });
-
-  return updated;
 }
 
 // Self-service profile update — any authenticated staff member calling this
@@ -277,6 +301,22 @@ export async function deactivateStaff(id: string, clinicId: string) {
       data:  { is_active: false, deleted_at: new Date() },
     }),
   ]);
+}
+
+// Manual override for the 24h auto-unlock — a locked-out staff member
+// otherwise has no recourse until the lockout period passes on its own.
+export async function unlockStaff(id: string, clinicId: string) {
+  await assertStaff(id, clinicId);
+
+  return prisma.staffUser.update({
+    where: { id },
+    data: {
+      failed_login_attempts: 0,
+      last_failed_login_at:  null,
+      locked_until:           null,
+    },
+    select: { ...SAFE_FIELDS, ...staffDetailIncludes },
+  });
 }
 
 export async function getSchedule(id: string, clinicId: string) {

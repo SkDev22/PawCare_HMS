@@ -27,6 +27,7 @@ import { BillingPage } from './pages/billing/BillingPage';
 import { InvoiceDetailPage } from './pages/billing/InvoiceDetailPage';
 import { StaffPage } from './pages/staff/StaffPage';
 import { StaffDetailPage } from './pages/staff/StaffDetailPage';
+import { AuditLogPage } from './pages/audit-log/AuditLogPage';
 import { LabPage } from './pages/lab/LabPage';
 import { LabOrderDetailPage } from './pages/lab/LabOrderDetailPage';
 import { WardPage } from './pages/ward/WardPage';
@@ -172,6 +173,7 @@ export function App() {
           {/* Staff Management */}
           <Route path="/staff"     element={<AuthLayout permission="STAFF_READ"><StaffPage /></AuthLayout>} />
           <Route path="/staff/:id" element={<AuthLayout permission="STAFF_READ"><StaffDetailPage /></AuthLayout>} />
+          <Route path="/audit-log" element={<AuthLayout permission="AUDIT_LOG_READ"><AuditLogPage /></AuthLayout>} />
 
           {/* Laboratory */}
           <Route path="/lab"     element={<AuthLayout permission="LAB_ORDER_WRITE" feature="LABORATORY"><LabPage /></AuthLayout>} />

@@ -89,6 +89,7 @@ staffRouter.put(
         req.params.id,
         authed(req).user.clinic_id,
         req.body,
+        authed(req).user.id,
       );
       res.json(staff);
     } catch (err) { next(err); }
@@ -103,6 +104,18 @@ staffRouter.delete(
     try {
       await svc.deactivateStaff(req.params.id, authed(req).user.clinic_id);
       res.status(204).end();
+    } catch (err) { next(err); }
+  },
+);
+
+staffRouter.post(
+  '/:id/unlock',
+  authenticate,
+  authorize('STAFF_WRITE'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const staff = await svc.unlockStaff(req.params.id, authed(req).user.clinic_id);
+      res.json(staff);
     } catch (err) { next(err); }
   },
 );

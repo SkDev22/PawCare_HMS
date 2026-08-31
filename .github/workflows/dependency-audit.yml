@@ -1,0 +1,40 @@
+name: Dependency Audit
+
+on:
+  pull_request:
+    branches: [main, staging, develop]
+  push:
+    branches: [main]
+  schedule:
+    # Catches a CVE published against a dependency nobody has touched since
+    # — Dependabot's weekly PR scan covers the same ground, but this backstop
+    # doesn't depend on a PR being open to notice it.
+    - cron: '0 3 * * 1'   # 03:00 UTC every Monday
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit dependencies
+        # Fails the job (non-zero exit) on any high or critical advisory.
+        # Moderate/low findings are left to Dependabot's routine PRs rather
+        # than blocking merges — most of those land in dev-only tooling that
+        # never ships to production.
+        run: pnpm audit --audit-level=high

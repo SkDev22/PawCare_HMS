@@ -3,9 +3,49 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../../lib/prisma';
 import { signAccessToken } from '../../lib/jwt';
 import { AppError } from '../../lib/errors';
+import { notifyRole } from '../notifications/notifications.service';
 
 const REFRESH_TOKEN_BYTES = 64;
 const REFRESH_TOKEN_EXPIRY_DAYS = 30;
+
+// Sliding-window lockout: 10 failed attempts within 1 hour of each other
+// locks the account for 24 hours. All three fields reset on a successful login.
+const MAX_FAILED_ATTEMPTS = 10;
+const FAILED_ATTEMPT_WINDOW_MS = 60 * 60 * 1000;
+const LOCKOUT_DURATION_MS = 24 * 60 * 60 * 1000;
+
+async function recordFailedLogin(staff: {
+  id: string;
+  clinic_id: string;
+  first_name: string;
+  last_name: string;
+  failed_login_attempts: number;
+  last_failed_login_at: Date | null;
+}): Promise<void> {
+  const now = new Date();
+  const withinWindow =
+    staff.last_failed_login_at !== null &&
+    now.getTime() - staff.last_failed_login_at.getTime() < FAILED_ATTEMPT_WINDOW_MS;
+  const attempts = withinWindow ? staff.failed_login_attempts + 1 : 1;
+  const justLocked = attempts >= MAX_FAILED_ATTEMPTS;
+
+  await prisma.staffUser.update({
+    where: { id: staff.id },
+    data: {
+      failed_login_attempts: attempts,
+      last_failed_login_at: now,
+      ...(justLocked ? { locked_until: new Date(now.getTime() + LOCKOUT_DURATION_MS) } : {}),
+    },
+  });
+
+  if (justLocked) {
+    await notifyRole(prisma, staff.clinic_id, ['ADMIN'], {
+      type:    'account_locked',
+      subject: 'Staff Account Locked',
+      body:    `${staff.first_name} ${staff.last_name}'s account was locked after ${MAX_FAILED_ATTEMPTS} failed login attempts.`,
+    });
+  }
+}
 
 function hashToken(raw: string): string {
   return crypto.createHash('sha256').update(raw).digest('hex');
@@ -31,7 +71,22 @@ export async function login(email: string, password: string) {
   const passwordToCheck = staff?.password_hash ?? '$2b$12$invalidhashtopreventtimingattack';
   const valid = await bcrypt.compare(password, passwordToCheck);
 
-  if (!staff || !valid) {
+  if (!staff) {
+    throw new AppError('INVALID_CREDENTIALS', 'Invalid email or password', 401);
+  }
+
+  // Checked before the password result is used — even a correct password
+  // doesn't bypass an active lock.
+  if (staff.locked_until && staff.locked_until > new Date()) {
+    throw new AppError(
+      'ACCOUNT_LOCKED',
+      'Too many failed login attempts. Your account is temporarily locked — try again later.',
+      403,
+    );
+  }
+
+  if (!valid) {
+    await recordFailedLogin(staff);
     throw new AppError('INVALID_CREDENTIALS', 'Invalid email or password', 401);
   }
 
@@ -58,7 +113,12 @@ export async function login(email: string, password: string) {
     }),
     prisma.staffUser.update({
       where: { id: staff.id },
-      data: { last_login_at: new Date() },
+      data: {
+        last_login_at: new Date(),
+        failed_login_attempts: 0,
+        last_failed_login_at: null,
+        locked_until: null,
+      },
     }),
   ]);
 

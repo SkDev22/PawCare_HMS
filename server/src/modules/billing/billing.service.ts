@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { notifyRole } from '../notifications/notifications.service';
+import { recordAuditLog } from '../../lib/audit-log';
 import type {
   CreateInvoiceInput,
   UpdateInvoiceInput,
@@ -407,6 +408,16 @@ export async function voidPayment(
       type:    'payment_voided',
       subject: 'Payment Voided',
       body:    `Payment of ${payment.amount} on invoice ${invoiceId.slice(0, 8).toUpperCase()} was voided: ${data.reason}`,
+    });
+
+    await recordAuditLog(tx, {
+      clinicId,
+      entityType:  'Payment',
+      entityId:    paymentId,
+      action:      'UPDATE',
+      before:      payment,
+      after:       voided,
+      performedBy: voidedByStaffId,
     });
 
     return voided;

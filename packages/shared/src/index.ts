@@ -18,4 +18,5 @@ export * from './schemas/reports.schema';
 export * from './schemas/dashboard.schema';
 export * from './schemas/notifications.schema';
 export * from './schemas/search.schema';
+export * from './schemas/audit-log.schema';
 export * from './types/index';
