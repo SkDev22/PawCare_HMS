@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcryptjs';
+import { encrypt } from '../lib/encryption';
 
 const adapter = new PrismaPg(process.env['DATABASE_URL']!);
 const prisma = new PrismaClient({ adapter });
@@ -63,7 +64,7 @@ async function main() {
         last_name: 'Smith',
         role: 'VETERINARIAN',
         specialization: 'Small animals',
-        license_number: 'VET-2024-001',
+        license_number: encrypt('VET-2024-001'),
       },
     });
     console.log(`✅ Created veterinarian: ${vetEmail}`);
@@ -200,7 +201,7 @@ async function main() {
           last_name: s.last_name,
           role: s.role,
           specialization: 'specialization' in s ? s.specialization : null,
-          license_number: 'license_number' in s ? s.license_number : null,
+          license_number: 'license_number' in s ? encrypt(s.license_number) : null,
         },
       });
       console.log(`✅ Created ${s.role.toLowerCase()}: ${s.email}`);

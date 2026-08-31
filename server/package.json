@@ -16,6 +16,7 @@
     "db:reset": "dotenv -e ../.env -- prisma migrate reset --force",
     "db:truncate": "dotenv -e ../.env -- ts-node -r tsconfig-paths/register src/prisma/truncate.ts",
     "db:backfill-invoice-numbers": "dotenv -e ../.env -- ts-node -r tsconfig-paths/register src/prisma/backfill-invoice-numbers.ts",
+    "db:backfill-encrypt-sensitive-fields": "dotenv -e ../.env -- ts-node -r tsconfig-paths/register src/prisma/backfill-encrypt-sensitive-fields.ts",
     "clinic:create": "dotenv -e ../.env -- ts-node -r tsconfig-paths/register src/prisma/create-clinic.ts",
     "clinic:upgrade": "dotenv -e ../.env -- ts-node -r tsconfig-paths/register src/prisma/clinic-upgrade.ts",
     "db:studio": "dotenv -e ../.env -- prisma studio"

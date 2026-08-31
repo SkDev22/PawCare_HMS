@@ -4,6 +4,7 @@ import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { notifyStaff } from '../notifications/notifications.service';
 import { recordAuditLog } from '../../lib/audit-log';
+import { encrypt, decrypt } from '../../lib/encryption';
 import { getSeatLimit } from '@pawcare/shared';
 import type {
   CreateStaffInput,
@@ -56,6 +57,10 @@ const staffDetailIncludes = {
     select: { appointments: true, medical_records: true },
   },
 } as const;
+
+function decryptStaff<T extends { license_number: string | null }>(staff: T): T {
+  return { ...staff, license_number: decrypt(staff.license_number) };
+}
 
 type Db = typeof prisma | Prisma.TransactionClient;
 
@@ -139,7 +144,7 @@ export async function listStaff(clinicId: string, params: StaffQueryInput) {
   const result  = hasMore ? items.slice(0, limit) : items;
 
   return {
-    items:      result,
+    items:      result.map(decryptStaff),
     nextCursor: hasMore ? result[result.length - 1].id : null,
     hasMore,
   };
@@ -151,7 +156,7 @@ export async function getStaff(id: string, clinicId: string) {
     select:  { ...SAFE_FIELDS, ...staffDetailIncludes },
   });
   if (!staff) throw new AppError('NOT_FOUND', 'Staff member not found', 404);
-  return staff;
+  return decryptStaff(staff);
 }
 
 export async function createStaff(clinicId: string, data: CreateStaffInput) {
@@ -174,13 +179,13 @@ export async function createStaff(clinicId: string, data: CreateStaffInput) {
       last_name:      data.last_name,
       role:           data.role,
       ...(data.specialization ? { specialization: data.specialization } : {}),
-      ...(data.license_number ? { license_number: data.license_number } : {}),
+      ...(data.license_number ? { license_number: encrypt(data.license_number) } : {}),
       ...(data.phone          ? { phone:          data.phone }          : {}),
     },
     select: { ...SAFE_FIELDS, ...staffDetailIncludes },
   });
 
-  return staff;
+  return decryptStaff(staff);
 }
 
 export async function updateStaff(
@@ -231,7 +236,7 @@ export async function updateStaff(
         ...(data.email          !== undefined ? { email:          data.email }          : {}),
         ...(data.role           !== undefined ? { role:           data.role }           : {}),
         ...(data.specialization !== undefined ? { specialization: data.specialization } : {}),
-        ...(data.license_number !== undefined ? { license_number: data.license_number } : {}),
+        ...(data.license_number !== undefined ? { license_number: encrypt(data.license_number) } : {}),
         ...(data.phone          !== undefined ? { phone:          data.phone }          : {}),
         ...(data.avatar_url     !== undefined ? { avatar_url:     data.avatar_url }     : {}),
         ...(data.is_active      !== undefined ? { is_active:      data.is_active }      : {}),
@@ -251,7 +256,7 @@ export async function updateStaff(
       });
     }
 
-    return updated;
+    return decryptStaff(updated);
   });
 }
 
@@ -266,17 +271,19 @@ export async function updateOwnProfile(id: string, data: UpdateOwnProfileInput) 
   });
   if (!existing) throw new AppError('NOT_FOUND', 'Staff account not found', 404);
 
-  return prisma.staffUser.update({
+  const updated = await prisma.staffUser.update({
     where: { id },
     data: {
       ...(data.first_name     !== undefined ? { first_name:     data.first_name }     : {}),
       ...(data.last_name      !== undefined ? { last_name:      data.last_name }      : {}),
       ...(data.specialization !== undefined ? { specialization: data.specialization } : {}),
-      ...(data.license_number !== undefined ? { license_number: data.license_number } : {}),
+      ...(data.license_number !== undefined ? { license_number: encrypt(data.license_number) } : {}),
       ...(data.phone          !== undefined ? { phone:          data.phone }          : {}),
     },
     select: SAFE_FIELDS,
   });
+
+  return decryptStaff(updated);
 }
 
 export async function deactivateStaff(id: string, clinicId: string) {
@@ -308,7 +315,7 @@ export async function deactivateStaff(id: string, clinicId: string) {
 export async function unlockStaff(id: string, clinicId: string) {
   await assertStaff(id, clinicId);
 
-  return prisma.staffUser.update({
+  const updated = await prisma.staffUser.update({
     where: { id },
     data: {
       failed_login_attempts: 0,
@@ -317,6 +324,8 @@ export async function unlockStaff(id: string, clinicId: string) {
     },
     select: { ...SAFE_FIELDS, ...staffDetailIncludes },
   });
+
+  return decryptStaff(updated);
 }
 
 export async function getSchedule(id: string, clinicId: string) {

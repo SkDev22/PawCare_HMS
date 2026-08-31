@@ -1,6 +1,17 @@
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
+import { encrypt, decrypt } from '../../lib/encryption';
 import type { CreateOwnerInput, UpdateOwnerInput, OwnerQueryInput } from '@pawcare/shared';
+
+function decryptOwner<T extends { emergency_contact: string | null }>(owner: T): T {
+  return { ...owner, emergency_contact: decrypt(owner.emergency_contact) };
+}
+
+// getOwner's `pets` include returns full, unselected pet rows — insurance_id
+// comes back encrypted just like emergency_contact does.
+function decryptNestedPet<T extends { insurance_id: string | null }>(pet: T): T {
+  return { ...pet, insurance_id: decrypt(pet.insurance_id) };
+}
 
 export async function listOwners(clinicId: string, query: OwnerQueryInput) {
   const { search, cursor, limit } = query;
@@ -32,7 +43,7 @@ export async function listOwners(clinicId: string, query: OwnerQueryInput) {
   const items = hasMore ? owners.slice(0, limit) : owners;
 
   return {
-    items,
+    items: items.map(decryptOwner),
     nextCursor: hasMore ? items[items.length - 1]?.id : null,
     hasMore,
   };
@@ -53,7 +64,10 @@ export async function getOwner(id: string, clinicId: string) {
     throw new AppError('NOT_FOUND', 'Owner not found', 404);
   }
 
-  return owner;
+  return {
+    ...decryptOwner(owner),
+    pets: owner.pets.map(decryptNestedPet),
+  };
 }
 
 export async function createOwner(clinicId: string, data: CreateOwnerInput) {
@@ -66,7 +80,7 @@ export async function createOwner(clinicId: string, data: CreateOwnerInput) {
     }
   }
 
-  return prisma.owner.create({
+  const owner = await prisma.owner.create({
     data: {
       clinic_id: clinicId,
       first_name: data.first_name,
@@ -74,11 +88,13 @@ export async function createOwner(clinicId: string, data: CreateOwnerInput) {
       email:      data.email || null,
       phone:      data.phone,
       ...(data.address           !== undefined && { address: data.address }),
-      ...(data.emergency_contact !== undefined && { emergency_contact: data.emergency_contact }),
+      ...(data.emergency_contact !== undefined && { emergency_contact: encrypt(data.emergency_contact) }),
       preferred_contact: data.preferred_contact ?? 'email',
       portal_enabled:    data.portal_enabled ?? false,
     },
   });
+
+  return decryptOwner(owner);
 }
 
 export async function updateOwner(id: string, clinicId: string, data: UpdateOwnerInput) {
@@ -99,7 +115,7 @@ export async function updateOwner(id: string, clinicId: string, data: UpdateOwne
     }
   }
 
-  return prisma.owner.update({
+  const updated = await prisma.owner.update({
     where: { id },
     data: {
       ...(data.first_name !== undefined  && { first_name: data.first_name }),
@@ -107,11 +123,13 @@ export async function updateOwner(id: string, clinicId: string, data: UpdateOwne
       ...(data.email      !== undefined  && { email: data.email || null }),
       ...(data.phone      !== undefined  && { phone: data.phone }),
       ...(data.address    !== undefined  && { address: data.address }),
-      ...(data.emergency_contact !== undefined && { emergency_contact: data.emergency_contact }),
+      ...(data.emergency_contact !== undefined && { emergency_contact: encrypt(data.emergency_contact) }),
       ...(data.preferred_contact !== undefined && { preferred_contact: data.preferred_contact }),
       ...(data.portal_enabled    !== undefined && { portal_enabled: data.portal_enabled }),
     },
   });
+
+  return decryptOwner(updated);
 }
 
 export async function deleteOwner(id: string, clinicId: string) {

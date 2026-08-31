@@ -1,10 +1,15 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
+import { encrypt, decrypt } from '../../lib/encryption';
 import type { CreatePetInput, UpdatePetInput, PetQueryInput, CreateAllergyInput } from '@pawcare/shared';
 
 const { Decimal } = Prisma;
 type Decimal = Prisma.Decimal;
+
+function decryptPet<T extends { insurance_id: string | null }>(pet: T): T {
+  return { ...pet, insurance_id: decrypt(pet.insurance_id) };
+}
 
 export async function listPets(clinicId: string, query: PetQueryInput) {
   const { search, owner_id, species, status, cursor, limit } = query;
@@ -36,7 +41,7 @@ export async function listPets(clinicId: string, query: PetQueryInput) {
   const items = hasMore ? pets.slice(0, limit) : pets;
 
   return {
-    items,
+    items: items.map(decryptPet),
     nextCursor: hasMore ? items[items.length - 1]?.id : null,
     hasMore,
   };
@@ -64,7 +69,7 @@ export async function getPet(id: string, clinicId: string) {
     throw new AppError('NOT_FOUND', 'Pet not found', 404);
   }
 
-  return pet;
+  return decryptPet(pet);
 }
 
 export async function getPetHistory(id: string, clinicId: string) {
@@ -112,7 +117,7 @@ export async function createPet(clinicId: string, data: CreatePetInput) {
     throw new AppError('NOT_FOUND', 'Owner not found or does not belong to this clinic', 404);
   }
 
-  return prisma.pet.create({
+  const pet = await prisma.pet.create({
     data: {
       owner_id:      data.owner_id,
       name:          data.name,
@@ -122,10 +127,12 @@ export async function createPet(clinicId: string, data: CreatePetInput) {
       ...(data.breed        !== undefined && { breed: data.breed }),
       ...(data.sex          !== undefined && { sex: data.sex }),
       ...(data.color        !== undefined && { color: data.color }),
-      ...(data.insurance_id !== undefined && { insurance_id: data.insurance_id }),
+      ...(data.insurance_id !== undefined && { insurance_id: encrypt(data.insurance_id) }),
       ...(data.notes        !== undefined && { notes: data.notes }),
     },
   });
+
+  return decryptPet(pet);
 }
 
 export async function updatePet(id: string, clinicId: string, data: UpdatePetInput) {
@@ -137,7 +144,7 @@ export async function updatePet(id: string, clinicId: string, data: UpdatePetInp
     throw new AppError('NOT_FOUND', 'Pet not found', 404);
   }
 
-  return prisma.pet.update({
+  const updated = await prisma.pet.update({
     where: { id },
     data: {
       ...(data.name          !== undefined && { name: data.name }),
@@ -153,11 +160,13 @@ export async function updatePet(id: string, clinicId: string, data: UpdatePetInp
       }),
       ...(data.sex          !== undefined && { sex: data.sex }),
       ...(data.color        !== undefined && { color: data.color }),
-      ...(data.insurance_id !== undefined && { insurance_id: data.insurance_id }),
+      ...(data.insurance_id !== undefined && { insurance_id: encrypt(data.insurance_id) }),
       ...(data.notes        !== undefined && { notes: data.notes }),
       ...(data.status       !== undefined && { status: data.status }),
     },
   });
+
+  return decryptPet(updated);
 }
 
 export async function archivePet(id: string, clinicId: string) {
