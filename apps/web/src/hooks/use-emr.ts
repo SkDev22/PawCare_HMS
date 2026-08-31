@@ -10,7 +10,6 @@ import type {
   Prescription,
   Charge,
   ControlledApproval,
-  AuditLogEntry,
 } from '../types/emr';
 
 type ApiError = { response?: { data?: { error?: { message?: string } } } };
@@ -258,15 +257,5 @@ export function useRejectControlledDispense() {
       toast.success('Dispense rejected');
     },
     onError: (err: ApiError) => toast.error(errMsg(err, 'Failed to reject dispense')),
-  });
-}
-
-// ── Audit Log ────────────────────────────────────────────────────────────────
-
-export function useAuditLog(recordId: string | undefined) {
-  return useQuery<AuditLogEntry[]>({
-    queryKey: ['medical-records', recordId, 'audit-log'],
-    queryFn: () => api.get(`/medical-records/${recordId}/audit-log`).then((r) => r.data),
-    enabled: !!recordId,
   });
 }

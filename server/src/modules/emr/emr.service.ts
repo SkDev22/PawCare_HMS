@@ -901,28 +901,3 @@ export async function removeCharge(recordId: string, chargeId: string, clinicId:
   return prisma.$transaction((tx) => removeChargeTx(tx, recordId, chargeId, clinicId, staffId));
 }
 
-// ── Audit Log ────────────────────────────────────────────────────────────────
-
-export async function listAuditLog(recordId: string, clinicId: string) {
-  await assertRecordInClinic(recordId, clinicId);
-
-  const entries = await prisma.auditLog.findMany({
-    where:   { medical_record_id: recordId },
-    orderBy: { created_at: 'desc' },
-  });
-
-  const staffIds = [...new Set(entries.map((e) => e.performed_by))];
-  const staff =
-    staffIds.length > 0
-      ? await prisma.staffUser.findMany({
-          where:  { id: { in: staffIds } },
-          select: { id: true, first_name: true, last_name: true },
-        })
-      : [];
-  const staffMap = new Map(staff.map((s) => [s.id, s]));
-
-  return entries.map((e) => ({
-    ...e,
-    performed_by_staff: staffMap.get(e.performed_by) ?? null,
-  }));
-}

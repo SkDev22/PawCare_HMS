@@ -12,6 +12,7 @@ import {
   FlaskConical,
   BedDouble,
   UserCog,
+  ScrollText,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -144,6 +145,12 @@ const NAV_GROUPS: {
         href: "/staff",
         icon: UserCog,
         permission: "STAFF_READ",
+      },
+      {
+        title: "Audit Log",
+        href: "/audit-log",
+        icon: ScrollText,
+        permission: "AUDIT_LOG_READ",
       },
       { title: "Settings", href: "/settings", icon: Settings },
     ],

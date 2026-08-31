@@ -13,8 +13,8 @@ function toJsonSafe(value: unknown): Prisma.InputJsonValue | typeof Prisma.JsonN
 
 export interface RecordAuditLogParams {
   clinicId: string;
-  medicalRecordId: string;
-  entityType: 'MedicalRecord' | 'SoapNote' | 'Vitals' | 'Diagnosis' | 'Prescription' | 'MedicalRecordCharge';
+  medicalRecordId?: string;
+  entityType: 'MedicalRecord' | 'SoapNote' | 'Vitals' | 'Diagnosis' | 'Prescription' | 'MedicalRecordCharge' | 'Payment' | 'StaffUser';
   entityId: string;
   action: 'CREATE' | 'UPDATE' | 'DELETE';
   before?: unknown;
@@ -30,7 +30,7 @@ export async function recordAuditLog(tx: TxClient, params: RecordAuditLogParams)
   await tx.auditLog.create({
     data: {
       clinic_id:         params.clinicId,
-      medical_record_id: params.medicalRecordId,
+      medical_record_id: params.medicalRecordId ?? null,
       entity_type:       params.entityType,
       entity_id:         params.entityId,
       action:            params.action,

@@ -17,6 +17,7 @@ import { reportsRouter } from '../../modules/reports/reports.routes';
 import { notificationsRouter } from '../../modules/notifications/notifications.routes';
 import { dashboardRouter } from '../../modules/dashboard/dashboard.routes';
 import { searchRouter } from '../../modules/search/search.routes';
+import { auditLogRouter } from '../../modules/audit-log/audit-log.routes';
 
 export const apiRouter: IRouter = Router();
 
@@ -28,6 +29,7 @@ apiRouter.use('/appointments', appointmentsRouter);
 apiRouter.use('/medical-records', emrRouter);
 apiRouter.use('/billing', billingRouter);
 apiRouter.use('/staff', staffRouter);
+apiRouter.use('/audit-log', auditLogRouter);
 apiRouter.use('/clinic', clinicRouter);
 // These four modules differ by plan (ADR-04) — gate them once here rather
 // than touching every route's own authenticate/authorize chain. authenticate

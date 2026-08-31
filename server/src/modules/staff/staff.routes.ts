@@ -89,6 +89,7 @@ staffRouter.put(
         req.params.id,
         authed(req).user.clinic_id,
         req.body,
+        authed(req).user.id,
       );
       res.json(staff);
     } catch (err) { next(err); }

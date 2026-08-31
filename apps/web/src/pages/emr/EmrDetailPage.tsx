@@ -19,7 +19,6 @@ import {
   Package,
   Printer,
   ArrowRight,
-  History,
 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
@@ -79,7 +78,6 @@ import {
   useCharges,
   useAddCharge,
   useRemoveCharge,
-  useAuditLog,
 } from "../../hooks/use-emr";
 import { useInventoryItems, useItemBatches } from "../../hooks/use-inventory";
 import type { StockBatch } from "../../types/inventory";
@@ -88,7 +86,6 @@ import type { Service } from "../../types/billing";
 import { useDebounce } from "../../hooks/use-debounce";
 import { formatCurrency } from "../../lib/currency";
 import { hasFeature } from "../../lib/features";
-import { hasPermission } from "../../lib/permissions";
 import { useAuthStore } from "../../stores/auth.store";
 import { SoapNotePrint } from "./components/SoapNotePrint";
 import type {
@@ -96,7 +93,6 @@ import type {
   Diagnosis,
   Prescription,
   Charge,
-  AuditLogEntry,
 } from "../../types/emr";
 
 // ── SOAP Note Tab ──────────────────────────────────────────────────────────────
@@ -1676,133 +1672,6 @@ function ChargesTab({ record }: { record: MedicalRecord }) {
   );
 }
 
-// ── History Tab (admin-only audit trail) ────────────────────────────────────
-
-const ENTITY_LABELS: Record<AuditLogEntry["entity_type"], string> = {
-  MedicalRecord: "Medical record",
-  SoapNote: "SOAP note",
-  Vitals: "Vitals",
-  Diagnosis: "Diagnosis",
-  Prescription: "Prescription",
-  MedicalRecordCharge: "Charge",
-};
-
-const ACTION_VERBS: Record<AuditLogEntry["action"], string> = {
-  CREATE: "added",
-  UPDATE: "updated",
-  DELETE: "removed",
-};
-
-// Internal bookkeeping fields aren't useful in a before/after diff.
-const DIFF_SKIP_KEYS = new Set([
-  "id",
-  "created_at",
-  "updated_at",
-  "medical_record_id",
-  "pet_id",
-  "vet_id",
-  "prescribed_by",
-  "created_by",
-  "invoice_line_item_id",
-]);
-
-function diffFields(
-  before: Record<string, unknown> | null,
-  after: Record<string, unknown> | null,
-): { field: string; from: unknown; to: unknown }[] {
-  if (!before || !after) return [];
-  const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
-  const changes: { field: string; from: unknown; to: unknown }[] = [];
-  for (const key of keys) {
-    if (DIFF_SKIP_KEYS.has(key)) continue;
-    const from = before[key];
-    const to = after[key];
-    // Every real column on these entities is a primitive (string/number/
-    // boolean/date-string/null) — an object or array here means a relation
-    // slipped into the audit snapshot (a backend bug, not a real field
-    // change), so it's never useful to show and would otherwise dump raw
-    // JSON into the history. Skip rather than render it.
-    if (isPlainObjectOrArray(from) || isPlainObjectOrArray(to)) continue;
-    if (JSON.stringify(from) !== JSON.stringify(to)) {
-      changes.push({ field: key, from, to });
-    }
-  }
-  return changes;
-}
-
-function isPlainObjectOrArray(value: unknown): boolean {
-  return typeof value === "object" && value !== null;
-}
-
-function formatDiffValue(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "—";
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
-}
-
-function HistoryTab({ record }: { record: MedicalRecord }) {
-  const { data: entries, isLoading } = useAuditLog(record.id);
-
-  if (isLoading) {
-    return (
-      <div className="space-y-3">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-14 w-full" />
-        ))}
-      </div>
-    );
-  }
-
-  if (!entries || entries.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground py-8 text-center">
-        No edit history recorded yet.
-      </p>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {entries.map((entry) => {
-        const staffName = entry.performed_by_staff
-          ? `${entry.performed_by_staff.first_name} ${entry.performed_by_staff.last_name}`
-          : "Unknown staff";
-        const changes =
-          entry.action === "UPDATE"
-            ? diffFields(entry.before, entry.after)
-            : [];
-
-        return (
-          <div key={entry.id} className="rounded-md">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm">
-                <span className="font-medium">
-                  • {ENTITY_LABELS[entry.entity_type]}
-                </span>{" "}
-                {ACTION_VERBS[entry.action]} by {staffName}
-              </p>
-              <span className="text-xs text-muted-foreground shrink-0">
-                {format(new Date(entry.created_at), "PPp")}
-              </span>
-            </div>
-
-            {changes.length > 0 && (
-              <div className="mt-2 space-y-1 border-t pt-2">
-                {changes.map((c) => (
-                  <p key={c.field} className="text-xs text-muted-foreground">
-                    <span className="font-mono">{c.field}</span>:{" "}
-                    {formatDiffValue(c.from)} → {formatDiffValue(c.to)}
-                  </p>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 // ── Pet Info Sidebar ───────────────────────────────────────────────────────────
 
 const SPECIES_LABEL: Record<string, string> = {
@@ -1974,7 +1843,6 @@ const TAB_ORDER = [
   "diagnoses",
   "prescriptions",
   "charges",
-  "history",
 ] as const;
 type EmrTab = (typeof TAB_ORDER)[number];
 
@@ -1983,8 +1851,6 @@ export function EmrDetailPage() {
   const navigate = useNavigate();
   const { data: record, isLoading } = useMedicalRecord(id);
   const [activeTab, setActiveTab] = useState<EmrTab>("soap");
-  const role = useAuthStore((s) => s.user?.role);
-  const canViewHistory = hasPermission(role, "AUDIT_LOG_READ");
 
   const goToNextTab = (current: EmrTab) => {
     const idx = TAB_ORDER.indexOf(current);
@@ -2101,12 +1967,6 @@ export function EmrDetailPage() {
             <Receipt className="h-3.5 w-3.5" />
             Charges
           </TabsTrigger>
-          {canViewHistory && (
-            <TabsTrigger value="history" className="flex items-center gap-1.5">
-              <History className="h-3.5 w-3.5" />
-              History
-            </TabsTrigger>
-          )}
         </TabsList>
 
         <div className="mt-4">
@@ -2161,16 +2021,6 @@ export function EmrDetailPage() {
               </CardContent>
             </Card>
           </TabsContent>
-
-          {canViewHistory && (
-            <TabsContent value="history">
-              <Card>
-                <CardContent className="pt-5">
-                  <HistoryTab record={record} />
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
         </div>
       </Tabs>
     </div>

@@ -276,16 +276,3 @@ emrRouter.delete(
   },
 );
 
-// ── Audit Log ────────────────────────────────────────────────────────────────
-
-emrRouter.get(
-  '/:id/audit-log',
-  authenticate,
-  authorize('AUDIT_LOG_READ'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const entries = await svc.listAuditLog(req.params.id, authed(req).user.clinic_id);
-      res.json(entries);
-    } catch (err) { next(err); }
-  },
-);
