@@ -203,7 +203,7 @@ export function DashboardPage() {
           Good {getGreeting()}, {user?.first_name ?? "there"}
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Here's what's happening at PawCare today.
+          Here's what's happening at {user?.clinic_name ?? "PawCare HMS"} today.
         </p>
       </div>
 

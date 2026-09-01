@@ -14,7 +14,7 @@ import { hasFeature } from "@/lib/features";
 import { ClinicInformationForm } from "./components/ClinicInformationForm";
 import { ThemeColorForm } from "./components/ThemeColorForm";
 import { SubscriptionCard } from "./components/SubscriptionCard";
-import { BusinessHoursForm } from "./components/BusinessHoursForm";
+// import { BusinessHoursForm } from "./components/BusinessHoursForm";
 import { DataExportCard } from "./components/DataExportCard";
 import { ServicesManagementCard } from "./components/ServicesManagementCard";
 
@@ -105,7 +105,7 @@ export function SettingsPage() {
 
         {canEditClinicInfo && <ThemeColorForm />}
 
-        {canEditClinicInfo && <BusinessHoursForm />}
+        {/* {canEditClinicInfo && <BusinessHoursForm />} */}
 
         {canManageServices && <ServicesManagementCard />}
 
