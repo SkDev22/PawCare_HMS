@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { format } from "date-fns";
 import { Plus, Search, FileText } from "lucide-react";
 import { Button } from "../../components/ui/button";
@@ -50,12 +50,36 @@ function TableSkeleton() {
   );
 }
 
+interface NewRecordPet {
+  id: string;
+  name: string;
+  species: string;
+  owner?: { first_name: string; last_name: string } | null;
+}
+
 export function EmrPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [prefilledPet, setPrefilledPet] = useState<NewRecordPet | undefined>(
+    undefined,
+  );
+
+  // Arriving from patient registration with a pet to chart immediately —
+  // open the New Record dialog pre-filled instead of making the user
+  // navigate here and search for the patient manually.
+  useEffect(() => {
+    const state = location.state as { newRecordForPet?: NewRecordPet } | null;
+    if (state?.newRecordForPet) {
+      setPrefilledPet(state.newRecordForPet);
+      setCreateOpen(true);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { data, isLoading } = useMedicalRecords({
     ...(search ? { search } : {}),
@@ -74,7 +98,13 @@ export function EmrPage() {
             Electronic medical records for all patients
           </p> */}
         </div>
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <Dialog
+          open={createOpen}
+          onOpenChange={(open) => {
+            setCreateOpen(open);
+            if (!open) setPrefilledPet(undefined);
+          }}
+        >
           <DialogTrigger asChild>
             <Button className="cursor-pointer">
               <Plus className="h-4 w-4 mr-2" />
@@ -86,11 +116,16 @@ export function EmrPage() {
               <DialogTitle>Create Medical Record</DialogTitle>
             </DialogHeader>
             <MedicalRecordForm
+              {...(prefilledPet ? { defaultPet: prefilledPet } : {})}
               onSuccess={(id) => {
                 setCreateOpen(false);
+                setPrefilledPet(undefined);
                 navigate(`/emr/${id}`);
               }}
-              onCancel={() => setCreateOpen(false)}
+              onCancel={() => {
+                setCreateOpen(false);
+                setPrefilledPet(undefined);
+              }}
             />
           </DialogContent>
         </Dialog>

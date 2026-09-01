@@ -23,8 +23,9 @@ export const FEATURES = [
   // subscription plan chart. SMS gets its own key once that channel exists.
   "EMAIL_NOTIFICATIONS",
   // The "Today's Appointments" dashboard widget specifically — decoupled
-  // from the APPOINTMENTS module itself (which BASIC does have) since the
-  // subscription chart gates the dashboard tile separately from the module.
+  // from the APPOINTMENTS module itself since the subscription chart gates
+  // the dashboard tile separately from the module (both happen to be
+  // PRO+ only today, but that's coincidence, not a dependency).
   "DASHBOARD_TODAY_APPOINTMENTS",
 ] as const;
 export type FeatureKey = (typeof FEATURES)[number];
@@ -35,7 +36,6 @@ export const PLAN_FEATURES: Record<ClinicPlanType, readonly FeatureKey[]> = {
   TRIAL: FEATURES,
   BASIC: [
     "PATIENTS",
-    "APPOINTMENTS",
     "EMR",
     "BILLING",
     "STAFF",

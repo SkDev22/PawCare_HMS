@@ -74,6 +74,7 @@ const NAV_GROUPS: {
         href: "/appointments",
         icon: CalendarDays,
         permission: "APPOINTMENT_READ",
+        feature: "APPOINTMENTS",
         items: [
           { title: "All Appointments", href: "/appointments" },
           { title: "Queue", href: "/appointments/queue" },

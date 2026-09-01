@@ -35,18 +35,30 @@ const FormSchema = z.object({
 
 type FormValues = z.infer<typeof FormSchema>;
 
+interface DefaultPet {
+  id: string;
+  name: string;
+  species: string;
+  owner?: { first_name: string; last_name: string } | null;
+}
+
 function PetSearch({
   value,
   onChange,
+  defaultPet,
 }: {
   value: string;
   onChange: (id: string) => void;
+  defaultPet?: DefaultPet;
 }) {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const { data } = usePets({ search, limit: 8 });
 
   const selected = data?.items.find((p) => p.id === value);
+  const defaultLabel = defaultPet
+    ? `${defaultPet.name}${defaultPet.owner ? ` (${defaultPet.owner.first_name} ${defaultPet.owner.last_name})` : ""}`
+    : "";
 
   return (
     <div className="relative">
@@ -57,7 +69,9 @@ function PetSearch({
             ? search
             : selected
               ? `${selected.name}${selected.owner ? ` (${selected.owner.first_name} ${selected.owner.last_name})` : ""}`
-              : ""
+              : value === defaultPet?.id
+                ? defaultLabel
+                : ""
         }
         onChange={(e) => {
           setSearch(e.target.value);
@@ -95,11 +109,13 @@ function PetSearch({
 }
 
 interface MedicalRecordFormProps {
+  defaultPet?: DefaultPet;
   onSuccess?: (recordId: string) => void;
   onCancel?: () => void;
 }
 
 export function MedicalRecordForm({
+  defaultPet,
   onSuccess,
   onCancel,
 }: MedicalRecordFormProps) {
@@ -109,7 +125,7 @@ export function MedicalRecordForm({
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
-      pet_id: "",
+      pet_id: defaultPet?.id ?? "",
       visit_date: format(new Date(), "yyyy-MM-dd"),
       chief_complaint: "",
     },
@@ -141,7 +157,11 @@ export function MedicalRecordForm({
             <FormItem>
               <FormLabel>Patient</FormLabel>
               <FormControl>
-                <PetSearch value={field.value} onChange={field.onChange} />
+                <PetSearch
+                  value={field.value}
+                  onChange={field.onChange}
+                  {...(defaultPet ? { defaultPet } : {})}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

@@ -25,17 +25,33 @@ apiRouter.use('/auth', authRouter);
 apiRouter.use('/dashboard', dashboardRouter);
 apiRouter.use('/search', searchRouter);
 apiRouter.use('/', patientsRouter);
-apiRouter.use('/appointments', appointmentsRouter);
 apiRouter.use('/medical-records', emrRouter);
 apiRouter.use('/billing', billingRouter);
 apiRouter.use('/staff', staffRouter);
 apiRouter.use('/audit-log', auditLogRouter);
 apiRouter.use('/clinic', clinicRouter);
-// These four modules differ by plan (ADR-04) — gate them once here rather
+// These five modules differ by plan (ADR-04) — gate them once here rather
 // than touching every route's own authenticate/authorize chain. authenticate
 // runs again inside each router too (each route already calls it directly);
 // that's redundant but harmless, and keeps this the only place plan-gating
 // needs to be added or changed per module.
+apiRouter.use(
+  '/appointments',
+  authenticate,
+  authorizeFeature('APPOINTMENTS', {
+    // BASIC clinics document visits via direct medical-record creation
+    // instead (appointment_id is optional there) — but read access must
+    // survive the gate, both to keep a downgraded clinic's own appointment
+    // history visible, and because the EMR "New Record" form's vet picker
+    // depends on GET /appointments/vets.
+    allowReadWithoutFeature: true,
+    // Lets a visit already in progress at the moment of a downgrade still
+    // be finished (completed/cancelled) rather than stranded — same
+    // reasoning as WARD's discharge/care-logs exemption below.
+    exemptPaths: [/^\/[^/]+\/status$/],
+  }),
+  appointmentsRouter,
+);
 apiRouter.use('/lab-orders', authenticate, authorizeFeature('LABORATORY', { allowReadWithoutFeature: true }), labRouter);
 apiRouter.use(
   '/ward',

@@ -157,9 +157,9 @@ export function App() {
           <Route path="/patients/:id" element={<AuthLayout permission="PATIENT_READ"><PetDetailPage /></AuthLayout>} />
 
           {/* Appointments */}
-          <Route path="/appointments"       element={<AuthLayout permission="APPOINTMENT_READ"><AppointmentsPage /></AuthLayout>} />
-          <Route path="/appointments/queue" element={<AuthLayout permission="APPOINTMENT_READ"><QueuePage /></AuthLayout>} />
-          <Route path="/appointments/:id"   element={<AuthLayout permission="APPOINTMENT_READ"><AppointmentDetailPage /></AuthLayout>} />
+          <Route path="/appointments"       element={<AuthLayout permission="APPOINTMENT_READ" feature="APPOINTMENTS"><AppointmentsPage /></AuthLayout>} />
+          <Route path="/appointments/queue" element={<AuthLayout permission="APPOINTMENT_READ" feature="APPOINTMENTS"><QueuePage /></AuthLayout>} />
+          <Route path="/appointments/:id"   element={<AuthLayout permission="APPOINTMENT_READ" feature="APPOINTMENTS"><AppointmentDetailPage /></AuthLayout>} />
 
           {/* Medical Records (EMR) */}
           <Route path="/emr"         element={<AuthLayout permission="MEDICAL_RECORD_READ"><EmrPage /></AuthLayout>} />

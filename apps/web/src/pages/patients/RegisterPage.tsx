@@ -11,6 +11,8 @@ import {
 import { useCreateOwner, useOwners } from "@/hooks/use-owners";
 import { useCreatePet } from "@/hooks/use-pets";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useAuthStore } from "@/stores/auth.store";
+import { hasFeature } from "@/lib/features";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -56,6 +58,7 @@ const PET_FIELDS_DEFAULTS: PetFieldsInput = {
 
 export function RegisterPage() {
   const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
   const [ownerMode, setOwnerMode] = useState<"new" | "existing">("new");
 
   // ── Existing-owner search ──────────────────────────────────────────────
@@ -140,26 +143,30 @@ export function RegisterPage() {
 
   // Registration's whole point is to save time — send the user straight
   // into scheduling the visit instead of making them navigate there and
-  // search for the patient they just created.
+  // search for the patient they just created. Clinics without the
+  // Appointments feature (BASIC) document visits directly instead, so they
+  // land on a pre-filled "New Medical Record" form on the EMR page instead.
   function goToNewAppointment(
     petId: string,
     petName: string,
     species: string,
     owner: Owner,
   ) {
-    navigate("/appointments", {
-      state: {
-        newAppointmentForPet: {
-          id: petId,
-          name: petName,
-          species,
-          owner: {
-            first_name: owner.first_name,
-            last_name: owner.last_name,
-          },
-        },
+    const prefilledPet = {
+      id: petId,
+      name: petName,
+      species,
+      owner: {
+        first_name: owner.first_name,
+        last_name: owner.last_name,
       },
-    });
+    };
+
+    if (hasFeature(user, "APPOINTMENTS")) {
+      navigate("/appointments", { state: { newAppointmentForPet: prefilledPet } });
+    } else {
+      navigate("/emr", { state: { newRecordForPet: prefilledPet } });
+    }
   }
 
   function handleOwnerSelect(owner: Owner) {
