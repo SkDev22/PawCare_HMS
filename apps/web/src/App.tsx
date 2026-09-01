@@ -9,6 +9,8 @@ import { hasFeature } from './lib/features';
 import { api } from './lib/api';
 import { ForbiddenPage } from './components/ForbiddenPage';
 import { LoginPage } from './pages/auth/LoginPage';
+import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { TrialExpiredPage } from './pages/TrialExpiredPage';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
@@ -141,6 +143,23 @@ export function App() {
             element={
               <RequireGuest>
                 <LoginPage />
+              </RequireGuest>
+            }
+          />
+
+          <Route
+            path="/forgot-password"
+            element={
+              <RequireGuest>
+                <ForgotPasswordPage />
+              </RequireGuest>
+            }
+          />
+          <Route
+            path="/reset-password"
+            element={
+              <RequireGuest>
+                <ResetPasswordPage />
               </RequireGuest>
             }
           />

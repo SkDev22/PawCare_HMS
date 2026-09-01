@@ -3,7 +3,15 @@ import rateLimit from 'express-rate-limit';
 import { validate } from '../../middleware/validate';
 import { authenticate, AuthenticatedRequest } from '../../middleware/authenticate';
 import { asyncHandler } from '../../lib/async-handler';
-import { LoginSchema, ChangePasswordSchema, type ChangePasswordInput } from '@pawcare/shared';
+import {
+  LoginSchema,
+  ChangePasswordSchema,
+  ForgotPasswordSchema,
+  ResetPasswordSchema,
+  type ChangePasswordInput,
+  type ForgotPasswordInput,
+  type ResetPasswordInput,
+} from '@pawcare/shared';
 import * as authService from './auth.service';
 
 const REFRESH_COOKIE = 'refresh_token';
@@ -22,6 +30,16 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
   message: {
     error: { code: 'RATE_LIMITED', message: 'Too many login attempts. Try again in 15 minutes.' },
+  },
+});
+
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: { code: 'RATE_LIMITED', message: 'Too many reset requests. Try again in 15 minutes.' },
   },
 });
 
@@ -58,6 +76,32 @@ authRouter.post(
 
     const { accessToken, staff } = await authService.refresh(rawToken);
     res.status(200).json({ accessToken, staff });
+  }),
+);
+
+authRouter.post(
+  '/forgot-password',
+  forgotPasswordLimiter,
+  validate(ForgotPasswordSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { email } = req.body as ForgotPasswordInput;
+    await authService.requestPasswordReset(email);
+
+    // Always the same response, whether or not the email matched an
+    // account — this is what makes the endpoint enumeration-safe.
+    res.status(200).json({
+      message: 'If an account exists for that email, a reset link has been sent.',
+    });
+  }),
+);
+
+authRouter.post(
+  '/reset-password',
+  validate(ResetPasswordSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { token, newPassword } = req.body as ResetPasswordInput;
+    await authService.resetPassword(token, newPassword);
+    res.status(204).end();
   }),
 );
 

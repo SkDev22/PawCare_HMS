@@ -4,9 +4,15 @@ import { prisma } from '../../lib/prisma';
 import { signAccessToken } from '../../lib/jwt';
 import { AppError } from '../../lib/errors';
 import { notifyRole } from '../notifications/notifications.service';
+import { sendEmail } from '../../services/sendgrid';
+import { env } from '../../config/env';
+import { logger } from '../../lib/logger';
 
 const REFRESH_TOKEN_BYTES = 64;
 const REFRESH_TOKEN_EXPIRY_DAYS = 30;
+
+const RESET_TOKEN_BYTES = 32;
+const RESET_TOKEN_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 
 // Sliding-window lockout: 10 failed attempts within 1 hour of each other
 // locks the account for 24 hours. All three fields reset on a successful login.
@@ -261,4 +267,103 @@ export async function changePassword(
 
   // All sessions (this one included) must re-authenticate with the new password
   await revokeAllTokens(staffId);
+}
+
+// Never reveals whether the email matched an account — the route always
+// sends the same generic response regardless of what happens in here.
+export async function requestPasswordReset(email: string): Promise<void> {
+  const staff = await prisma.staffUser.findFirst({
+    where: { email, deleted_at: null, is_active: true },
+    select: { id: true, email: true, first_name: true },
+  });
+  if (!staff) return;
+
+  const rawToken = crypto.randomBytes(RESET_TOKEN_BYTES).toString('hex');
+
+  await prisma.$transaction([
+    // Only the newest link should ever work — invalidate anything still
+    // outstanding from an earlier request.
+    prisma.passwordResetToken.updateMany({
+      where: { staff_id: staff.id, used_at: null },
+      data: { used_at: new Date() },
+    }),
+    prisma.passwordResetToken.create({
+      data: {
+        staff_id: staff.id,
+        token_hash: hashToken(rawToken),
+        expires_at: new Date(Date.now() + RESET_TOKEN_EXPIRY_MS),
+      },
+    }),
+  ]);
+
+  const resetUrl = `${env.CORS_ORIGIN}/reset-password?token=${rawToken}`;
+
+  try {
+    await sendEmail({
+      to: staff.email,
+      subject: 'Reset your PawCare HMS password',
+      html: `
+        <p>Hi ${staff.first_name},</p>
+        <p>Click the link below to reset your PawCare HMS password. This link expires in 1 hour and can only be used once.</p>
+        <p><a href="${resetUrl}">${resetUrl}</a></p>
+        <p>If you didn't request this, you can safely ignore this email.</p>
+      `,
+    });
+  } catch (err) {
+    // A downstream email outage shouldn't 500 the request or hint at
+    // anything to the caller — just make sure it's visible server-side.
+    logger.error('Failed to send password reset email', {
+      staffId: staff.id,
+      err: err instanceof Error ? { message: err.message } : err,
+    });
+  }
+}
+
+export async function resetPassword(rawToken: string, newPassword: string): Promise<void> {
+  const stored = await prisma.passwordResetToken.findUnique({
+    where: { token_hash: hashToken(rawToken) },
+    include: { staff: { select: { id: true, email: true, first_name: true } } },
+  });
+
+  if (!stored || stored.used_at !== null || stored.expires_at < new Date()) {
+    throw new AppError('INVALID_TOKEN', 'This reset link is invalid or has expired', 400);
+  }
+
+  const password_hash = await bcrypt.hash(newPassword, 12);
+
+  await prisma.$transaction([
+    prisma.staffUser.update({
+      where: { id: stored.staff_id },
+      data: {
+        password_hash,
+        failed_login_attempts: 0,
+        last_failed_login_at: null,
+        locked_until: null,
+      },
+    }),
+    prisma.passwordResetToken.update({
+      where: { id: stored.id },
+      data: { used_at: new Date() },
+    }),
+    prisma.refreshToken.updateMany({
+      where: { staff_id: stored.staff_id, revoked_at: null },
+      data: { revoked_at: new Date() },
+    }),
+  ]);
+
+  try {
+    await sendEmail({
+      to: stored.staff.email,
+      subject: 'Your PawCare HMS password was changed',
+      html: `
+        <p>Hi ${stored.staff.first_name},</p>
+        <p>Your PawCare HMS password was just reset. If this wasn't you, contact your clinic administrator immediately.</p>
+      `,
+    });
+  } catch (err) {
+    logger.error('Failed to send password-changed confirmation email', {
+      staffId: stored.staff_id,
+      err: err instanceof Error ? { message: err.message } : err,
+    });
+  }
 }

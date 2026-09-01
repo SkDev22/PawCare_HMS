@@ -126,6 +126,7 @@ model StaffUser {
 
   clinic          Clinic          @relation(fields: [clinic_id], references: [id])
   refresh_tokens  RefreshToken[]
+  password_reset_tokens PasswordResetToken[]
   appointments    Appointment[]
   soap_notes      SoapNote[]
   schedules       StaffSchedule[]
@@ -149,6 +150,20 @@ model RefreshToken {
 
   @@index([staff_id])
   @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  staff_id   String    @db.Uuid
+  token_hash String    @unique
+  expires_at DateTime
+  used_at    DateTime?
+  created_at DateTime  @default(now())
+
+  staff StaffUser @relation(fields: [staff_id], references: [id])
+
+  @@index([staff_id])
+  @@map("password_reset_tokens")
 }
 
 model StaffSchedule {

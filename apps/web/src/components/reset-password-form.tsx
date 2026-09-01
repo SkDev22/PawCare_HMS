@@ -1,27 +1,35 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
-import { LoginSchema, type LoginInput, type AuthUser } from "@pawcare/shared";
+import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
-import { useAuthStore } from "@/stores/auth.store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-interface LoginResponse {
-  accessToken: string;
-  staff: AuthUser;
-}
+const FormSchema = z
+  .object({
+    newPassword: z.string().min(8, "Password must be at least 8 characters"),
+    confirmPassword: z.string().min(1, "Please confirm your new password"),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
 
-export function LoginForm({
+type FormValues = z.infer<typeof FormSchema>;
+
+export function ResetPasswordForm({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<"form">) {
   const navigate = useNavigate();
-  const setAuth = useAuthStore((s) => s.setAuth);
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token") ?? "";
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -29,16 +37,19 @@ export function LoginForm({
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<LoginInput>({
-    resolver: zodResolver(LoginSchema),
+  } = useForm<FormValues>({
+    resolver: zodResolver(FormSchema),
   });
 
-  const onSubmit = async (data: LoginInput) => {
+  const onSubmit = async (data: FormValues) => {
     setServerError(null);
     try {
-      const res = await api.post<LoginResponse>("/auth/login", data);
-      setAuth(res.data.staff, res.data.accessToken);
-      navigate("/dashboard", { replace: true });
+      await api.post("/auth/reset-password", {
+        token,
+        newPassword: data.newPassword,
+      });
+      toast.success("Password reset — sign in with your new password.");
+      navigate("/login", { replace: true });
     } catch (err: unknown) {
       if (
         err !== null &&
@@ -50,13 +61,32 @@ export function LoginForm({
       ) {
         const data = err.response.data as { error?: { message?: string } };
         setServerError(
-          data?.error?.message ?? "Login failed. Please try again.",
+          data?.error?.message ?? "Unable to reset password. Please try again.",
         );
       } else {
         setServerError("Unable to connect to the server. Check your network.");
       }
     }
   };
+
+  if (!token) {
+    return (
+      <div className={cn("flex flex-col gap-6", className)}>
+        <div className="flex flex-col items-center gap-2 text-center mb-5">
+          <h1 className="text-2xl font-bold">Invalid reset link</h1>
+          <p className="text-balance text-sm text-muted-foreground">
+            This link is missing its reset token. Request a new one below.
+          </p>
+        </div>
+        <Link
+          to="/forgot-password"
+          className="text-sm text-center underline underline-offset-4"
+        >
+          Request a new link
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <form
@@ -66,9 +96,9 @@ export function LoginForm({
       {...props}
     >
       <div className="flex flex-col items-center gap-2 text-center mb-5">
-        <h1 className="text-2xl font-bold">Login to your account</h1>
+        <h1 className="text-2xl font-bold">Set a new password</h1>
         <p className="text-balance text-sm text-muted-foreground">
-          Enter your email below to sign in
+          Choose a new password for your account
         </p>
       </div>
 
@@ -80,37 +110,15 @@ export function LoginForm({
 
       <div className="grid gap-6">
         <div className="grid gap-2">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            placeholder="you@pawcare.vet"
-            {...register("email")}
-          />
-          {errors.email && (
-            <p className="text-xs text-destructive">{errors.email.message}</p>
-          )}
-        </div>
-
-        <div className="grid gap-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
-            <Link
-              to="/forgot-password"
-              className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
-            >
-              Forgot password?
-            </Link>
-          </div>
+          <Label htmlFor="newPassword">New password</Label>
           <div className="relative">
             <Input
-              id="password"
+              id="newPassword"
               type={showPassword ? "text" : "password"}
-              autoComplete="current-password"
+              autoComplete="new-password"
               placeholder="••••••••"
               className="pr-10"
-              {...register("password")}
+              {...register("newPassword")}
             />
             <button
               type="button"
@@ -125,9 +133,25 @@ export function LoginForm({
               )}
             </button>
           </div>
-          {errors.password && (
+          {errors.newPassword && (
             <p className="text-xs text-destructive">
-              {errors.password.message}
+              {errors.newPassword.message}
+            </p>
+          )}
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="confirmPassword">Confirm new password</Label>
+          <Input
+            id="confirmPassword"
+            type={showPassword ? "text" : "password"}
+            autoComplete="new-password"
+            placeholder="••••••••"
+            {...register("confirmPassword")}
+          />
+          {errors.confirmPassword && (
+            <p className="text-xs text-destructive">
+              {errors.confirmPassword.message}
             </p>
           )}
         </div>
@@ -137,7 +161,7 @@ export function LoginForm({
           className="w-full mt-2 cursor-pointer"
           disabled={isSubmitting}
         >
-          {isSubmitting ? "Signing in…" : "Sign in"}
+          {isSubmitting ? "Resetting…" : "Reset password"}
         </Button>
       </div>
     </form>
