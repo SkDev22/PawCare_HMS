@@ -88,7 +88,7 @@ export function SearchCommand() {
   // for fewer round trips to the database — see the "why is search slow" note below.
   const debouncedQuery = useDebounce(query, 300);
   const navigate = useNavigate();
-  const role = useAuthStore((s) => s.user?.role);
+  const effectivePermissions = useAuthStore((s) => s.user?.effective_permissions);
 
   const trimmed = query.trim();
   const isSearching = trimmed.length > 0;
@@ -97,9 +97,9 @@ export function SearchCommand() {
     if (!isSearching) return [];
     const q = trimmed.toLowerCase();
     return ALL_PAGES.filter(
-      (p) => (!p.permission || hasPermission(role, p.permission)) && p.title.toLowerCase().includes(q),
+      (p) => (!p.permission || hasPermission(effectivePermissions, p.permission)) && p.title.toLowerCase().includes(q),
     );
-  }, [isSearching, trimmed, role]);
+  }, [isSearching, trimmed, effectivePermissions]);
 
   // Data search only fires past MIN_QUERY_LENGTH and once the debounce settles —
   // a single keystroke would otherwise fan out to every permitted category.

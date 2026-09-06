@@ -41,3 +41,10 @@ export function initSocket(httpServer: HTTPServer): SocketIOServer {
 export function emitToStaff(staffId: string, notification: Notification): void {
   io?.to(`staff:${staffId}`).emit('notification:new', notification);
 }
+
+// Pushes an instant "your permissions changed" nudge — deliberately no
+// payload, the client refetches GET /role-permissions/me itself so it always
+// reflects the current DB state instead of trusting this event's data.
+export function emitPermissionsUpdated(staffId: string): void {
+  io?.to(`staff:${staffId}`).emit('permissions:updated');
+}

@@ -85,9 +85,9 @@ function AuthLayout({
   permission?: PermissionKey;
   feature?: FeatureKey;
 }) {
-  const role = useAuthStore((s) => s.user?.role);
+  const effectivePermissions = useAuthStore((s) => s.user?.effective_permissions);
   const user = useAuthStore((s) => s.user);
-  const allowed = (!permission || hasPermission(role, permission)) && (!feature || hasFeature(user, feature));
+  const allowed = (!permission || hasPermission(effectivePermissions, permission)) && (!feature || hasFeature(user, feature));
 
   return (
     <RequireAuth>

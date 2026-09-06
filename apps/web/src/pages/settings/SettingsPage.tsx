@@ -17,6 +17,7 @@ import { SubscriptionCard } from "./components/SubscriptionCard";
 // import { BusinessHoursForm } from "./components/BusinessHoursForm";
 import { DataExportCard } from "./components/DataExportCard";
 import { ServicesManagementCard } from "./components/ServicesManagementCard";
+import { RolePermissionsCard } from "./components/RolePermissionsCard";
 
 const PLACEHOLDER_SECTIONS = [
   {
@@ -81,13 +82,14 @@ function NotificationPreferencesCard() {
 
 export function SettingsPage() {
   const user = useAuthStore((s) => s.user);
-  const role = user?.role;
+  const effectivePermissions = user?.effective_permissions;
   // Editable clinic settings stay ADMIN-only even though CLINIC_READ (used
   // for printable letterheads) is now available to every role.
-  const canEditClinicInfo = hasPermission(role, "CLINIC_WRITE");
-  const canManageServices = hasPermission(role, "INVOICE_WRITE");
+  const canEditClinicInfo = hasPermission(effectivePermissions, "CLINIC_WRITE");
+  const canManageServices = hasPermission(effectivePermissions, "INVOICE_WRITE");
   const canExport =
-    hasPermission(role, "REPORT_READ") && hasFeature(user, "REPORTS");
+    hasPermission(effectivePermissions, "REPORT_READ") && hasFeature(user, "REPORTS");
+  const canManageRolePermissions = hasPermission(effectivePermissions, "ROLE_PERMISSIONS_MANAGE");
 
   return (
     <div className="space-y-6 w-full">
@@ -108,6 +110,8 @@ export function SettingsPage() {
         {/* {canEditClinicInfo && <BusinessHoursForm />} */}
 
         {canManageServices && <ServicesManagementCard />}
+
+        {canManageRolePermissions && <RolePermissionsCard />}
 
         <NotificationPreferencesCard />
 

@@ -41,8 +41,8 @@ const PAGE_SIZE = 20;
 
 export function OwnersPage() {
   const navigate = useNavigate();
-  const role = useAuthStore((s) => s.user?.role);
-  const canWrite = hasPermission(role, "PATIENT_WRITE");
+  const effectivePermissions = useAuthStore((s) => s.user?.effective_permissions);
+  const canWrite = hasPermission(effectivePermissions, "PATIENT_WRITE");
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editOwner, setEditOwner] = useState<Owner | undefined>();

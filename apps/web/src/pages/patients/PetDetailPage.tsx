@@ -50,10 +50,10 @@ import { hasPermission } from "@/lib/permissions";
 export function PetDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const role = useAuthStore((s) => s.user?.role);
-  const canWrite = hasPermission(role, "PATIENT_WRITE");
-  const canDelete = hasPermission(role, "PATIENT_DELETE");
-  const canViewHistory = hasPermission(role, "MEDICAL_RECORD_READ");
+  const effectivePermissions = useAuthStore((s) => s.user?.effective_permissions);
+  const canWrite = hasPermission(effectivePermissions, "PATIENT_WRITE");
+  const canDelete = hasPermission(effectivePermissions, "PATIENT_DELETE");
+  const canViewHistory = hasPermission(effectivePermissions, "MEDICAL_RECORD_READ");
   const { data: pet, isLoading, error } = usePet(id);
 
   const [editOpen, setEditOpen] = useState(false);

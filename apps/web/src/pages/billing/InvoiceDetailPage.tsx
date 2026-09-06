@@ -557,8 +557,8 @@ export function InvoiceDetailPage() {
   const { data: invoice, isLoading } = useInvoice(id);
   const updateStatus = useUpdateInvoiceStatus(id!);
   const removeLineItem = useRemoveLineItem(id!);
-  const role = useAuthStore((s) => s.user?.role);
-  const canVoidPayments = hasPermission(role, "PAYMENT_VOID");
+  const effectivePermissions = useAuthStore((s) => s.user?.effective_permissions);
+  const canVoidPayments = hasPermission(effectivePermissions, "PAYMENT_VOID");
 
   const [addLineOpen, setAddLineOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);

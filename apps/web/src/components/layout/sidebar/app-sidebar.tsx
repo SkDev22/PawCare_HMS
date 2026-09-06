@@ -167,14 +167,14 @@ const NAV_GROUPS: {
 ];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const role = useAuthStore((s) => s.user?.role);
+  const effectivePermissions = useAuthStore((s) => s.user?.effective_permissions);
   const user = useAuthStore((s) => s.user);
 
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter(
       (item) =>
-        (!item.permission || hasPermission(role, item.permission)) &&
+        (!item.permission || hasPermission(effectivePermissions, item.permission)) &&
         (!item.feature || hasFeature(user, item.feature)),
     ),
   })).filter((group) => group.items.length > 0);

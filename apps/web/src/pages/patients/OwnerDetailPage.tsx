@@ -41,8 +41,8 @@ import { hasPermission } from "@/lib/permissions";
 export function OwnerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const role = useAuthStore((s) => s.user?.role);
-  const canWrite = hasPermission(role, "PATIENT_WRITE");
+  const effectivePermissions = useAuthStore((s) => s.user?.effective_permissions);
+  const canWrite = hasPermission(effectivePermissions, "PATIENT_WRITE");
   const { data: owner, isLoading, error } = useOwner(id);
   const deleteOwner = useDeleteOwner();
   const { data: invoicesData, isLoading: invoicesLoading } = useInvoices(

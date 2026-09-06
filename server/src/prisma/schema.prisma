@@ -65,6 +65,7 @@ model Clinic {
   goods_received_notes GoodsReceivedNote[]
   suppliers            Supplier[]
   hours                ClinicHours[]
+  role_permission_overrides RolePermissionOverride[]
 
   @@map("clinics")
 }
@@ -98,6 +99,28 @@ enum StaffRole {
   NURSE
   RECEPTIONIST
   LAB_TECHNICIAN
+}
+
+// A per-clinic exception to the shipped default PERMISSIONS map (see
+// packages/shared/src/constants/permissions.ts) — absence of a row for a
+// given (clinic, role, permission) always means "use the shipped default".
+// ADMIN is never given rows here (enforced at the app layer): it always
+// resolves to every permission, so the "last active admin" safety guard
+// elsewhere in the codebase never has to reason about a locked-out admin.
+model RolePermissionOverride {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clinic_id  String    @db.Uuid
+  role       StaffRole
+  permission String
+  granted    Boolean
+  updated_by String    @db.Uuid
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+
+  clinic Clinic @relation(fields: [clinic_id], references: [id])
+
+  @@unique([clinic_id, role, permission])
+  @@map("role_permission_overrides")
 }
 
 model StaffUser {

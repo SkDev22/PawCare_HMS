@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { useNotifications, useUnreadCount, useMarkRead, useMarkAllRead } from '@/hooks/use-notifications';
+import { useRefreshMyPermissions } from '@/hooks/use-role-permissions';
 import { useAuthStore } from '@/stores/auth.store';
 import { connectSocket, disconnectSocket } from '@/lib/socket';
 import type { Notification } from '@/types/notifications';
@@ -50,6 +51,7 @@ export function Notifications() {
   const { data: notifData } = useNotifications({ limit: 8 });
   const markRead            = useMarkRead();
   const markAllRead         = useMarkAllRead();
+  const refreshPermissions  = useRefreshMyPermissions();
 
   const unreadCount   = accessToken ? (countData?.count ?? 0) : 0;
   const notifications = notifData?.items ?? [];
@@ -63,10 +65,14 @@ export function Notifications() {
         queryClient.invalidateQueries({ queryKey: ['notifications'] });
         toast(notification.subject ?? notification.body);
       });
+      socket.on('permissions:updated', () => {
+        refreshPermissions.mutate();
+      });
     } else if (!accessToken && connected.current) {
       connected.current = false;
       disconnectSocket();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, queryClient]);
 
   return (

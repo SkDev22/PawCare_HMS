@@ -58,8 +58,8 @@ const SPECIES_OPTIONS: { label: string; value: Species }[] = [
 
 export function PetsPage() {
   const navigate = useNavigate();
-  const role = useAuthStore((s) => s.user?.role);
-  const canWrite = hasPermission(role, "PATIENT_WRITE");
+  const effectivePermissions = useAuthStore((s) => s.user?.effective_permissions);
+  const canWrite = hasPermission(effectivePermissions, "PATIENT_WRITE");
   const [speciesFilter, setSpeciesFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [search, setSearch] = useState("");

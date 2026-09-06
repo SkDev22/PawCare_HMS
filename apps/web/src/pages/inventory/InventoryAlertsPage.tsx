@@ -29,7 +29,7 @@ import { hasPermission } from "../../lib/permissions";
 
 function ControlledApprovalsCard() {
   const user = useAuthStore((s) => s.user);
-  const canApprove = hasPermission(user?.role, "CONTROLLED_SUBSTANCE_APPROVE");
+  const canApprove = hasPermission(user?.effective_permissions, "CONTROLLED_SUBSTANCE_APPROVE");
   const { data: approvals, isLoading } = useControlledApprovals();
   const approve = useApproveControlledDispense();
   const reject = useRejectControlledDispense();

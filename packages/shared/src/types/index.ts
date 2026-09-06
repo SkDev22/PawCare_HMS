@@ -1,4 +1,5 @@
 import type { ClinicPlanType } from '../constants/features';
+import type { PermissionKey } from '../constants/permissions';
 
 export type StaffRole =
   | 'ADMIN'
@@ -18,6 +19,11 @@ export interface AuthUser {
   plan: ClinicPlanType;
   trial_ends_at: string | null;
   extra_features: string[];
+  // Resolved server-side per-clinic override merge (see
+  // server/src/lib/role-permissions.ts) — deliberately not embedded in the
+  // signed JWT like plan/extra_features, so it can be pushed live via the
+  // permissions:updated socket event without waiting on a token refresh.
+  effective_permissions: PermissionKey[];
   avatar_url?: string;
   phone?: string;
   specialization?: string;

@@ -493,8 +493,8 @@ export function PosCheckoutPage() {
 
   const { data: clinic } = useClinic();
   const createSale = useCreateSale();
-  const role = useAuthStore((s) => s.user?.role);
-  const canReturn = hasPermission(role, "PAYMENT_VOID");
+  const effectivePermissions = useAuthStore((s) => s.user?.effective_permissions);
+  const canReturn = hasPermission(effectivePermissions, "PAYMENT_VOID");
 
   const addToCart = (item: { id: string; name: string; price: string }) => {
     setCart((prev) => {

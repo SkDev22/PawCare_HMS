@@ -1,14 +1,15 @@
-import { Request, Response, NextFunction } from 'express';
-import { PERMISSIONS, PermissionKey } from '@pawcare/shared';
+import { Request, Response, NextFunction, RequestHandler } from 'express';
+import { PermissionKey, StaffRole } from '@pawcare/shared';
 import { AuthenticatedRequest } from './authenticate';
+import { getEffectivePermissions } from '../lib/role-permissions';
+import { asyncHandler } from '../lib/async-handler';
 
-export function authorize(...requiredPermissions: PermissionKey[]) {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    const { role } = (req as AuthenticatedRequest).user;
+export function authorize(...requiredPermissions: PermissionKey[]): RequestHandler {
+  return asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    const { clinic_id, role } = (req as AuthenticatedRequest).user;
 
-    const allowed = requiredPermissions.every((perm) =>
-      (PERMISSIONS[perm] as readonly string[]).includes(role),
-    );
+    const effective = await getEffectivePermissions(clinic_id, role as StaffRole);
+    const allowed = requiredPermissions.every((perm) => effective.includes(perm));
 
     if (!allowed) {
       res.status(403).json({
@@ -18,5 +19,5 @@ export function authorize(...requiredPermissions: PermissionKey[]) {
     }
 
     next();
-  };
+  });
 }

@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../../lib/prisma';
 import { signAccessToken } from '../../lib/jwt';
 import { AppError } from '../../lib/errors';
+import { getEffectivePermissions } from '../../lib/role-permissions';
 import { notifyRole } from '../notifications/notifications.service';
 import { sendEmail } from '../../services/sendgrid';
 import { env } from '../../config/env';
@@ -109,23 +110,26 @@ export async function login(email: string, password: string) {
 
   const rawRefreshToken = generateRawToken();
 
-  await prisma.$transaction([
-    prisma.refreshToken.create({
-      data: {
-        staff_id: staff.id,
-        token_hash: hashToken(rawRefreshToken),
-        expires_at: refreshTokenExpiry(),
-      },
-    }),
-    prisma.staffUser.update({
-      where: { id: staff.id },
-      data: {
-        last_login_at: new Date(),
-        failed_login_attempts: 0,
-        last_failed_login_at: null,
-        locked_until: null,
-      },
-    }),
+  const [, effectivePermissions] = await Promise.all([
+    prisma.$transaction([
+      prisma.refreshToken.create({
+        data: {
+          staff_id: staff.id,
+          token_hash: hashToken(rawRefreshToken),
+          expires_at: refreshTokenExpiry(),
+        },
+      }),
+      prisma.staffUser.update({
+        where: { id: staff.id },
+        data: {
+          last_login_at: new Date(),
+          failed_login_attempts: 0,
+          last_failed_login_at: null,
+          locked_until: null,
+        },
+      }),
+    ]),
+    getEffectivePermissions(staff.clinic_id, staff.role),
   ]);
 
   return {
@@ -142,6 +146,7 @@ export async function login(email: string, password: string) {
       plan: staff.clinic.plan,
       trial_ends_at: trialEndsAt,
       extra_features: staff.clinic.extra_features,
+      effective_permissions: effectivePermissions,
       ...(staff.avatar_url ? { avatar_url: staff.avatar_url } : {}),
       ...(staff.phone ? { phone: staff.phone } : {}),
       ...(staff.specialization ? { specialization: staff.specialization } : {}),
@@ -193,6 +198,8 @@ export async function refresh(rawRefreshToken: string) {
     extra_features: stored.staff.clinic.extra_features,
   });
 
+  const effectivePermissions = await getEffectivePermissions(stored.staff.clinic_id, stored.staff.role);
+
   return {
     accessToken,
     staff: {
@@ -206,6 +213,7 @@ export async function refresh(rawRefreshToken: string) {
       plan: stored.staff.clinic.plan,
       trial_ends_at: trialEndsAt,
       extra_features: stored.staff.clinic.extra_features,
+      effective_permissions: effectivePermissions,
       ...(stored.staff.avatar_url ? { avatar_url: stored.staff.avatar_url } : {}),
       ...(stored.staff.phone ? { phone: stored.staff.phone } : {}),
       ...(stored.staff.specialization ? { specialization: stored.staff.specialization } : {}),

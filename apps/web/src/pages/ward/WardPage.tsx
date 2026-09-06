@@ -435,9 +435,9 @@ function ManageKennelsDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const role = useAuthStore((s) => s.user?.role);
-  const canManageRooms = hasPermission(role, "APPOINTMENT_WRITE");
-  const canManageKennels = hasPermission(role, "WARD_WRITE");
+  const effectivePermissions = useAuthStore((s) => s.user?.effective_permissions);
+  const canManageRooms = hasPermission(effectivePermissions, "APPOINTMENT_WRITE");
+  const canManageKennels = hasPermission(effectivePermissions, "WARD_WRITE");
 
   const { data: rooms } = useRooms();
   const { data: kennels } = useKennels();
@@ -647,8 +647,8 @@ function ManageKennelsDialog({
 
 export function WardPage() {
   const navigate = useNavigate();
-  const role = useAuthStore((s) => s.user?.role);
-  const canWriteKennels = hasPermission(role, "WARD_WRITE");
+  const effectivePermissions = useAuthStore((s) => s.user?.effective_permissions);
+  const canWriteKennels = hasPermission(effectivePermissions, "WARD_WRITE");
 
   const [tab, setTab] = useState<"kennels" | "list">("kennels");
   const [admitOpen, setAdmitOpen] = useState(false);
