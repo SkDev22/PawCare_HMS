@@ -13,6 +13,7 @@ export const ItemCategoryEnum = z.enum([
 export const CreateInventoryItemSchema = z.object({
   name:              z.string().min(1, 'Name is required').max(200),
   sku:               z.string().max(100).optional(),
+  barcode:           z.string().max(100).optional(),
   category:          ItemCategoryEnum,
   unit:              z.string().min(1, 'Unit is required').max(50),
   reorder_threshold: z.coerce.number().int().min(0).default(10),

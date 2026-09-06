@@ -9,11 +9,13 @@ import type {
   LineItem,
   Service,
   InvoiceStatus,
+  InvoiceChannel,
   PaymentMethod,
 } from '../types/billing';
 
 export function useInvoices(params?: {
   status?: InvoiceStatus;
+  channel?: InvoiceChannel;
   owner_id?: string;
   search?: string;
   date_from?: string;

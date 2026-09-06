@@ -12,18 +12,22 @@ import type {
   LogTransactionType,
 } from '../types/inventory';
 
-export function useInventoryItems(params?: {
-  category?:  ItemCategory;
-  low_stock?: boolean;
-  is_active?: boolean;
-  search?:    string;
-  cursor?:    string;
-  limit?:     number;
-}) {
+export function useInventoryItems(
+  params?: {
+    category?:  ItemCategory;
+    low_stock?: boolean;
+    is_active?: boolean;
+    search?:    string;
+    cursor?:    string;
+    limit?:     number;
+  },
+  options?: { enabled?: boolean },
+) {
   return useQuery<PaginatedInventory>({
     queryKey: ['inventory', params],
     queryFn:  () => api.get('/inventory', { params }).then((r) => r.data),
     staleTime: 30_000,
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -68,6 +72,7 @@ export function useCreateInventoryItem() {
       unit:               string;
       reorder_threshold?: number;
       sku?:               string;
+      barcode?:           string;
       supplier_name?:     string;
       supplier_sku?:      string;
       location?:          string;
@@ -92,6 +97,7 @@ export function useUpdateInventoryItem(id: string) {
       unit:              string;
       reorder_threshold: number;
       sku:               string;
+      barcode:           string;
       supplier_name:     string;
       supplier_sku:      string;
       location:          string;

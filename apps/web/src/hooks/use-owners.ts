@@ -4,12 +4,16 @@ import { api } from '@/lib/api';
 import type { Owner, PaginatedResponse } from '@/types/patients';
 import type { CreateOwnerInput, UpdateOwnerInput } from '@pawcare/shared';
 
-export function useOwners(params?: { search?: string; cursor?: string; limit?: number }) {
+export function useOwners(
+  params?: { search?: string; cursor?: string; limit?: number },
+  options?: { enabled?: boolean },
+) {
   return useQuery<PaginatedResponse<Owner>>({
     queryKey: ['owners', params],
     queryFn: () => api.get('/owners', { params }).then((r) => r.data),
     staleTime: 30_000,
     placeholderData: keepPreviousData,
+    enabled: options?.enabled ?? true,
   });
 }
 

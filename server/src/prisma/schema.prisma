@@ -133,6 +133,7 @@ model StaffUser {
   medical_records MedicalRecord[]
   lab_orders      LabOrder[]      @relation("LabOrderVet")
   medical_record_charges MedicalRecordCharge[]
+  pos_returns_processed  PosReturn[]
   goods_received_notes   GoodsReceivedNote[]
 
   @@map("staff_users")
@@ -693,6 +694,7 @@ model InventoryItem {
   clinic_id          String       @db.Uuid
   name               String
   sku                String?      @unique
+  barcode            String?      @unique
   category           ItemCategory
   unit               String
   quantity_on_hand   Int          @default(0)
@@ -858,10 +860,26 @@ enum InvoiceStatus {
   REFUNDED
 }
 
+enum InvoiceChannel {
+  CLINICAL
+  RETAIL
+}
+
 model Invoice {
   id                       String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clinic_id                String        @db.Uuid
-  owner_id                 String        @db.Uuid
+  // Nullable so a Pet Shop retail sale (see server/src/modules/pos) can
+  // belong to an anonymous walk-in customer — a clinical invoice always has
+  // one in practice, enforced at the application layer, not the schema.
+  owner_id                 String?       @db.Uuid
+  // Free-typed walk-in name for a Pet Shop sale with no linked Owner record
+  // — only meaningful when owner_id is null; a real owner's name always
+  // comes from the relation, never duplicated here.
+  customer_name            String?
+  // Explicit rather than inferred from owner_id being null — a clinical
+  // invoice could in principle end up ownerless too (e.g. a deleted owner),
+  // and inference would silently misclassify it in reports.
+  channel                  InvoiceChannel @default(CLINICAL)
   appointment_id           String?       @unique @db.Uuid
   // Human-readable number assigned once at creation from the clinic's
   // invoice_prefix/invoice_next_number counter — never reassigned, even if
@@ -884,10 +902,11 @@ model Invoice {
   created_at               DateTime      @default(now())
   updated_at               DateTime      @updatedAt
 
-  owner       Owner           @relation(fields: [owner_id], references: [id])
+  owner       Owner?          @relation(fields: [owner_id], references: [id])
   appointment Appointment?    @relation(fields: [appointment_id], references: [id])
   line_items  InvoiceLineItem[]
   payments    Payment[]
+  pos_returns PosReturn[]
 
   @@unique([clinic_id, invoice_number])
   @@index([owner_id, status])
@@ -911,8 +930,45 @@ model InvoiceLineItem {
   item    InventoryItem? @relation(fields: [item_id], references: [id])
   batch   StockBatch?    @relation(fields: [batch_id], references: [id])
   charge  MedicalRecordCharge?
+  pos_return_line_items PosReturnLineItem[]
 
   @@map("invoice_line_items")
+}
+
+// A Pet Shop return — kept as its own record rather than mutating the
+// original sale, matching this schema's general convention of layering
+// corrections on top of history instead of rewriting it (see Payment's
+// voided_at rather than a deleted row). Restocks the exact batch each
+// returned line was sold from (see pos.service.ts processReturn).
+model PosReturn {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  invoice_id    String   @db.Uuid
+  clinic_id     String   @db.Uuid
+  reason        String?
+  refund_amount Decimal  @db.Decimal(10, 2)
+  refund_method String
+  processed_by  String   @db.Uuid
+  created_at    DateTime @default(now())
+
+  invoice            Invoice             @relation(fields: [invoice_id], references: [id])
+  processed_by_staff StaffUser           @relation(fields: [processed_by], references: [id])
+  line_items         PosReturnLineItem[]
+
+  @@index([invoice_id])
+  @@map("pos_returns")
+}
+
+model PosReturnLineItem {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  return_id    String  @db.Uuid
+  line_item_id String  @db.Uuid
+  quantity     Int
+  amount       Decimal @db.Decimal(10, 2)
+
+  return    PosReturn       @relation(fields: [return_id], references: [id])
+  line_item InvoiceLineItem @relation(fields: [line_item_id], references: [id])
+
+  @@map("pos_return_line_items")
 }
 
 model Payment {
@@ -920,9 +976,16 @@ model Payment {
   invoice_id       String   @db.Uuid
   amount           Decimal  @db.Decimal(10, 2)
   method           String
+  // Cash tendered by the customer — change due is computed (tendered minus
+  // amount), never stored redundantly. Nullable: most payment methods
+  // (card, bank transfer) have no concept of tendered/change.
+  amount_tendered  Decimal? @db.Decimal(10, 2)
   stripe_charge_id String?
   received_at      DateTime @default(now())
   notes            String?
+  // Nullable — existing payments predate this column and have no way to be
+  // backfilled. No relation declared, matching voided_by below.
+  received_by      String?    @db.Uuid
   // A voided payment is never deleted — it stays visible on the invoice for
   // audit purposes, with its effect reversed out of the invoice's
   // paid_amount/status (see billing.service.ts voidPayment).

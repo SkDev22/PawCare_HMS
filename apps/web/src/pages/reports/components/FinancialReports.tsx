@@ -27,6 +27,7 @@ export function RevenueReportView({ start, end }: { start: string; end: string }
   if (!data) return null;
 
   const methodRows = Object.entries(data.byMethod).sort((a, b) => b[1] - a[1]);
+  const channelRows = Object.entries(data.byChannel).sort((a, b) => b[1] - a[1]);
   const dailyRows = [...data.dailySeries].sort((a, b) => a.date.localeCompare(b.date));
 
   return (
@@ -35,6 +36,38 @@ export function RevenueReportView({ start, end }: { start: string; end: string }
         <StatCard label="Total Revenue" value={formatCurrency(data.totalRevenue)} tone="success" />
         <StatCard label="Outstanding" value={formatCurrency(data.totalOutstanding)} tone="warning" />
       </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Revenue by Channel</CardTitle>
+        </CardHeader>
+        {channelRows.every(([, amount]) => amount === 0) ? (
+          <CardContent>
+            <EmptyState message="No payments recorded in this period." />
+          </CardContent>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Channel</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {channelRows.map(([channel, amount]) => (
+                <TableRow key={channel}>
+                  <TableCell className="text-sm">
+                    {channel === "RETAIL" ? "Pet Shop" : "Clinical"}
+                  </TableCell>
+                  <TableCell className="text-right text-sm font-medium">
+                    {formatCurrency(amount)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
 
       <Card>
         <CardHeader className="pb-2">
@@ -186,7 +219,11 @@ export function ServiceSalesReportView({ start, end }: { start: string; end: str
 
   return (
     <div className="space-y-4">
-      <StatCard label="Total Revenue" value={formatCurrency(data.totalRevenue)} tone="success" />
+      <div className="grid grid-cols-3 gap-4">
+        <StatCard label="Total Revenue" value={formatCurrency(data.totalRevenue)} tone="success" />
+        <StatCard label="Clinical" value={formatCurrency(data.byChannel.CLINICAL ?? 0)} />
+        <StatCard label="Pet Shop" value={formatCurrency(data.byChannel.RETAIL ?? 0)} />
+      </div>
       {data.items.length === 0 ? (
         <EmptyState message="No sales in this period." />
       ) : (

@@ -5,6 +5,7 @@ export type RevenueReport = {
   totalOutstanding: number;
   dailySeries:      DailyRevenue[];
   byMethod:         Record<string, number>;
+  byChannel:        Record<string, number>;
 };
 
 export type DailyCount = { date: string; count: number };
@@ -133,6 +134,7 @@ export type ServiceSaleItem = {
 export type ServiceSalesReport = {
   items:        ServiceSaleItem[];
   totalRevenue: number;
+  byChannel:    Record<string, number>;
 };
 
 // ── Medical Records Summary ─────────────────────────────────────────────────────

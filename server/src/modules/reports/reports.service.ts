@@ -46,7 +46,7 @@ export async function exportInvoicesCsv(clinicId: string): Promise<string> {
     ],
     invoices.map((inv) => [
       inv.invoice_number ?? inv.id.slice(0, 8).toUpperCase(),
-      `${inv.owner.first_name} ${inv.owner.last_name}`,
+      inv.owner ? `${inv.owner.first_name} ${inv.owner.last_name}` : 'Walk-in customer',
       inv.status,
       inv.subtotal.toString(),
       inv.tax_amount.toString(),
@@ -76,6 +76,7 @@ export async function getRevenueReport(clinicId: string, startDate: string, endD
       amount:      true,
       method:      true,
       received_at: true,
+      invoice:     { select: { channel: true } },
     },
     orderBy: { received_at: 'asc' },
   });
@@ -91,13 +92,41 @@ export async function getRevenueReport(clinicId: string, startDate: string, endD
     totalRevenue += amt;
   }
 
-  const dailySeries = [...byDay.entries()].map(([date, amount]) => ({ date, amount }));
-
   // By payment method
   const byMethod: Record<string, number> = {};
   for (const p of payments) {
     byMethod[p.method] = (byMethod[p.method] ?? 0) + Number(p.amount);
   }
+
+  // By channel — clinical (medical records/appointments) vs Pet Shop retail.
+  const byChannel: Record<string, number> = { CLINICAL: 0, RETAIL: 0 };
+  for (const p of payments) {
+    byChannel[p.invoice.channel] = (byChannel[p.invoice.channel] ?? 0) + Number(p.amount);
+  }
+
+  // Pet Shop returns — netted out as a negative entry on the day the return
+  // was *processed*, not retracted from the original sale's day, matching
+  // how any POS/accounting system treats a refund as its own cash-flow
+  // event. Returns only ever exist on RETAIL invoices (see
+  // pos.service.ts's processReturn), so they only ever affect that channel.
+  const returns = await prisma.posReturn.findMany({
+    where: {
+      created_at: { gte: start, lte: end },
+      invoice:    { clinic_id: clinicId },
+    },
+    select: { refund_amount: true, refund_method: true, created_at: true },
+  });
+
+  for (const r of returns) {
+    const day = r.created_at.toISOString().split('T')[0];
+    const amt = Number(r.refund_amount);
+    byDay.set(day, (byDay.get(day) ?? 0) - amt);
+    totalRevenue -= amt;
+    byMethod[r.refund_method] = (byMethod[r.refund_method] ?? 0) - amt;
+    byChannel.RETAIL -= amt;
+  }
+
+  const dailySeries = [...byDay.entries()].map(([date, amount]) => ({ date, amount }));
 
   // Outstanding invoices
   const outstanding = await prisma.invoice.findMany({
@@ -113,7 +142,7 @@ export async function getRevenueReport(clinicId: string, startDate: string, endD
     0,
   );
 
-  return { totalRevenue, totalOutstanding, dailySeries, byMethod };
+  return { totalRevenue, totalOutstanding, dailySeries, byMethod, byChannel };
 }
 
 // ── Appointments ──────────────────────────────────────────────────────────────
@@ -200,6 +229,11 @@ export async function getOutstandingBalances(clinicId: string) {
     where: {
       clinic_id: clinicId,
       status:    { notIn: ['PAID', 'CANCELLED', 'REFUNDED'] },
+      // Retail Pet Shop sales are created PAID immediately and never need a
+      // follow-up reminder — this is already implied by the status filter
+      // above, but made explicit so the guarantee doesn't rely on that
+      // never drifting.
+      channel:   'CLINICAL',
     },
     select: {
       id:          true,
@@ -216,7 +250,9 @@ export async function getOutstandingBalances(clinicId: string) {
   const now = new Date();
 
   const buckets = { current: 0, days30: 0, days60: 0, days90plus: 0 };
-  const items = invoices.map((inv) => {
+  const items = invoices
+    .filter((inv): inv is typeof inv & { owner: NonNullable<typeof inv.owner> } => inv.owner !== null)
+    .map((inv) => {
     const balance = Math.max(0, Number(inv.total) - Number(inv.paid_amount));
     const daysOverdue = inv.due_date
       ? Math.max(0, Math.floor((now.getTime() - inv.due_date.getTime()) / (1000 * 60 * 60 * 24)))
@@ -358,39 +394,62 @@ export async function getServiceSales(clinicId: string, startDate: string, endDa
       },
     },
     select: {
+      id:          true,
       description: true,
       quantity:    true,
       total:       true,
       service: { select: { id: true, name: true, category: true } },
       item:    { select: { id: true, name: true, category: true } },
+      invoice: { select: { channel: true } },
     },
   });
+
+  // Net out whatever's been returned against each line item — a "top
+  // products" report should reflect what was actually kept, not the gross
+  // amount before any of it came back.
+  const returnLines = lineItems.length > 0
+    ? await prisma.posReturnLineItem.findMany({
+        where: { line_item_id: { in: lineItems.map((li) => li.id) } },
+        select: { line_item_id: true, quantity: true, amount: true },
+      })
+    : [];
+  const returnedQtyByLine = new Map<string, number>();
+  const returnedAmtByLine = new Map<string, number>();
+  for (const r of returnLines) {
+    returnedQtyByLine.set(r.line_item_id, (returnedQtyByLine.get(r.line_item_id) ?? 0) + r.quantity);
+    returnedAmtByLine.set(r.line_item_id, (returnedAmtByLine.get(r.line_item_id) ?? 0) + Number(r.amount));
+  }
 
   const byKey = new Map<
     string,
     { key: string; name: string; category: string; type: 'service' | 'item' | 'other'; quantity: number; revenue: number }
   >();
+  const byChannel: Record<string, number> = { CLINICAL: 0, RETAIL: 0 };
 
   for (const li of lineItems) {
+    const netQuantity = li.quantity - (returnedQtyByLine.get(li.id) ?? 0);
+    const netRevenue  = Number(li.total) - (returnedAmtByLine.get(li.id) ?? 0);
+
     const key = li.service ? `service:${li.service.id}` : li.item ? `item:${li.item.id}` : `other:${li.description}`;
     const existing = byKey.get(key);
     if (existing) {
-      existing.quantity += li.quantity;
-      existing.revenue  += Number(li.total);
+      existing.quantity += netQuantity;
+      existing.revenue  += netRevenue;
     } else {
       byKey.set(key, {
         key,
         name:     li.service?.name ?? li.item?.name ?? li.description,
         category: li.service?.category ?? li.item?.category ?? 'Other',
         type:     li.service ? 'service' : li.item ? 'item' : 'other',
-        quantity: li.quantity,
-        revenue:  Number(li.total),
+        quantity: netQuantity,
+        revenue:  netRevenue,
       });
     }
+    byChannel[li.invoice.channel] = (byChannel[li.invoice.channel] ?? 0) + netRevenue;
   }
 
   const items = [...byKey.values()].sort((a, b) => b.revenue - a.revenue);
-  return { items, totalRevenue: items.reduce((sum, i) => sum + i.revenue, 0) };
+  return { items, totalRevenue: items.reduce((sum, i) => sum + i.revenue, 0), byChannel };
 }
 
 // ── Medical Records Summary ─────────────────────────────────────────────────────

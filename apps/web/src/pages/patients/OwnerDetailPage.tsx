@@ -13,9 +13,12 @@ import {
   MessageCircle,
   ShieldCheck,
   Calendar,
+  Receipt,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useOwner, useDeleteOwner } from "@/hooks/use-owners";
+import { useInvoices } from "@/hooks/use-billing";
+import { formatCurrency } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +45,10 @@ export function OwnerDetailPage() {
   const canWrite = hasPermission(role, "PATIENT_WRITE");
   const { data: owner, isLoading, error } = useOwner(id);
   const deleteOwner = useDeleteOwner();
+  const { data: invoicesData, isLoading: invoicesLoading } = useInvoices(
+    id ? { owner_id: id, limit: 5 } : undefined,
+  );
+  const invoices = invoicesData?.items ?? [];
 
   const [editOpen, setEditOpen] = useState(false);
   const [addPetOpen, setAddPetOpen] = useState(false);
@@ -264,6 +271,62 @@ export function OwnerDetailPage() {
 
                 <Badge variant={speciesBadgeVariant(pet.status)}>
                   {pet.status}
+                </Badge>
+              </Link>
+            ))}
+        </CardContent>
+      </Card>
+
+      {/* Invoices section */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between py-4">
+          <CardTitle className="text-base">Invoices</CardTitle>
+          {invoicesData && invoicesData.hasMore && (
+            <Link to="/billing" className="text-sm text-primary hover:underline">
+              View all in Billing
+            </Link>
+          )}
+        </CardHeader>
+        <Separator />
+        <CardContent className="p-0">
+          {invoicesLoading &&
+            Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-6 py-4 border-b last:border-0">
+                <div className="space-y-1.5 flex-1">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+                <Skeleton className="h-4 w-16" />
+              </div>
+            ))}
+
+          {!invoicesLoading && invoices.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground">
+              <Receipt className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">No invoices yet.</p>
+            </div>
+          )}
+
+          {!invoicesLoading &&
+            invoices.map((inv) => (
+              <Link
+                key={inv.id}
+                to={`/billing/${inv.id}`}
+                className="flex items-center gap-4 px-6 py-4 border-b last:border-0 hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium font-mono text-sm">
+                    {inv.invoice_number ?? `#${inv.id.slice(0, 8).toUpperCase()}`}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {format(new Date(inv.created_at), "MMM d, yyyy")}
+                    {" · "}
+                    {inv.channel === "RETAIL" ? "Pet Shop" : "Clinical"}
+                  </p>
+                </div>
+                <p className="font-medium text-sm shrink-0">{formatCurrency(inv.total)}</p>
+                <Badge variant="secondary" className="shrink-0">
+                  {inv.status.replace(/_/g, " ")}
                 </Badge>
               </Link>
             ))}

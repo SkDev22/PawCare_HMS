@@ -1,4 +1,5 @@
 export type InvoiceStatus = 'DRAFT' | 'SENT' | 'PAID' | 'PARTIALLY_PAID' | 'OVERDUE' | 'CANCELLED' | 'REFUNDED';
+export type InvoiceChannel = 'CLINICAL' | 'RETAIL';
 export type PaymentMethod = 'cash' | 'card' | 'insurance' | 'bank_transfer';
 
 export type ServiceCategory = 'exam' | 'procedure' | 'lab' | 'medication' | 'grooming' | 'other';
@@ -50,7 +51,9 @@ export type InvoiceOwner = {
 export type InvoiceListItem = {
   id: string;
   clinic_id: string;
-  owner_id: string;
+  owner_id: string | null;
+  customer_name: string | null;
+  channel: InvoiceChannel;
   invoice_number: string | null;
   status: InvoiceStatus;
   subtotal: string;
@@ -61,14 +64,16 @@ export type InvoiceListItem = {
   due_date: string | null;
   created_at: string;
   updated_at: string;
-  owner: Pick<InvoiceOwner, 'id' | 'first_name' | 'last_name' | 'email' | 'phone'>;
+  owner: Pick<InvoiceOwner, 'id' | 'first_name' | 'last_name' | 'email' | 'phone'> | null;
   _count: { line_items: number; payments: number };
 };
 
 export type Invoice = {
   id: string;
   clinic_id: string;
-  owner_id: string;
+  owner_id: string | null;
+  customer_name: string | null;
+  channel: InvoiceChannel;
   appointment_id: string | null;
   invoice_number: string | null;
   status: InvoiceStatus;
@@ -82,7 +87,7 @@ export type Invoice = {
   stripe_payment_intent_id: string | null;
   created_at: string;
   updated_at: string;
-  owner: InvoiceOwner;
+  owner: InvoiceOwner | null;
   appointment: { id: string; type: string; status: string; start_at: string } | null;
   line_items: LineItem[];
   payments: InvoicePayment[];

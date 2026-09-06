@@ -6,6 +6,7 @@
 export const CLINIC_PLANS = ["TRIAL", "BASIC", "PRO", "ENTERPRISE"] as const;
 export type ClinicPlanType = (typeof CLINIC_PLANS)[number];
 
+// Core features — scale with the clinic's plan tier (BASIC < PRO < ENTERPRISE).
 export const FEATURES = [
   "PATIENTS",
   "APPOINTMENTS",
@@ -13,7 +14,6 @@ export const FEATURES = [
   "BILLING",
   "INVENTORY",
   "STAFF",
-  "LABORATORY",
   "WARD",
   "NOTIFICATIONS",
   "REPORTS",
@@ -28,12 +28,27 @@ export const FEATURES = [
   // PRO+ only today, but that's coincidence, not a dependency).
   "DASHBOARD_TODAY_APPOINTMENTS",
 ] as const;
-export type FeatureKey = (typeof FEATURES)[number];
 
-// TRIAL and ENTERPRISE get everything; BASIC/PRO are deliberately narrower
-// so the mechanism actually does something — tune freely per real pricing.
+// Paid add-on modules — sold independently of plan tier, never bundled by
+// default into any paid plan (BASIC/PRO/ENTERPRISE all need them granted
+// explicitly via `clinic:upgrade --add-feature`, same mechanism regardless
+// of tier). Only TRIAL includes them automatically, to show the full
+// product during a trial. Laboratory moved here because it's about to grow
+// well beyond what any plan tier bundles for free; Pet Shop was designed
+// as an add-on from the start.
+export const ADDON_FEATURES = [
+  "LABORATORY",
+  "PET_SHOP",
+] as const;
+
+export type FeatureKey = (typeof FEATURES)[number] | (typeof ADDON_FEATURES)[number];
+
+// TRIAL gets every core feature plus every add-on, to showcase full value.
+// ENTERPRISE gets every core feature but NOT add-ons — those are sold
+// separately regardless of tier. BASIC/PRO are deliberately narrower than
+// core so the mechanism actually does something — tune freely per real pricing.
 export const PLAN_FEATURES: Record<ClinicPlanType, readonly FeatureKey[]> = {
-  TRIAL: FEATURES,
+  TRIAL: [...FEATURES, ...ADDON_FEATURES],
   BASIC: [
     "PATIENTS",
     "EMR",
@@ -49,7 +64,6 @@ export const PLAN_FEATURES: Record<ClinicPlanType, readonly FeatureKey[]> = {
     "BILLING",
     "INVENTORY",
     "STAFF",
-    "LABORATORY",
     "NOTIFICATIONS",
     "REPORTS",
     "THEME_CUSTOMIZATION",

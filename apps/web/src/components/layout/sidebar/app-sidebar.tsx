@@ -13,6 +13,7 @@ import {
   BedDouble,
   UserCog,
   ScrollText,
+  ShoppingCart,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -130,6 +131,13 @@ const NAV_GROUPS: {
         ],
       },
       {
+        title: "Pet Shop",
+        href: "/pos",
+        icon: ShoppingCart,
+        permission: "PAYMENT_PROCESS",
+        feature: "PET_SHOP",
+      },
+      {
         title: "Reports",
         href: "/reports",
         icon: BarChart3,
@@ -172,7 +180,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   })).filter((group) => group.items.length > 0);
 
   return (
-    <Sidebar collapsible="icon" {...props}>
+    <Sidebar collapsible="icon" className="print:hidden" {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>

@@ -35,6 +35,7 @@ import { LabOrderDetailPage } from './pages/lab/LabOrderDetailPage';
 import { WardPage } from './pages/ward/WardPage';
 import { HospitalizationDetailPage } from './pages/ward/HospitalizationDetailPage';
 import { InventoryPage } from './pages/inventory/InventoryPage';
+import { PosCheckoutPage } from './pages/pos/PosCheckoutPage';
 import { InventoryNewPage } from './pages/inventory/InventoryNewPage';
 import { InventoryEditPage } from './pages/inventory/InventoryEditPage';
 import { InventoryDetailPage } from './pages/inventory/InventoryDetailPage';
@@ -188,6 +189,9 @@ export function App() {
           {/* Billing & Invoicing */}
           <Route path="/billing"     element={<AuthLayout permission="INVOICE_READ"><BillingPage /></AuthLayout>} />
           <Route path="/billing/:id" element={<AuthLayout permission="INVOICE_READ"><InvoiceDetailPage /></AuthLayout>} />
+
+          {/* Pet Shop POS */}
+          <Route path="/pos" element={<AuthLayout permission="PAYMENT_PROCESS" feature="PET_SHOP"><PosCheckoutPage /></AuthLayout>} />
 
           {/* Staff Management */}
           <Route path="/staff"     element={<AuthLayout permission="STAFF_READ"><StaffPage /></AuthLayout>} />

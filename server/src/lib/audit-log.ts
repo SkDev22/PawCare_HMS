@@ -14,7 +14,7 @@ function toJsonSafe(value: unknown): Prisma.InputJsonValue | typeof Prisma.JsonN
 export interface RecordAuditLogParams {
   clinicId: string;
   medicalRecordId?: string;
-  entityType: 'MedicalRecord' | 'SoapNote' | 'Vitals' | 'Diagnosis' | 'Prescription' | 'MedicalRecordCharge' | 'Payment' | 'StaffUser';
+  entityType: 'MedicalRecord' | 'SoapNote' | 'Vitals' | 'Diagnosis' | 'Prescription' | 'MedicalRecordCharge' | 'Payment' | 'StaffUser' | 'PosReturn';
   entityId: string;
   action: 'CREATE' | 'UPDATE' | 'DELETE';
   before?: unknown;

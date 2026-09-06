@@ -6,7 +6,8 @@ export type AuditEntityType =
   | "Prescription"
   | "MedicalRecordCharge"
   | "Payment"
-  | "StaffUser";
+  | "StaffUser"
+  | "PosReturn";
 
 export type AuditLogEntry = {
   id: string;

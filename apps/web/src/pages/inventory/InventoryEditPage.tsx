@@ -50,6 +50,7 @@ const EditSchema = z.object({
   unit: z.string().min(1, "Unit is required").max(50),
   reorder_threshold: z.coerce.number().int().min(0).default(10),
   sku: z.string().max(100).default(""),
+  barcode: z.string().max(100).default(""),
   supplier_name: z.string().max(200).default(""),
   location: z.string().max(200).default(""),
   is_controlled: z.boolean().default(false),
@@ -69,6 +70,7 @@ export function InventoryEditPage() {
       unit: "",
       reorder_threshold: 10,
       sku: "",
+      barcode: "",
       supplier_name: "",
       location: "",
       is_controlled: false,
@@ -83,6 +85,7 @@ export function InventoryEditPage() {
       unit: item.unit,
       reorder_threshold: item.reorder_threshold,
       sku: item.sku ?? "",
+      barcode: item.barcode ?? "",
       supplier_name: item.supplier_name ?? "",
       location: item.location ?? "",
       is_controlled: item.is_controlled,
@@ -100,6 +103,7 @@ export function InventoryEditPage() {
         unit: values.unit,
         reorder_threshold: values.reorder_threshold,
         sku: values.sku,
+        barcode: values.barcode,
         supplier_name: values.supplier_name,
         location: values.location,
         is_controlled: values.is_controlled,
@@ -231,6 +235,20 @@ export function InventoryEditPage() {
                       <FormLabel>SKU</FormLabel>
                       <FormControl>
                         <Input placeholder="Optional" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="barcode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Barcode</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Optional — for Pet Shop scanning" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

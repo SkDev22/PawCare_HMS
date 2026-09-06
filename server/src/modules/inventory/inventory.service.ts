@@ -67,14 +67,19 @@ async function batchAggregatesByItem(itemIds: string[]) {
 
 // ── CRUD ──────────────────────────────────────────────────────────────────
 
+// Matches name, SKU, or barcode — a POS checkout scanning a barcode into
+// the same search box needs it to find the item by that code, not just by name.
+function searchFilter(search: string): Prisma.InventoryItemWhereInput {
+  const contains = { contains: search, mode: 'insensitive' as const };
+  return { OR: [{ name: contains }, { sku: contains }, { barcode: contains }] };
+}
+
 export async function listItems(clinicId: string, params: InventoryQuery) {
   const where: Prisma.InventoryItemWhereInput = {
     ...clinicScope(clinicId),
     ...(params.category ? { category: params.category } : {}),
     ...(params.is_active !== undefined ? { is_active: params.is_active } : { is_active: true }),
-    ...(params.search
-      ? { name: { contains: params.search, mode: 'insensitive' as const } }
-      : {}),
+    ...(params.search ? searchFilter(params.search) : {}),
     ...(params.cursor ? { id: { lt: params.cursor } } : {}),
   };
 
@@ -93,7 +98,7 @@ export async function listItems(clinicId: string, params: InventoryQuery) {
         ...clinicScope(clinicId),
         ...(params.category ? { category: params.category } : {}),
         is_active: true,
-        ...(params.search ? { name: { contains: params.search, mode: 'insensitive' as const } } : {}),
+        ...(params.search ? searchFilter(params.search) : {}),
       },
       orderBy: { name: 'asc' },
     });
@@ -155,6 +160,10 @@ export async function createItem(clinicId: string, data: CreateInventoryItemInpu
     const existing = await prisma.inventoryItem.findUnique({ where: { sku: data.sku } });
     if (existing) throw new AppError('CONFLICT', 'SKU already in use', 409);
   }
+  if (data.barcode) {
+    const existing = await prisma.inventoryItem.findUnique({ where: { barcode: data.barcode } });
+    if (existing) throw new AppError('CONFLICT', 'Barcode already in use', 409);
+  }
 
   return prisma.inventoryItem.create({
     data: {
@@ -165,6 +174,7 @@ export async function createItem(clinicId: string, data: CreateInventoryItemInpu
       reorder_threshold: data.reorder_threshold ?? 10,
       is_controlled:     data.is_controlled ?? false,
       ...(data.sku ? { sku: data.sku } : {}),
+      ...(data.barcode ? { barcode: data.barcode } : {}),
       ...(data.supplier_name ? { supplier_name: data.supplier_name } : {}),
       ...(data.supplier_sku ? { supplier_sku: data.supplier_sku } : {}),
       ...(data.location ? { location: data.location } : {}),
@@ -174,6 +184,13 @@ export async function createItem(clinicId: string, data: CreateInventoryItemInpu
 
 export async function updateItem(id: string, clinicId: string, data: UpdateInventoryItemInput) {
   await assertItem(id, clinicId);
+
+  if (data.barcode) {
+    const existing = await prisma.inventoryItem.findFirst({
+      where: { barcode: data.barcode, id: { not: id } },
+    });
+    if (existing) throw new AppError('CONFLICT', 'Barcode already in use', 409);
+  }
 
   return prisma.inventoryItem.update({
     where: { id },
@@ -188,6 +205,7 @@ export async function updateItem(id: string, clinicId: string, data: UpdateInven
       ...(data.is_controlled !== undefined ? { is_controlled: data.is_controlled } : {}),
       ...(data.is_active !== undefined ? { is_active: data.is_active } : {}),
       ...(data.sku !== undefined ? { sku: data.sku } : {}),
+      ...(data.barcode !== undefined ? { barcode: data.barcode } : {}),
     },
   });
 }

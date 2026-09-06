@@ -18,6 +18,7 @@ import { notificationsRouter } from '../../modules/notifications/notifications.r
 import { dashboardRouter } from '../../modules/dashboard/dashboard.routes';
 import { searchRouter } from '../../modules/search/search.routes';
 import { auditLogRouter } from '../../modules/audit-log/audit-log.routes';
+import { posRouter } from '../../modules/pos/pos.routes';
 
 export const apiRouter: IRouter = Router();
 
@@ -30,7 +31,7 @@ apiRouter.use('/billing', billingRouter);
 apiRouter.use('/staff', staffRouter);
 apiRouter.use('/audit-log', auditLogRouter);
 apiRouter.use('/clinic', clinicRouter);
-// These five modules differ by plan (ADR-04) — gate them once here rather
+// These six modules differ by plan (ADR-04) — gate them once here rather
 // than touching every route's own authenticate/authorize chain. authenticate
 // runs again inside each router too (each route already calls it directly);
 // that's redundant but harmless, and keeps this the only place plan-gating
@@ -75,4 +76,8 @@ apiRouter.use('/suppliers', authenticate, authorizeFeature('INVENTORY', { allowR
 // read over other tables, so unlike the modules above, letting GET through
 // here would just remove the plan gate entirely. Stays hard-gated.
 apiRouter.use('/reports', authenticate, authorizeFeature('REPORTS'), reportsRouter);
+// Retail sales are an opt-in add-on, not a plan default (see features.ts) —
+// history stays visible on a downgrade like the other data-owning modules
+// above, since a shop's past sales shouldn't vanish if the add-on lapses.
+apiRouter.use('/pos', authenticate, authorizeFeature('PET_SHOP', { allowReadWithoutFeature: true }), posRouter);
 apiRouter.use('/notifications', notificationsRouter);

@@ -48,6 +48,7 @@ export type InventoryItem = {
   clinic_id:         string;
   name:              string;
   sku:               string | null;
+  barcode:           string | null;
   category:          ItemCategory;
   unit:              string;
   quantity_on_hand:  number;

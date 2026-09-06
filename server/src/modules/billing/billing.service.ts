@@ -95,12 +95,13 @@ const invoiceFullIncludes = {
 // ── Invoices ───────────────────────────────────────────────────────────────────
 
 export async function listInvoices(clinicId: string, query: InvoiceQueryInput) {
-  const { status, owner_id, search, date_from, date_to, cursor, limit } = query;
+  const { status, channel, owner_id, search, date_from, date_to, cursor, limit } = query;
 
   const invoices = await prisma.invoice.findMany({
     where: {
       clinic_id: clinicId,
       ...(status   ? { status }   : {}),
+      ...(channel  ? { channel }  : {}),
       ...(owner_id ? { owner_id } : {}),
       ...(search
         ? {
@@ -108,6 +109,8 @@ export async function listInvoices(clinicId: string, query: InvoiceQueryInput) {
               { owner: { first_name: { contains: search, mode: 'insensitive' as const } } },
               { owner: { last_name:  { contains: search, mode: 'insensitive' as const } } },
               { appointment: { pet: { name: { contains: search, mode: 'insensitive' as const } } } },
+              // Free-typed walk-in name on a Pet Shop sale with no linked owner.
+              { customer_name: { contains: search, mode: 'insensitive' as const } },
             ],
           }
         : {}),
@@ -296,7 +299,12 @@ export async function removeLineItem(invoiceId: string, lineId: string, clinicId
 
 // ── Payments ───────────────────────────────────────────────────────────────────
 
-export async function recordPayment(invoiceId: string, clinicId: string, data: RecordPaymentInput) {
+export async function recordPayment(
+  invoiceId: string,
+  clinicId: string,
+  data: RecordPaymentInput,
+  receivedBy: string,
+) {
   const invoice = await assertInvoice(invoiceId, clinicId);
   if (['CANCELLED', 'REFUNDED'].includes(invoice.status)) {
     throw new AppError(
@@ -328,10 +336,11 @@ export async function recordPayment(invoiceId: string, clinicId: string, data: R
   return prisma.$transaction(async (tx) => {
     const payment = await tx.payment.create({
       data: {
-        invoice_id: invoiceId,
-        amount:     paymentAmount,
-        method:     data.method,
-        notes:      data.notes ?? null,
+        invoice_id:  invoiceId,
+        amount:      paymentAmount,
+        method:      data.method,
+        notes:       data.notes ?? null,
+        received_by: receivedBy,
       },
     });
 

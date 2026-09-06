@@ -49,15 +49,21 @@ export function InvoiceReceipt({ invoice, statusLabel }: Props) {
           <p className="mb-1 text-xs font-bold uppercase tracking-wide text-brand-700">
             Bill To
           </p>
-          <p className="text-base font-semibold">
-            {invoice.owner.first_name} {invoice.owner.last_name}
-          </p>
-          {invoice.owner.address && (
-            <p className="text-sm text-slate-500">{invoice.owner.address}</p>
-          )}
-          <p className="text-sm text-slate-500">{invoice.owner.phone}</p>
-          {invoice.owner.email && (
-            <p className="text-sm text-slate-500">{invoice.owner.email}</p>
+          {invoice.owner ? (
+            <>
+              <p className="text-base font-semibold">
+                {invoice.owner.first_name} {invoice.owner.last_name}
+              </p>
+              {invoice.owner.address && (
+                <p className="text-sm text-slate-500">{invoice.owner.address}</p>
+              )}
+              <p className="text-sm text-slate-500">{invoice.owner.phone}</p>
+              {invoice.owner.email && (
+                <p className="text-sm text-slate-500">{invoice.owner.email}</p>
+              )}
+            </>
+          ) : (
+            <p className="text-base font-semibold">{invoice.customer_name ?? "Walk-in customer"}</p>
           )}
         </div>
         <div className="shrink-0 space-y-1">

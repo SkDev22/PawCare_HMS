@@ -644,12 +644,16 @@ export function InvoiceDetailPage() {
                 </Badge>
               </div>
               <p className="text-muted-foreground mt-1">
-                <Link
-                  to={`/owners/${invoice.owner.id}`}
-                  className="text-primary hover:underline font-medium"
-                >
-                  {invoice.owner.first_name} {invoice.owner.last_name}
-                </Link>
+                {invoice.owner ? (
+                  <Link
+                    to={`/owners/${invoice.owner.id}`}
+                    className="text-primary hover:underline font-medium"
+                  >
+                    {invoice.owner.first_name} {invoice.owner.last_name}
+                  </Link>
+                ) : (
+                  <span className="font-medium">{invoice.customer_name ?? "Walk-in customer"}</span>
+                )}
                 {" · "}Created{" "}
                 {format(new Date(invoice.created_at), "MMM d, yyyy")}
               </p>
@@ -701,11 +705,15 @@ export function InvoiceDetailPage() {
               <p className="text-xs text-muted-foreground">Paid</p>
             </div>
             <div className="bg-muted/50 rounded-lg p-3 flex flex-col items-center text-center gap-1">
-              <p
-                className={`text-sm font-semibold ${balance > 0.001 ? "text-destructive" : "text-emerald-600"}`}
-              >
-                {formatCurrency(balance)}
-              </p>
+              {invoice.status === "CANCELLED" || invoice.status === "REFUNDED" ? (
+                <p className="text-sm font-semibold text-muted-foreground">—</p>
+              ) : (
+                <p
+                  className={`text-sm font-semibold ${balance > 0.001 ? "text-destructive" : "text-emerald-600"}`}
+                >
+                  {formatCurrency(balance)}
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">Balance Due</p>
             </div>
             <div className="bg-muted/50 rounded-lg p-3 flex flex-col items-center text-center gap-1">
@@ -913,16 +921,24 @@ export function InvoiceDetailPage() {
               <CardTitle className="text-base">Client</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1 text-sm">
-              <p className="font-medium">
-                {invoice.owner.first_name} {invoice.owner.last_name}
-              </p>
-              {invoice.owner.email && (
-                <p className="text-muted-foreground">{invoice.owner.email}</p>
-              )}
-              <p className="text-muted-foreground">{invoice.owner.phone}</p>
-              {invoice.owner.address && (
-                <p className="text-muted-foreground text-xs mt-1">
-                  {invoice.owner.address}
+              {invoice.owner ? (
+                <>
+                  <p className="font-medium">
+                    {invoice.owner.first_name} {invoice.owner.last_name}
+                  </p>
+                  {invoice.owner.email && (
+                    <p className="text-muted-foreground">{invoice.owner.email}</p>
+                  )}
+                  <p className="text-muted-foreground">{invoice.owner.phone}</p>
+                  {invoice.owner.address && (
+                    <p className="text-muted-foreground text-xs mt-1">
+                      {invoice.owner.address}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="font-medium text-muted-foreground">
+                  {invoice.customer_name ?? "Walk-in customer"}
                 </p>
               )}
             </CardContent>

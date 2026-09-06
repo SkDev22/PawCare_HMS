@@ -412,6 +412,7 @@ export function InventoryDetailPage() {
           <p className="text-sm text-muted-foreground">
             {item.category.replace(/_/g, " ")} · {item.unit}
             {item.sku ? ` · SKU: ${item.sku}` : ""}
+            {item.barcode ? ` · Barcode: ${item.barcode}` : ""}
           </p>
         </div>
         <div className="flex gap-2">

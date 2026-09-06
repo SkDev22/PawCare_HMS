@@ -31,6 +31,7 @@ const FEATURE_LABELS: Record<FeatureKey, string> = {
   THEME_CUSTOMIZATION: "Theme Customization",
   EMAIL_NOTIFICATIONS: "Email Reminders",
   DASHBOARD_TODAY_APPOINTMENTS: "Dashboard: Today's Appointments",
+  PET_SHOP: "Pet Shop (POS)",
 };
 
 function daysRemaining(trialEndsAt: string): number {

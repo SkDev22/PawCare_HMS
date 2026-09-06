@@ -9,6 +9,7 @@ export const AuditEntityTypeEnum = z.enum([
   'MedicalRecordCharge',
   'Payment',
   'StaffUser',
+  'PosReturn',
 ]);
 
 export const AuditLogQuerySchema = z.object({

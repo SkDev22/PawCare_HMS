@@ -180,7 +180,7 @@ async function searchInvoices(clinicId: string, q: string, limit: number): Promi
     label: 'Invoices',
     items: invoices.map((i) => ({
       id: i.id,
-      title: `Invoice — ${i.owner.first_name} ${i.owner.last_name}`,
+      title: `Invoice — ${i.owner ? `${i.owner.first_name} ${i.owner.last_name}` : 'Walk-in customer'}`,
       subtitle: `${i.status} · ${i.total}`,
       href: `/billing/${i.id}`,
     })),

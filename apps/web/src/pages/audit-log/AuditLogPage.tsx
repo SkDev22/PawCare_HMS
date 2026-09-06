@@ -33,6 +33,7 @@ const ENTITY_LABELS: Record<AuditEntityType, string> = {
   MedicalRecordCharge: "Charge",
   Payment: "Payment",
   StaffUser: "Staff member",
+  PosReturn: "Pet Shop return",
 };
 
 const ACTION_VERBS: Record<AuditLogEntry["action"], string> = {

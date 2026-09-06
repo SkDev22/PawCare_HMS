@@ -4,6 +4,8 @@ export const InvoiceStatusEnum = z.enum([
   'DRAFT', 'SENT', 'PAID', 'PARTIALLY_PAID', 'OVERDUE', 'CANCELLED', 'REFUNDED',
 ]);
 
+export const InvoiceChannelEnum = z.enum(['CLINICAL', 'RETAIL']);
+
 export const CreateInvoiceSchema = z.object({
   owner_id: z.string().uuid('Invalid owner ID'),
   appointment_id: z.string().uuid('Invalid appointment ID').optional(),
@@ -24,6 +26,7 @@ export const UpdateInvoiceSchema = z.object({
 
 export const InvoiceQuerySchema = z.object({
   status: InvoiceStatusEnum.optional(),
+  channel: InvoiceChannelEnum.optional(),
   owner_id: z.string().uuid().optional(),
   search: z.string().max(200).optional(),
   date_from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD').optional(),
@@ -82,6 +85,7 @@ export const ServiceQuerySchema = z.object({
 export type CreateInvoiceInput = z.infer<typeof CreateInvoiceSchema>;
 export type UpdateInvoiceInput = z.infer<typeof UpdateInvoiceSchema>;
 export type InvoiceQueryInput = z.infer<typeof InvoiceQuerySchema>;
+export type InvoiceChannelType = z.infer<typeof InvoiceChannelEnum>;
 export type AddLineItemInput = z.infer<typeof AddLineItemSchema>;
 export type RecordPaymentInput = z.infer<typeof RecordPaymentSchema>;
 export type UpdateInvoiceStatusInput = z.infer<typeof UpdateInvoiceStatusSchema>;

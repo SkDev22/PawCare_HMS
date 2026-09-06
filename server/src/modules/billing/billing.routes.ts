@@ -176,7 +176,12 @@ billingRouter.post(
   validate({ body: RecordPaymentSchema }),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const payment = await svc.recordPayment(req.params.id, authed(req).user.clinic_id, req.body);
+      const payment = await svc.recordPayment(
+        req.params.id,
+        authed(req).user.clinic_id,
+        req.body,
+        authed(req).user.id,
+      );
       res.status(201).json(payment);
     } catch (err) { next(err); }
   },

@@ -15,6 +15,9 @@ import {
 } from '../../components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '../../components/ui/select';
+import {
   Pagination,
   PaginationContent,
   PaginationItem,
@@ -26,7 +29,13 @@ import { Skeleton } from '../../components/ui/skeleton';
 import { useInvoices } from '../../hooks/use-billing';
 import { InvoiceForm } from './components/InvoiceForm';
 import { formatCurrency } from '../../lib/currency';
-import type { InvoiceStatus } from '../../types/billing';
+import type { InvoiceStatus, InvoiceChannel } from '../../types/billing';
+
+const CHANNEL_OPTIONS: Array<{ label: string; value: InvoiceChannel | 'ALL' }> = [
+  { label: 'All Channels', value: 'ALL' },
+  { label: 'Clinical', value: 'CLINICAL' },
+  { label: 'Pet Shop', value: 'RETAIL' },
+];
 
 const STATUS_TABS: Array<{ label: string; value: InvoiceStatus | 'ALL' }> = [
   { label: 'All', value: 'ALL' },
@@ -73,6 +82,7 @@ const PAGE_SIZE = 20;
 export function BillingPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<InvoiceStatus | 'ALL'>('ALL');
+  const [channel, setChannel] = useState<InvoiceChannel | 'ALL'>('ALL');
   const [createOpen, setCreateOpen] = useState(false);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 300);
@@ -85,13 +95,14 @@ export function BillingPage() {
   useEffect(() => {
     setPageIndex(0);
     setCursorHistory([]);
-  }, [debouncedSearch, tab]);
+  }, [debouncedSearch, tab, channel]);
 
   const currentCursor =
     pageIndex === 0 ? undefined : cursorHistory[pageIndex - 1];
 
   const { data, isLoading, isFetching } = useInvoices({
     ...(tab !== 'ALL' ? { status: tab } : {}),
+    ...(channel !== 'ALL' ? { channel } : {}),
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
     ...(currentCursor ? { cursor: currentCursor } : {}),
     limit: PAGE_SIZE,
@@ -115,6 +126,12 @@ export function BillingPage() {
 
   const balance = (item: (typeof invoices)[0]) =>
     parseFloat(item.total) - parseFloat(item.paid_amount);
+
+  // A refunded/cancelled invoice's total is intentionally left as the
+  // original sale amount (see pos.service.ts's processReturn) — total minus
+  // paid_amount would otherwise read as money still owed, when nothing is.
+  const hasNoMeaningfulBalance = (status: string) =>
+    status === 'REFUNDED' || status === 'CANCELLED';
 
   return (
     <div className="space-y-6">
@@ -154,14 +171,29 @@ export function BillingPage() {
           </TabsList>
         </Tabs>
 
-        <div className="relative sm:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-          <Input
-            className="pl-8"
-            placeholder="Search owner or patient name…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div className="flex gap-2">
+          <Select value={channel} onValueChange={(v) => setChannel(v as InvoiceChannel | 'ALL')}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="Channel" />
+            </SelectTrigger>
+            <SelectContent>
+              {CHANNEL_OPTIONS.map((c) => (
+                <SelectItem key={c.value} value={c.value}>
+                  {c.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="relative sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+            <Input
+              className="pl-8"
+              placeholder="Search owner, patient, or walk-in name…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
@@ -213,11 +245,19 @@ export function BillingPage() {
                           {invoice.invoice_number ?? `#${invoice.id.slice(0, 8).toUpperCase()}`}
                         </TableCell>
                         <TableCell>
-                          <div className="font-medium text-sm">
-                            {invoice.owner.first_name} {invoice.owner.last_name}
-                          </div>
-                          {invoice.owner.email && (
-                            <div className="text-xs text-muted-foreground">{invoice.owner.email}</div>
+                          {invoice.owner ? (
+                            <>
+                              <div className="font-medium text-sm">
+                                {invoice.owner.first_name} {invoice.owner.last_name}
+                              </div>
+                              {invoice.owner.email && (
+                                <div className="text-xs text-muted-foreground">{invoice.owner.email}</div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="text-sm text-muted-foreground">
+                              {invoice.customer_name ?? 'Walk-in customer'}
+                            </div>
                           )}
                         </TableCell>
                         <TableCell className="text-sm whitespace-nowrap">
@@ -240,9 +280,13 @@ export function BillingPage() {
                           {formatCurrency(invoice.paid_amount)}
                         </TableCell>
                         <TableCell className="text-right text-sm font-medium">
-                          <span className={bal > 0.001 ? 'text-destructive' : 'text-emerald-600'}>
-                            {formatCurrency(bal)}
-                          </span>
+                          {hasNoMeaningfulBalance(invoice.status) ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <span className={bal > 0.001 ? 'text-destructive' : 'text-emerald-600'}>
+                              {formatCurrency(bal)}
+                            </span>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
