@@ -2,3 +2,34 @@ packages:
   - 'apps/*'
   - 'packages/*'
   - 'server'
+
+# pnpm 10+'s postinstall-script allowlist (a new security gate — these
+# scripts don't run at all unless explicitly trusted here). All three are
+# required for the app to function: Prisma's postinstall fetches its query
+# engine binaries, and esbuild's fetches the platform-specific binary Vite
+# depends on to build at all.
+allowBuilds:
+  '@prisma/engines': true
+  esbuild: true
+  prisma: true
+
+# Moved from package.json's "pnpm" field — pnpm no longer reads overrides or
+# peerDependencyRules from there (see the "pnpm field ... no longer read"
+# warning this used to print on every command). This file is the one place
+# both local pnpm and CI (pnpm/action-setup) actually apply these from.
+overrides:
+  vite: ^6.4.3
+  postcss: ^8.5.18
+  nanoid: ^3.3.18
+  brace-expansion: ^1.1.18
+  js-yaml: ^3.15.1
+  fast-uri: ^3.1.5
+  deepmerge-ts: ^8.0.0
+  sharp: ^0.35.0
+  browserslist: ^4.28.7
+  mysql2: ^3.22.0
+
+peerDependencyRules:
+  allowedVersions:
+    'recharts>react': '19'
+    'recharts>react-dom': '19'
