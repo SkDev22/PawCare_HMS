@@ -10,7 +10,9 @@ export type SearchCategoryKey =
   | 'invoices'
   | 'inventory'
   | 'lab_orders'
-  | 'ward';
+  | 'ward'
+  | 'suppliers'
+  | 'goods_received_notes';
 
 export interface SearchResultItem {
   id: string;
@@ -178,11 +180,66 @@ async function searchInvoices(clinicId: string, q: string, limit: number): Promi
   return {
     key: 'invoices',
     label: 'Invoices',
-    items: invoices.map((i) => ({
-      id: i.id,
-      title: `Invoice — ${i.owner ? `${i.owner.first_name} ${i.owner.last_name}` : 'Walk-in customer'}`,
-      subtitle: `${i.status} · ${i.total}`,
-      href: `/billing/${i.id}`,
+    items: invoices.map((i) => {
+      const customer = i.owner ? `${i.owner.first_name} ${i.owner.last_name}` : (i.customer_name ?? 'Walk-in customer');
+      return {
+        id: i.id,
+        // Pet Shop sales are Invoice rows too (channel: RETAIL) — labeled
+        // distinctly so they don't read as clinical invoices in results.
+        title: `${i.channel === 'RETAIL' ? 'Pet Shop Sale' : 'Invoice'} — ${customer}`,
+        subtitle: `${i.status} · ${i.total}`,
+        href: `/billing/${i.id}`,
+      };
+    }),
+  };
+}
+
+async function searchSuppliers(clinicId: string, q: string, limit: number): Promise<SearchGroup> {
+  const suppliers = await prisma.supplier.findMany({
+    where: {
+      clinic_id: clinicId,
+      OR: [{ name: contains(q) }, { phone: contains(q) }, { email: contains(q) }],
+    },
+    orderBy: { created_at: 'desc' },
+    take: limit,
+  });
+
+  return {
+    key: 'suppliers',
+    label: 'Suppliers',
+    items: suppliers.map((s) => ({
+      id: s.id,
+      title: s.name,
+      // No standalone supplier detail page exists — Goods Received is the
+      // closest related view, since that's where a supplier's history lives.
+      subtitle: s.phone ?? s.email ?? 'Supplier',
+      href: `/inventory/grn`,
+    })),
+  };
+}
+
+async function searchGoodsReceivedNotes(clinicId: string, q: string, limit: number): Promise<SearchGroup> {
+  const grns = await prisma.goodsReceivedNote.findMany({
+    where: {
+      clinic_id: clinicId,
+      OR: [
+        { grn_number: contains(q) },
+        { supplier_name: contains(q) },
+        { supplier_invoice_no: contains(q) },
+      ],
+    },
+    orderBy: { received_at: 'desc' },
+    take: limit,
+  });
+
+  return {
+    key: 'goods_received_notes',
+    label: 'Goods Received',
+    items: grns.map((g) => ({
+      id: g.id,
+      title: g.grn_number,
+      subtitle: `${g.supplier_name} · ${new Date(g.received_at).toLocaleDateString()}`,
+      href: `/inventory/grn/${g.id}`,
     })),
   };
 }
@@ -274,6 +331,8 @@ const CATEGORY_PERMISSIONS: Record<SearchCategoryKey, PermissionKey> = {
   inventory: 'INVENTORY_READ',
   lab_orders: 'LAB_ORDER_WRITE',
   ward: 'WARD_READ',
+  suppliers: 'INVENTORY_READ',
+  goods_received_notes: 'INVENTORY_READ',
 };
 
 const CATEGORY_FINDERS: Record<
@@ -289,6 +348,8 @@ const CATEGORY_FINDERS: Record<
   inventory: searchInventory,
   lab_orders: searchLabOrders,
   ward: searchWard,
+  suppliers: searchSuppliers,
+  goods_received_notes: searchGoodsReceivedNotes,
 };
 
 // A search hit can span records the caller's role isn't allowed to read (e.g. a

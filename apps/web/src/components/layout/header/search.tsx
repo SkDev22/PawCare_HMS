@@ -1,5 +1,5 @@
-import * as React from 'react';
-import { useNavigate } from 'react-router-dom';
+import * as React from "react";
+import { useNavigate } from "react-router-dom";
 import {
   SearchIcon,
   CalendarDays,
@@ -19,9 +19,15 @@ import {
   ClipboardList,
   BarChart3,
   Loader2,
-} from 'lucide-react';
-import type { PermissionKey } from '@pawcare/shared';
-import { Button } from '@/components/ui/button';
+  ShoppingCart,
+  PackagePlus,
+  Truck,
+  AlertTriangle,
+  ScrollText,
+  Building2,
+} from "lucide-react";
+import type { FeatureKey, PermissionKey } from "@pawcare/shared";
+import { Button } from "@/components/ui/button";
 import {
   CommandDialog,
   CommandEmpty,
@@ -31,13 +37,20 @@ import {
   CommandList,
   CommandSeparator,
   CommandShortcut,
-} from '@/components/ui/command';
-import { useDebounce } from '@/hooks/use-debounce';
-import { useGlobalSearch } from '@/hooks/use-global-search';
-import { useAuthStore } from '@/stores/auth.store';
-import { hasPermission } from '@/lib/permissions';
+} from "@/components/ui/command";
+import { useDebounce } from "@/hooks/use-debounce";
+import { useGlobalSearch } from "@/hooks/use-global-search";
+import { useAuthStore } from "@/stores/auth.store";
+import { hasPermission } from "@/lib/permissions";
+import { hasFeature } from "@/lib/features";
 
-const DEFAULT_PAGES_HREFS = new Set(['/dashboard', '/appointments', '/owners', '/patients', '/emr']);
+const DEFAULT_PAGES_HREFS = new Set([
+  "/dashboard",
+  "/appointments",
+  "/owners",
+  "/patients",
+  "/emr",
+]);
 
 // Every navigable page/module, so typing a module name like "Ward" or
 // "Settings" always resolves instantly — this is a plain client-side array,
@@ -47,27 +60,135 @@ const ALL_PAGES: Array<{
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   permission?: PermissionKey;
+  // Plan/add-on gate, same as app-sidebar.tsx's nav items — without this, a
+  // page could show up as a search match on a plan that doesn't include it
+  // (permission alone isn't enough, since most permissions are granted by
+  // default role regardless of plan).
+  feature?: FeatureKey | FeatureKey[];
 }> = [
-  { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, permission: 'DASHBOARD_READ' },
-  { title: 'Appointments', href: '/appointments', icon: CalendarDays, permission: 'APPOINTMENT_READ' },
-  { title: 'Appointment Queue', href: '/appointments/queue', icon: ListChecks, permission: 'APPOINTMENT_READ' },
-  { title: 'Owners', href: '/owners', icon: Users, permission: 'PATIENT_READ' },
-  { title: 'Pets / Patients', href: '/patients', icon: PawPrint, permission: 'PATIENT_READ' },
-  { title: 'Register Patient', href: '/patients/register', icon: PawPrint, permission: 'PATIENT_WRITE' },
-  { title: 'Medical Records', href: '/emr', icon: FileText, permission: 'MEDICAL_RECORD_READ' },
-  { title: 'Medical History', href: '/emr/history', icon: ClipboardList, permission: 'MEDICAL_RECORD_READ' },
-  { title: 'Billing', href: '/billing', icon: Receipt, permission: 'INVOICE_READ' },
-  { title: 'Staff', href: '/staff', icon: UserCog, permission: 'STAFF_READ' },
-  { title: 'Laboratory', href: '/lab', icon: FlaskConical, permission: 'LAB_ORDER_WRITE' },
-  { title: 'Ward', href: '/ward', icon: BedDouble, permission: 'WARD_READ' },
-  { title: 'Inventory', href: '/inventory', icon: Package, permission: 'INVENTORY_READ' },
-  { title: 'Reports', href: '/reports', icon: BarChart3, permission: 'REPORT_READ' },
-  { title: 'Notifications', href: '/notifications', icon: Bell },
-  { title: 'Settings', href: '/settings', icon: Settings },
-  { title: 'Profile', href: '/profile', icon: User },
+  {
+    title: "Dashboard",
+    href: "/dashboard",
+    icon: LayoutDashboard,
+    permission: "DASHBOARD_READ",
+  },
+  {
+    title: "Appointments",
+    href: "/appointments",
+    icon: CalendarDays,
+    permission: "APPOINTMENT_READ",
+    feature: "APPOINTMENTS",
+  },
+  {
+    title: "Appointment Queue",
+    href: "/appointments/queue",
+    icon: ListChecks,
+    permission: "APPOINTMENT_READ",
+    feature: "APPOINTMENTS",
+  },
+  { title: "Owners", href: "/owners", icon: Users, permission: "PATIENT_READ" },
+  {
+    title: "Pets / Patients",
+    href: "/patients",
+    icon: PawPrint,
+    permission: "PATIENT_READ",
+  },
+  {
+    title: "Register Patient",
+    href: "/patients/register",
+    icon: PawPrint,
+    permission: "PATIENT_WRITE",
+  },
+  {
+    title: "Medical Records",
+    href: "/emr",
+    icon: FileText,
+    permission: "MEDICAL_RECORD_READ",
+  },
+  {
+    title: "Medical History",
+    href: "/emr/history",
+    icon: ClipboardList,
+    permission: "MEDICAL_RECORD_READ",
+  },
+  {
+    title: "Billing",
+    href: "/billing",
+    icon: Receipt,
+    permission: "INVOICE_READ",
+  },
+  {
+    title: "Pet Shop",
+    href: "/pos",
+    icon: ShoppingCart,
+    permission: "PAYMENT_PROCESS",
+    feature: "PET_SHOP",
+  },
+  { title: "Staff", href: "/staff", icon: UserCog, permission: "STAFF_READ" },
+  {
+    title: "Audit Log",
+    href: "/audit-log",
+    icon: ScrollText,
+    permission: "AUDIT_LOG_READ",
+  },
+  {
+    title: "Laboratory",
+    href: "/lab",
+    icon: FlaskConical,
+    permission: "LAB_ORDER_WRITE",
+    feature: "LABORATORY",
+  },
+  {
+    title: "Ward",
+    href: "/ward",
+    icon: BedDouble,
+    permission: "WARD_READ",
+    feature: "WARD",
+  },
+  {
+    title: "Inventory",
+    href: "/inventory",
+    icon: Package,
+    permission: "INVENTORY_READ",
+    feature: ["INVENTORY", "PET_SHOP"],
+  },
+  {
+    title: "Add Item",
+    href: "/inventory/new",
+    icon: PackagePlus,
+    permission: "INVENTORY_WRITE",
+    feature: ["INVENTORY", "PET_SHOP"],
+  },
+  {
+    title: "Goods Received",
+    href: "/inventory/grn",
+    icon: Truck,
+    permission: "INVENTORY_READ",
+    feature: ["INVENTORY", "PET_SHOP"],
+  },
+  {
+    title: "Inventory Alerts",
+    href: "/inventory/alerts",
+    icon: AlertTriangle,
+    permission: "INVENTORY_READ",
+    feature: ["INVENTORY", "PET_SHOP"],
+  },
+  {
+    title: "Reports",
+    href: "/reports",
+    icon: BarChart3,
+    permission: "REPORT_READ",
+    feature: "REPORTS",
+  },
+  { title: "Notifications", href: "/notifications", icon: Bell },
+  { title: "Settings", href: "/settings", icon: Settings },
+  { title: "Profile", href: "/profile", icon: User },
 ];
 
-const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+const CATEGORY_ICONS: Record<
+  string,
+  React.ComponentType<{ className?: string }>
+> = {
   owners: Users,
   pets: PawPrint,
   appointments: CalendarDays,
@@ -77,18 +198,21 @@ const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>
   inventory: Package,
   lab_orders: FlaskConical,
   ward: BedDouble,
+  suppliers: Building2,
+  goods_received_notes: Truck,
 };
 
 const MIN_QUERY_LENGTH = 2;
 
 export function SearchCommand() {
   const [open, setOpen] = React.useState(false);
-  const [query, setQuery] = React.useState('');
+  const [query, setQuery] = React.useState("");
   // A slightly longer debounce than a typical input trades a little responsiveness
   // for fewer round trips to the database — see the "why is search slow" note below.
   const debouncedQuery = useDebounce(query, 300);
   const navigate = useNavigate();
-  const effectivePermissions = useAuthStore((s) => s.user?.effective_permissions);
+  const user = useAuthStore((s) => s.user);
+  const effectivePermissions = user?.effective_permissions;
 
   const trimmed = query.trim();
   const isSearching = trimmed.length > 0;
@@ -97,29 +221,35 @@ export function SearchCommand() {
     if (!isSearching) return [];
     const q = trimmed.toLowerCase();
     return ALL_PAGES.filter(
-      (p) => (!p.permission || hasPermission(effectivePermissions, p.permission)) && p.title.toLowerCase().includes(q),
+      (p) =>
+        (!p.permission || hasPermission(effectivePermissions, p.permission)) &&
+        (!p.feature || hasFeature(user, p.feature)) &&
+        p.title.toLowerCase().includes(q),
     );
-  }, [isSearching, trimmed, effectivePermissions]);
+  }, [isSearching, trimmed, effectivePermissions, user]);
 
   // Data search only fires past MIN_QUERY_LENGTH and once the debounce settles —
   // a single keystroke would otherwise fan out to every permitted category.
-  const dataQuery = debouncedQuery.trim().length >= MIN_QUERY_LENGTH ? debouncedQuery.trim() : '';
+  const dataQuery =
+    debouncedQuery.trim().length >= MIN_QUERY_LENGTH
+      ? debouncedQuery.trim()
+      : "";
   const { data, isFetching } = useGlobalSearch(dataQuery);
   const groups = data?.groups ?? [];
 
   React.useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setOpen((o) => !o);
       }
     };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
   }, []);
 
   React.useEffect(() => {
-    if (!open) setQuery('');
+    if (!open) setQuery("");
   }, [open]);
 
   const run = (href: string) => {
@@ -127,7 +257,11 @@ export function SearchCommand() {
     navigate(href);
   };
 
-  const showDataLoading = isSearching && trimmed.length >= MIN_QUERY_LENGTH && isFetching && groups.length === 0;
+  const showDataLoading =
+    isSearching &&
+    trimmed.length >= MIN_QUERY_LENGTH &&
+    isFetching &&
+    groups.length === 0;
   const showNoResults =
     isSearching &&
     pageMatches.length === 0 &&
@@ -152,27 +286,34 @@ export function SearchCommand() {
         <CommandInput
           value={query}
           onValueChange={setQuery}
-          placeholder="Search anything — pages, owners, patients, appointments, staff, invoices..."
+          placeholder="Search anything..."
         />
         <CommandList>
           {!isSearching && (
             <>
               <CommandGroup heading="Navigation">
-                {ALL_PAGES.filter((p) => DEFAULT_PAGES_HREFS.has(p.href)).map(({ title, href, icon: Icon }) => (
-                  <CommandItem key={href} onSelect={() => run(href)}>
-                    <Icon className="mr-2 size-4" />
-                    {title}
-                    <CommandShortcut>Go</CommandShortcut>
-                  </CommandItem>
-                ))}
+                {ALL_PAGES.filter(
+                  (p) =>
+                    DEFAULT_PAGES_HREFS.has(p.href) &&
+                    (!p.permission || hasPermission(effectivePermissions, p.permission)) &&
+                    (!p.feature || hasFeature(user, p.feature)),
+                ).map(
+                  ({ title, href, icon: Icon }) => (
+                    <CommandItem key={href} onSelect={() => run(href)}>
+                      <Icon className="mr-2 size-4" />
+                      {title}
+                      <CommandShortcut>Go</CommandShortcut>
+                    </CommandItem>
+                  ),
+                )}
               </CommandGroup>
               <CommandSeparator />
               <CommandGroup heading="Quick Actions">
-                <CommandItem onSelect={() => run('/owners')}>
+                <CommandItem onSelect={() => run("/owners")}>
                   <Users className="mr-2 size-4" />
                   Add New Owner
                 </CommandItem>
-                <CommandItem onSelect={() => run('/patients')}>
+                <CommandItem onSelect={() => run("/patients")}>
                   <PawPrint className="mr-2 size-4" />
                   Add New Patient
                 </CommandItem>
@@ -199,7 +340,9 @@ export function SearchCommand() {
             </div>
           )}
 
-          {showNoResults && <CommandEmpty>No results found for "{trimmed}".</CommandEmpty>}
+          {showNoResults && (
+            <CommandEmpty>No results found for "{trimmed}".</CommandEmpty>
+          )}
 
           {isSearching &&
             groups.map((group) => {
@@ -209,11 +352,17 @@ export function SearchCommand() {
                   <CommandSeparator />
                   <CommandGroup heading={group.label}>
                     {group.items.map((item) => (
-                      <CommandItem key={item.id} value={item.id} onSelect={() => run(item.href)}>
+                      <CommandItem
+                        key={item.id}
+                        value={item.id}
+                        onSelect={() => run(item.href)}
+                      >
                         <Icon className="mr-2 size-4" />
                         <div className="flex min-w-0 flex-1 flex-col">
                           <span className="truncate">{item.title}</span>
-                          <span className="text-muted-foreground truncate text-xs">{item.subtitle}</span>
+                          <span className="text-muted-foreground truncate text-xs">
+                            {item.subtitle}
+                          </span>
                         </div>
                       </CommandItem>
                     ))}
