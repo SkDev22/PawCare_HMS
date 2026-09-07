@@ -16,12 +16,21 @@ import * as authService from './auth.service';
 
 const REFRESH_COOKIE = 'refresh_token';
 
-const cookieOptions = {
+const BASE_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env['NODE_ENV'] === 'production',
   sameSite: 'strict' as const,
-  maxAge: 30 * 24 * 60 * 60 * 1000,
 };
+
+// "Remember me" gets the usual 30-day persistent cookie; otherwise the
+// cookie carries no Max-Age at all, making it a true session cookie that
+// the browser clears when it fully closes — see auth.service.ts's
+// UNREMEMBERED_REFRESH_TOKEN_EXPIRY_DAYS for the matching DB-side ceiling.
+function refreshCookieOptions(rememberMe: boolean) {
+  return rememberMe
+    ? { ...BASE_COOKIE_OPTIONS, maxAge: 30 * 24 * 60 * 60 * 1000 }
+    : BASE_COOKIE_OPTIONS;
+}
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -50,10 +59,14 @@ authRouter.post(
   loginLimiter,
   validate(LoginSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { email, password } = req.body as { email: string; password: string };
-    const result = await authService.login(email, password);
+    const { email, password, remember_me } = req.body as {
+      email: string;
+      password: string;
+      remember_me: boolean;
+    };
+    const result = await authService.login(email, password, remember_me);
 
-    res.cookie(REFRESH_COOKIE, result.refreshToken, cookieOptions);
+    res.cookie(REFRESH_COOKIE, result.refreshToken, refreshCookieOptions(remember_me));
 
     res.status(200).json({
       accessToken: result.accessToken,

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { LoginSchema, type LoginInput, type AuthUser } from "@pawcare/shared";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ import { useAuthStore } from "@/stores/auth.store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 interface LoginResponse {
   accessToken: string;
@@ -21,9 +22,12 @@ export function LoginForm({
   ...props
 }: React.ComponentPropsWithoutRef<"form">) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const setAuth = useAuthStore((s) => s.setAuth);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const loggedOutForIdle = searchParams.get("reason") === "idle";
 
   const {
     register,
@@ -36,7 +40,10 @@ export function LoginForm({
   const onSubmit = async (data: LoginInput) => {
     setServerError(null);
     try {
-      const res = await api.post<LoginResponse>("/auth/login", data);
+      const res = await api.post<LoginResponse>("/auth/login", {
+        ...data,
+        remember_me: rememberMe,
+      });
       setAuth(res.data.staff, res.data.accessToken);
       navigate("/dashboard", { replace: true });
     } catch (err: unknown) {
@@ -71,6 +78,12 @@ export function LoginForm({
           Enter your email below to sign in
         </p>
       </div>
+
+      {loggedOutForIdle && !serverError && (
+        <div className="rounded-lg border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
+          You were logged out due to inactivity.
+        </div>
+      )}
 
       {serverError && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -130,6 +143,17 @@ export function LoginForm({
               {errors.password.message}
             </p>
           )}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <Label htmlFor="remember-me" className="text-sm font-normal cursor-pointer">
+            Remember me on this device
+          </Label>
+          <Switch
+            id="remember-me"
+            checked={rememberMe}
+            onCheckedChange={setRememberMe}
+          />
         </div>
 
         <Button

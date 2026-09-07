@@ -11,6 +11,13 @@ import { logger } from '../../lib/logger';
 
 const REFRESH_TOKEN_BYTES = 64;
 const REFRESH_TOKEN_EXPIRY_DAYS = 30;
+// Not "remembered" — a shared-terminal login shouldn't leave a
+// month-long-valid session behind if the browser is closed without
+// logging out. This is a defense-in-depth ceiling on the DB row itself:
+// the cookie for this case is also set with no Max-Age (a true session
+// cookie), but some browsers restore session cookies across a restart, so
+// the token's own expiry is what actually caps it either way.
+const UNREMEMBERED_REFRESH_TOKEN_EXPIRY_DAYS = 1;
 
 const RESET_TOKEN_BYTES = 32;
 const RESET_TOKEN_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
@@ -62,13 +69,13 @@ function generateRawToken(): string {
   return crypto.randomBytes(REFRESH_TOKEN_BYTES).toString('hex');
 }
 
-function refreshTokenExpiry(): Date {
+function refreshTokenExpiry(rememberMe: boolean): Date {
   const d = new Date();
-  d.setDate(d.getDate() + REFRESH_TOKEN_EXPIRY_DAYS);
+  d.setDate(d.getDate() + (rememberMe ? REFRESH_TOKEN_EXPIRY_DAYS : UNREMEMBERED_REFRESH_TOKEN_EXPIRY_DAYS));
   return d;
 }
 
-export async function login(email: string, password: string) {
+export async function login(email: string, password: string, rememberMe: boolean) {
   const staff = await prisma.staffUser.findFirst({
     where: { email, deleted_at: null, is_active: true },
     include: { clinic: { select: { name: true, plan: true, trial_ends_at: true, extra_features: true } } },
@@ -116,7 +123,7 @@ export async function login(email: string, password: string) {
         data: {
           staff_id: staff.id,
           token_hash: hashToken(rawRefreshToken),
-          expires_at: refreshTokenExpiry(),
+          expires_at: refreshTokenExpiry(rememberMe),
         },
       }),
       prisma.staffUser.update({
