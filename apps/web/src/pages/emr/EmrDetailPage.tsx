@@ -19,6 +19,7 @@ import {
   Package,
   Printer,
   ArrowRight,
+  Syringe,
 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
@@ -73,6 +74,8 @@ import {
   useUpsertVitals,
   useAddDiagnosis,
   useRemoveDiagnosis,
+  useAddVaccination,
+  useRemoveVaccination,
   useAddPrescription,
   useDeactivatePrescription,
   useCharges,
@@ -80,7 +83,7 @@ import {
   useRemoveCharge,
 } from "../../hooks/use-emr";
 import { useInventoryItems, useItemBatches } from "../../hooks/use-inventory";
-import type { StockBatch } from "../../types/inventory";
+import type { StockBatch, ItemCategory } from "../../types/inventory";
 import { useServices } from "../../hooks/use-billing";
 import type { Service } from "../../types/billing";
 import { useDebounce } from "../../hooks/use-debounce";
@@ -94,6 +97,7 @@ import type {
   Prescription,
   Charge,
 } from "../../types/emr";
+import type { Vaccination } from "../../types/patients";
 
 // ── SOAP Note Tab ──────────────────────────────────────────────────────────────
 
@@ -653,6 +657,392 @@ function DiagnosesTab({
 
       <AddDiagnosisDialog
         recordId={record.id}
+        open={addOpen}
+        onOpenChange={setAddOpen}
+      />
+
+      <div className="flex justify-end pt-2 print:hidden">
+        <Button variant="outline" size="sm" onClick={onContinue}>
+          Continue to Vaccinations
+          <ArrowRight className="h-3.5 w-3.5 ml-1" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Vaccinations Tab ─────────────────────────────────────────────────────────────
+
+const VaccinationSchema = z.object({
+  // Only used in "Not administered here" mode — in "Administered here" mode
+  // the name comes from the selected inventory item/service instead.
+  vaccine_name: z.string().max(200).optional(),
+  administered_at: z.string().min(1, "Administered date is required"),
+  next_due_at: z.string().optional(),
+  notes: z.string().max(1000).optional(),
+});
+
+function AddVaccinationDialog({
+  recordId,
+  visitDate,
+  open,
+  onOpenChange,
+}: {
+  recordId: string;
+  visitDate: string;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const addVax = useAddVaccination(recordId);
+  const hasInventory = hasFeature(useAuthStore((s) => s.user), "INVENTORY");
+  const [addedCount, setAddedCount] = useState(0);
+  const [administeredHere, setAdministeredHere] = useState(true);
+  const [selectedItem, setSelectedItem] = useState<{
+    id: string;
+    name: string;
+    selling_price: string;
+  } | null>(null);
+  const [selectedBatchId, setSelectedBatchId] = useState<string | undefined>(undefined);
+  const { data: itemBatches, isLoading: batchesLoading } = useItemBatches(selectedItem?.id);
+  // Clinics without INVENTORY (e.g. BASIC) bill against the plain Service
+  // catalog instead — same "Administered here" slot, different catalog,
+  // exactly like AddPrescriptionDialog.
+  const { data: services = [] } = useServices();
+  const [selectedService, setSelectedService] = useState<{
+    id: string;
+    name: string;
+    price: string;
+  } | null>(null);
+
+  const defaultValues = {
+    vaccine_name: "",
+    administered_at: visitDate.slice(0, 10),
+    next_due_at: "",
+    notes: "",
+  };
+  const form = useForm<z.infer<typeof VaccinationSchema>>({
+    resolver: zodResolver(VaccinationSchema),
+    defaultValues,
+  });
+
+  const resetSelection = () => {
+    setAdministeredHere(true);
+    setSelectedItem(null);
+    setSelectedBatchId(undefined);
+    setSelectedService(null);
+  };
+
+  const manualName = form.watch("vaccine_name");
+  const clinicSelectionMade = hasInventory ? !!selectedItem : !!selectedService;
+  const canSubmit = administeredHere ? clinicSelectionMade : !!manualName?.trim();
+  const selectedBatch = itemBatches?.find((b) => b.id === selectedBatchId);
+  const unitPrice = hasInventory
+    ? selectedBatch
+      ? batchEffectivePrice(selectedBatch)
+      : selectedItem
+        ? Number(selectedItem.selling_price)
+        : 0
+    : selectedService
+      ? Number(selectedService.price)
+      : 0;
+
+  const onSubmit = (values: z.infer<typeof VaccinationSchema>) => {
+    const vaccineName = administeredHere
+      ? ((hasInventory ? selectedItem?.name : selectedService?.name) ?? "")
+      : (values.vaccine_name?.trim() ?? "");
+    if (!vaccineName) return;
+
+    addVax.mutate(
+      {
+        vaccine_name: vaccineName,
+        administered_at: values.administered_at,
+        ...(values.next_due_at ? { next_due_at: values.next_due_at } : {}),
+        ...(values.notes ? { notes: values.notes } : {}),
+        ...(administeredHere && hasInventory && selectedItem
+          ? { item_id: selectedItem.id }
+          : {}),
+        ...(administeredHere && hasInventory && selectedBatchId
+          ? { batch_id: selectedBatchId }
+          : {}),
+        ...(administeredHere && !hasInventory && selectedService
+          ? { service_id: selectedService.id }
+          : {}),
+      },
+      {
+        onSuccess: () => {
+          form.reset(defaultValues);
+          resetSelection();
+          setAddedCount((n) => n + 1);
+        },
+      },
+    );
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        onOpenChange(v);
+        if (!v) {
+          form.reset(defaultValues);
+          resetSelection();
+          setAddedCount(0);
+        }
+      }}
+    >
+      <DialogContent className="sm:max-w-md md:max-w-xl p-10">
+        <DialogHeader>
+          <DialogTitle>Add Vaccination</DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Vaccine</label>
+              <div className="flex gap-2 mb-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={administeredHere ? "default" : "outline"}
+                  onClick={() => setAdministeredHere(true)}
+                >
+                  Administered here
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={!administeredHere ? "default" : "outline"}
+                  onClick={() => {
+                    setAdministeredHere(false);
+                    setSelectedItem(null);
+                    setSelectedBatchId(undefined);
+                    setSelectedService(null);
+                  }}
+                >
+                  Not administered here
+                </Button>
+              </div>
+
+              {administeredHere && hasInventory && (
+                <div className="space-y-2 rounded-md border border-border p-3 bg-muted/30">
+                  <label className="text-xs font-medium text-muted-foreground block">
+                    Match to inventory item
+                  </label>
+                  {selectedItem ? (
+                    <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-background text-sm">
+                      <Syringe className="size-3.5 text-muted-foreground shrink-0" />
+                      <span className="flex-1 truncate">{selectedItem.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedItem(null);
+                          setSelectedBatchId(undefined);
+                        }}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <ItemSearch category="VACCINE" onSelect={setSelectedItem} />
+                  )}
+                  {selectedItem && (
+                    <BatchSelect
+                      batches={itemBatches ?? []}
+                      isLoading={batchesLoading}
+                      value={selectedBatchId}
+                      onChange={setSelectedBatchId}
+                    />
+                  )}
+                  {selectedItem && (
+                    <p className="text-xs text-muted-foreground">
+                      Will bill {formatCurrency(unitPrice)} and deduct 1 from stock.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {administeredHere && !hasInventory && (
+                <div className="space-y-2 rounded-md border border-border p-3 bg-muted/30">
+                  <label className="text-xs font-medium text-muted-foreground block">
+                    Match to billable service
+                  </label>
+                  {selectedService ? (
+                    <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-background text-sm">
+                      <Receipt className="size-3.5 text-muted-foreground shrink-0" />
+                      <span className="flex-1 truncate">{selectedService.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedService(null)}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <ServiceSearch services={services} onSelect={setSelectedService} />
+                  )}
+                  {selectedService && (
+                    <p className="text-xs text-muted-foreground">
+                      Will bill {formatCurrency(unitPrice)}.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {!administeredHere && (
+                <FormField
+                  control={form.control}
+                  name="vaccine_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input placeholder="e.g. Rabies, DHPP" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="administered_at"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Administered On</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="next_due_at"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Next Due (optional)</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notes (optional)</FormLabel>
+                  <FormControl>
+                    <Textarea rows={2} className="resize-none" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="flex items-center justify-between gap-2 pt-2">
+              {addedCount > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {addedCount} added — keep adding or close when done.
+                </p>
+              ) : (
+                <span />
+              )}
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  {addedCount > 0 ? "Done" : "Cancel"}
+                </Button>
+                <Button type="submit" disabled={addVax.isPending || !canSubmit}>
+                  {addVax.isPending ? "Adding..." : "Add Vaccination"}
+                </Button>
+              </div>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function VaccinationsTab({
+  record,
+  onContinue,
+}: {
+  record: MedicalRecord;
+  onContinue: () => void;
+}) {
+  const [addOpen, setAddOpen] = useState(false);
+  const removeVax = useRemoveVaccination(record.id);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => setAddOpen(true)}>
+          <Plus className="h-4 w-4 mr-1" />
+          Add Vaccination
+        </Button>
+      </div>
+
+      {record.vaccinations.length === 0 ? (
+        <div className="text-center py-10 text-muted-foreground text-sm">
+          No vaccinations recorded for this visit yet.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {record.vaccinations.map((v: Vaccination) => (
+            <div
+              key={v.id}
+              className="flex items-start justify-between p-3 rounded-md border border-border bg-card"
+            >
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-sm">{v.vaccine_name}</span>
+                  {v.charge && (
+                    <Badge variant="success" className="text-xs">
+                      Billed · {formatCurrency(v.charge.total)}
+                    </Badge>
+                  )}
+                  {v.manufacturer && (
+                    <Badge variant="outline" className="text-xs">
+                      {v.manufacturer}
+                    </Badge>
+                  )}
+                  {v.lot_number && (
+                    <Badge variant="outline" className="text-xs font-mono">
+                      Lot {v.lot_number}
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Given {format(new Date(v.administered_at), "MMM d, yyyy")}
+                  {v.next_due_at && ` · Next due ${format(new Date(v.next_due_at), "MMM d, yyyy")}`}
+                </p>
+                {v.notes && (
+                  <p className="text-xs text-muted-foreground">{v.notes}</p>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-destructive print:hidden"
+                onClick={() => removeVax.mutate(v.id)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <AddVaccinationDialog
+        recordId={record.id}
+        visitDate={record.visit_date}
         open={addOpen}
         onOpenChange={setAddOpen}
       />
@@ -1241,14 +1631,19 @@ function PrescriptionsTab({
 
 function ItemSearch({
   onSelect,
+  category,
 }: {
   onSelect: (item: { id: string; name: string; selling_price: string }) => void;
+  // Restricts the catalog searched — e.g. "VACCINE" for the Vaccinations
+  // tab's picker. Omitted means unfiltered, unchanged from before (used by
+  // Charges and Prescriptions).
+  category?: ItemCategory;
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const debouncedQuery = useDebounce(query, 250);
   const { data } = useInventoryItems(
-    debouncedQuery ? { search: debouncedQuery, limit: 8 } : undefined,
+    debouncedQuery ? { search: debouncedQuery, ...(category ? { category } : {}), limit: 8 } : undefined,
   );
   const results = (data?.items ?? []).filter((i) => i.current_price !== null);
 
@@ -1841,6 +2236,7 @@ const TAB_ORDER = [
   "soap",
   "vitals",
   "diagnoses",
+  "vaccinations",
   "prescriptions",
   "charges",
 ] as const;
@@ -1956,6 +2352,10 @@ export function EmrDetailPage() {
             <Stethoscope className="h-3.5 w-3.5" />
             Diagnoses ({record.diagnoses.length})
           </TabsTrigger>
+          <TabsTrigger value="vaccinations" className="flex items-center gap-1.5">
+            <Syringe className="h-3.5 w-3.5" />
+            Vaccinations ({record.vaccinations.length})
+          </TabsTrigger>
           <TabsTrigger
             value="prescriptions"
             className="flex items-center gap-1.5"
@@ -1998,6 +2398,17 @@ export function EmrDetailPage() {
                 <DiagnosesTab
                   record={record}
                   onContinue={() => goToNextTab("diagnoses")}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="vaccinations">
+            <Card>
+              <CardContent className="pt-5">
+                <VaccinationsTab
+                  record={record}
+                  onContinue={() => goToNextTab("vaccinations")}
                 />
               </CardContent>
             </Card>

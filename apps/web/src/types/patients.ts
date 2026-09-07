@@ -65,6 +65,14 @@ export interface Vaccination {
   administered_by:  string;
   notes:            string | null;
   created_at:       string;
+  // Only populated when fetched via the EMR record (see types/emr.ts) —
+  // the Pet Detail page's plain vaccination list doesn't include these.
+  item_id?:    string | null;
+  service_id?: string | null;
+  charge_id?:  string | null;
+  item?:    { id: string; name: string } | null;
+  service?: { id: string; name: string } | null;
+  charge?:  { id: string; total: string } | null;
 }
 
 export interface Prescription {

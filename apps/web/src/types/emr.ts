@@ -1,3 +1,5 @@
+import type { Vaccination } from "./patients";
+
 export type SoapNoteVet = {
   id: string;
   first_name: string;
@@ -175,6 +177,7 @@ export type MedicalRecord = {
   soap_note: SoapNote | null;
   vitals: Vitals | null;
   diagnoses: Diagnosis[];
+  vaccinations: Vaccination[];
   prescriptions: Prescription[];
   lab_results: LabResult[];
   _count: { attachments: number };

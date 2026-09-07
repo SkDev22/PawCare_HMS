@@ -9,6 +9,7 @@ import {
   UpsertSoapNoteSchema,
   UpsertVitalsSchema,
   CreateDiagnosisSchema,
+  CreateVaccinationSchema,
   CreatePrescriptionSchema,
   UpdatePrescriptionSchema,
   CreateChargeSchema,
@@ -187,6 +188,35 @@ emrRouter.delete(
     try {
       const user = authed(req).user;
       await svc.removeDiagnosis(req.params.id, req.params.diagId, user.clinic_id, user.id);
+      res.status(204).end();
+    } catch (err) { next(err); }
+  },
+);
+
+// ── Vaccinations ─────────────────────────────────────────────────────────────────
+
+emrRouter.post(
+  '/:id/vaccinations',
+  authenticate,
+  authorize('MEDICAL_RECORD_WRITE'),
+  validate({ body: CreateVaccinationSchema }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = authed(req).user;
+      const vax = await svc.addVaccination(req.params.id, user.clinic_id, user.id, req.body);
+      res.status(201).json(vax);
+    } catch (err) { next(err); }
+  },
+);
+
+emrRouter.delete(
+  '/:id/vaccinations/:vaxId',
+  authenticate,
+  authorize('MEDICAL_RECORD_WRITE'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = authed(req).user;
+      await svc.removeVaccination(req.params.id, req.params.vaxId, user.clinic_id, user.id);
       res.status(204).end();
     } catch (err) { next(err); }
   },

@@ -404,6 +404,7 @@ model MedicalRecord {
   prescriptions Prescription[]
   attachments Attachment[]
   diagnoses   Diagnosis[]
+  vaccinations Vaccination[]
   charges     MedicalRecordCharge[]
 
   @@index([pet_id, visit_date])
@@ -498,18 +499,34 @@ model Attachment {
 // ─────────────────────────────────────────
 
 model Vaccination {
-  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  pet_id          String    @db.Uuid
-  vaccine_name    String
-  manufacturer    String?
-  lot_number      String?
-  administered_at DateTime
-  next_due_at     DateTime?
-  administered_by String    @db.Uuid
-  notes           String?
-  created_at      DateTime  @default(now())
+  id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pet_id            String        @db.Uuid
+  // Nullable like Prescription.medical_record_id — not every vaccination
+  // needs to trace back to a documented visit (e.g. historical records),
+  // but one recorded via the EMR flow will always have this set.
+  medical_record_id String?       @db.Uuid
+  vaccine_name      String
+  manufacturer      String?
+  lot_number        String?
+  administered_at   DateTime
+  next_due_at       DateTime?
+  administered_by   String        @db.Uuid
+  notes             String?
+  // Same shape as Prescription's item_id/service_id/charge_id: item_id
+  // bills + deducts clinic stock, service_id bills against the plain
+  // Service catalog (for clinics without the INVENTORY feature), and
+  // neither means a pure documentation record (e.g. reported by the
+  // owner, or given at another clinic) — no charge, no stock change.
+  item_id           String?       @db.Uuid
+  service_id        String?       @db.Uuid
+  charge_id         String?       @unique @db.Uuid
+  created_at        DateTime      @default(now())
 
-  pet Pet @relation(fields: [pet_id], references: [id])
+  pet            Pet                  @relation(fields: [pet_id], references: [id])
+  medical_record MedicalRecord?       @relation(fields: [medical_record_id], references: [id])
+  item           InventoryItem?       @relation(fields: [item_id], references: [id])
+  service        Service?             @relation(fields: [service_id], references: [id])
+  charge         MedicalRecordCharge? @relation(fields: [charge_id], references: [id])
 
   @@map("vaccinations")
 }
@@ -738,6 +755,7 @@ model InventoryItem {
   invoice_line_items InvoiceLineItem[]
   charges            MedicalRecordCharge[]
   prescriptions      Prescription[]
+  vaccinations       Vaccination[]
   batches            StockBatch[]
   grn_items          GoodsReceivedNoteItem[]
   controlled_approvals ControlledSubstanceApproval[]
@@ -873,6 +891,7 @@ model Service {
   invoice_line_items InvoiceLineItem[]
   charges            MedicalRecordCharge[]
   prescriptions      Prescription[]
+  vaccinations       Vaccination[]
 
   @@map("services")
 }
@@ -1050,6 +1069,7 @@ model MedicalRecordCharge {
   invoice_line_item InvoiceLineItem? @relation(fields: [invoice_line_item_id], references: [id])
   created_by_staff  StaffUser        @relation(fields: [created_by], references: [id])
   prescription      Prescription?
+  vaccination       Vaccination?
 
   @@index([medical_record_id])
   @@map("medical_record_charges")

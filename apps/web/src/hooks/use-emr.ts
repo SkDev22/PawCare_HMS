@@ -11,6 +11,7 @@ import type {
   Charge,
   ControlledApproval,
 } from '../types/emr';
+import type { Vaccination } from '../types/patients';
 
 type ApiError = { response?: { data?: { error?: { message?: string } } } };
 
@@ -130,6 +131,40 @@ export function useRemoveDiagnosis(recordId: string) {
       toast.success('Diagnosis removed');
     },
     onError: () => toast.error('Failed to remove diagnosis'),
+  });
+}
+
+export function useAddVaccination(recordId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      vaccine_name: string;
+      administered_at: string;
+      next_due_at?: string;
+      notes?: string;
+      item_id?: string;
+      batch_id?: string;
+      service_id?: string;
+    }) =>
+      api.post(`/medical-records/${recordId}/vaccinations`, data).then((r) => r.data as Vaccination),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['medical-records', recordId] });
+      toast.success('Vaccination added');
+    },
+    onError: () => toast.error('Failed to add vaccination'),
+  });
+}
+
+export function useRemoveVaccination(recordId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vaxId: string) =>
+      api.delete(`/medical-records/${recordId}/vaccinations/${vaxId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['medical-records', recordId] });
+      toast.success('Vaccination removed');
+    },
+    onError: () => toast.error('Failed to remove vaccination'),
   });
 }
 

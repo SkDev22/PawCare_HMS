@@ -195,6 +195,39 @@ export function SoapNotePrint({ record }: Props) {
         </div>
       )}
 
+      {/* Vaccinations */}
+      {record.vaccinations.length > 0 && (
+        <div className="mb-3 break-inside-avoid">
+          <p className="mb-1 border-b border-slate-300 pb-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+            Vaccinations
+          </p>
+          <table className="w-full border-collapse text-xs">
+            <thead>
+              <tr className="border-b-2 border-slate-900 text-left">
+                <th className="py-1 pr-2 font-semibold">Vaccine</th>
+                <th className="py-1 pr-2 font-semibold">Administered</th>
+                <th className="py-1 font-semibold">Next Due</th>
+              </tr>
+            </thead>
+            <tbody>
+              {record.vaccinations.map((v) => (
+                <tr key={v.id} className="border-b border-slate-200">
+                  <td className="py-1 pr-2">{v.vaccine_name}</td>
+                  <td className="py-1 pr-2">
+                    {format(new Date(v.administered_at), "MM-dd-yyyy")}
+                  </td>
+                  <td className="py-1">
+                    {v.next_due_at
+                      ? format(new Date(v.next_due_at), "MM-dd-yyyy")
+                      : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* Prescriptions */}
       {activeRx.length > 0 && (
         <div className="mb-4 break-inside-avoid">

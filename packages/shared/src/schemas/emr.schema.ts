@@ -47,6 +47,25 @@ export const CreateDiagnosisSchema = z.object({
   notes: z.string().max(1000).optional(),
 });
 
+const VaccinationBaseSchema = z.object({
+  vaccine_name:    z.string().min(1, 'Vaccine name is required').max(200),
+  administered_at: z.string().min(1, 'Administered date is required'),
+  next_due_at:     z.string().optional(),
+  notes:           z.string().max(1000).optional(),
+  // Same item_id/batch_id/service_id shape as Prescription — set item_id
+  // to bill + deduct clinic stock, service_id to bill against the plain
+  // Service catalog (clinics without INVENTORY), or neither for a pure
+  // documentation record (e.g. reported by the owner, or given elsewhere).
+  item_id:    z.string().uuid('Invalid item ID').optional(),
+  batch_id:   z.string().uuid('Invalid batch ID').optional(),
+  service_id: z.string().uuid('Invalid service ID').optional(),
+});
+
+export const CreateVaccinationSchema = VaccinationBaseSchema.refine(
+  (d) => !(d.item_id && d.service_id),
+  { message: 'Provide at most one of item_id or service_id', path: ['service_id'] },
+);
+
 const PrescriptionBaseSchema = z.object({
   drug_name: z.string().min(1, 'Drug name is required').max(200),
   dosage: z.string().min(1, 'Dosage is required').max(200),
@@ -110,6 +129,7 @@ export type MedicalRecordQueryInput = z.infer<typeof MedicalRecordQuerySchema>;
 export type UpsertSoapNoteInput = z.infer<typeof UpsertSoapNoteSchema>;
 export type UpsertVitalsInput = z.infer<typeof UpsertVitalsSchema>;
 export type CreateDiagnosisInput = z.infer<typeof CreateDiagnosisSchema>;
+export type CreateVaccinationInput = z.infer<typeof CreateVaccinationSchema>;
 export type CreatePrescriptionInput = z.infer<typeof CreatePrescriptionSchema>;
 export type UpdatePrescriptionInput = z.infer<typeof UpdatePrescriptionSchema>;
 export type CreateChargeInput = z.infer<typeof CreateChargeSchema>;

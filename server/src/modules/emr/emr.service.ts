@@ -12,6 +12,7 @@ import type {
   UpsertSoapNoteInput,
   UpsertVitalsInput,
   CreateDiagnosisInput,
+  CreateVaccinationInput,
   CreatePrescriptionInput,
   UpdatePrescriptionInput,
   CreateChargeInput,
@@ -92,6 +93,7 @@ const recordFullIncludes = {
   },
   vitals: true,
   diagnoses: { orderBy: { is_primary: 'desc' as const } },
+  vaccinations: { orderBy: { administered_at: 'desc' as const } },
   prescriptions: {
     where: { is_active: true },
     orderBy: { created_at: 'desc' as const },
@@ -360,6 +362,110 @@ export async function removeDiagnosis(
     await recordAuditLog(tx, {
       clinicId, medicalRecordId: recordId, entityType: 'Diagnosis', entityId: diagnosisId,
       action: 'DELETE', before: dx, performedBy: staffId,
+    });
+  });
+}
+
+// ── Vaccinations ───────────────────────────────────────────────────────────────
+
+export async function addVaccination(
+  recordId: string,
+  clinicId: string,
+  staffId: string,
+  data: CreateVaccinationInput,
+) {
+  return prisma.$transaction(async (tx) => {
+    const record = await assertRecordInClinic(recordId, clinicId, tx);
+
+    // Same three-way branch as addPrescription: item_id bills + deducts
+    // clinic stock, service_id bills against the plain Service catalog
+    // (clinics without INVENTORY), neither is a pure documentation record.
+    let chargeId: string | null = null;
+
+    if (data.item_id) {
+      const item = await tx.inventoryItem.findFirst({
+        where:  { id: data.item_id, clinic_id: clinicId },
+        select: { id: true, is_controlled: true },
+      });
+      if (!item) throw new AppError('NOT_FOUND', 'Inventory item not found', 404);
+      // Controlled-substance dual-approval exists for controlled drugs, not
+      // vaccines — rather than build a parallel flow for a case that
+      // essentially never occurs, a controlled item is simply rejected here.
+      if (item.is_controlled) {
+        throw new AppError('BAD_REQUEST', 'Controlled substances cannot be recorded as a vaccination', 400);
+      }
+
+      const charge = await createChargeTx(tx, recordId, clinicId, staffId, {
+        item_id: data.item_id,
+        quantity: 1,
+        description: data.vaccine_name,
+        ...(data.batch_id ? { batch_id: data.batch_id } : {}),
+      });
+      chargeId = charge.id;
+    } else if (data.service_id) {
+      const charge = await createChargeTx(tx, recordId, clinicId, staffId, {
+        service_id: data.service_id,
+        quantity: 1,
+        description: data.vaccine_name,
+      });
+      chargeId = charge.id;
+    }
+
+    const vax = await tx.vaccination.create({
+      data: {
+        pet_id: record.pet_id,
+        medical_record_id: recordId,
+        vaccine_name: data.vaccine_name,
+        administered_at: new Date(data.administered_at),
+        next_due_at: data.next_due_at ? new Date(data.next_due_at) : null,
+        administered_by: staffId,
+        notes: data.notes ?? null,
+        ...(data.item_id    ? { item_id: data.item_id }       : {}),
+        ...(data.service_id ? { service_id: data.service_id } : {}),
+        ...(chargeId        ? { charge_id: chargeId }         : {}),
+      },
+      include: {
+        item:    { select: { id: true, name: true } },
+        service: { select: { id: true, name: true } },
+        charge:  { select: { id: true, total: true } },
+      },
+    });
+
+    await recordAuditLog(tx, {
+      clinicId, medicalRecordId: recordId, entityType: 'Vaccination', entityId: vax.id,
+      action: 'CREATE', after: vax, performedBy: staffId,
+    });
+
+    return vax;
+  });
+}
+
+export async function removeVaccination(
+  recordId: string,
+  vaccinationId: string,
+  clinicId: string,
+  staffId: string,
+) {
+  return prisma.$transaction(async (tx) => {
+    await assertRecordInClinic(recordId, clinicId, tx);
+
+    const vax = await tx.vaccination.findFirst({
+      where: { id: vaccinationId, medical_record_id: recordId },
+    });
+    if (!vax) throw new AppError('NOT_FOUND', 'Vaccination not found', 404);
+
+    await tx.vaccination.delete({ where: { id: vaccinationId } });
+
+    // Deleting a vaccination that billed/deducted stock must also undo
+    // that charge — otherwise the bill (and the stock deduction it
+    // represents) is orphaned with nothing left to explain it.
+    if (vax.charge_id) {
+      await removeChargeTx(tx, recordId, vax.charge_id, clinicId, staffId);
+    }
+
+    await recordAuditLog(tx, {
+      clinicId, medicalRecordId: recordId, entityType: 'Vaccination', entityId: vaccinationId,
+      action: 'DELETE', before: vax, performedBy: staffId,
     });
   });
 }
