@@ -24,8 +24,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
-import { useCreateInventoryItem } from "../../hooks/use-inventory";
+import { useCreateInventoryItem, useInventoryItems } from "../../hooks/use-inventory";
 import { useCreateGrn } from "../../hooks/use-grn";
+import { useDebounce } from "../../hooks/use-debounce";
 import { SupplierPicker } from "../../components/inventory/SupplierPicker";
 import { useAuthStore } from "../../stores/auth.store";
 import { isInventoryRetailOnly } from "@pawcare/shared";
@@ -126,6 +127,20 @@ export function InventoryNewPage() {
     defaultValues: STOCK_DEFAULTS,
   });
 
+  // Live duplicate-barcode check — catches "this item already exists" the
+  // moment it's scanned, rather than after the rest of the form is filled
+  // in and the save is rejected with a 409. Non-blocking: it's a heads-up,
+  // not a hard stop, since the backend is still the source of truth.
+  const barcodeValue = form.watch("barcode");
+  const debouncedBarcode = useDebounce(barcodeValue, 400);
+  const { data: barcodeMatches } = useInventoryItems(
+    { search: debouncedBarcode, is_active: true, limit: 5 },
+    { enabled: debouncedBarcode.trim().length > 0 },
+  );
+  const duplicateItem = barcodeMatches?.items.find(
+    (i) => i.barcode === debouncedBarcode.trim(),
+  );
+
   const isBusy = createItem.isPending || createGrn.isPending;
 
   function completeCycle() {
@@ -145,7 +160,7 @@ export function InventoryNewPage() {
       is_controlled: itemValues.is_controlled,
     });
     stockForm.reset(STOCK_DEFAULTS);
-    form.setFocus("name");
+    form.setFocus("barcode");
   }
 
   function submitStock(itemId: string) {
@@ -256,6 +271,38 @@ export function InventoryNewPage() {
                 <fieldset disabled={!!pendingItemId} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
+                    name="barcode"
+                    render={({ field }) => (
+                      <FormItem className="sm:col-span-2">
+                        <FormLabel>Barcode</FormLabel>
+                        <FormControl>
+                          {/* Scan-first: a USB barcode scanner types into whatever
+                              field has focus, so this stays autoFocus'd both on
+                              first load and after each item is saved (see
+                              completeCycle's form.setFocus("barcode")) — scan the
+                              next item immediately with no click needed. */}
+                          <Input autoFocus placeholder="Scan barcode, or type it in" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        {duplicateItem && (
+                          <p className="text-sm text-destructive">
+                            Already used by{" "}
+                            <button
+                              type="button"
+                              className="underline underline-offset-2 hover:no-underline"
+                              onClick={() => navigate(`/inventory/${duplicateItem.id}`)}
+                            >
+                              {duplicateItem.name}
+                            </button>
+                            .
+                          </p>
+                        )}
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
                     name="name"
                     render={({ field }) => (
                       <FormItem className="sm:col-span-2">
@@ -341,20 +388,6 @@ export function InventoryNewPage() {
                         <FormLabel>SKU</FormLabel>
                         <FormControl>
                           <Input placeholder="Optional" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="barcode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Barcode</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Optional — for Pet Shop scanning" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
