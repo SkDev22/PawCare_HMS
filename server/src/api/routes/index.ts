@@ -71,9 +71,12 @@ apiRouter.use(
   }),
   wardRouter,
 );
-apiRouter.use('/inventory', authenticate, authorizeFeature('INVENTORY', { allowReadWithoutFeature: true }), inventoryRouter);
-apiRouter.use('/grn', authenticate, authorizeFeature('INVENTORY', { allowReadWithoutFeature: true }), grnRouter);
-apiRouter.use('/suppliers', authenticate, authorizeFeature('INVENTORY', { allowReadWithoutFeature: true }), suppliersRouter);
+// A clinic with only the PET_SHOP add-on (no INVENTORY plan feature) is let
+// through here too — inventory.service.ts/grn.service.ts then scope such a
+// caller to RETAIL-category items only (see isInventoryRetailOnly()).
+apiRouter.use('/inventory', authenticate, authorizeFeature(['INVENTORY', 'PET_SHOP'], { allowReadWithoutFeature: true }), inventoryRouter);
+apiRouter.use('/grn', authenticate, authorizeFeature(['INVENTORY', 'PET_SHOP'], { allowReadWithoutFeature: true }), grnRouter);
+apiRouter.use('/suppliers', authenticate, authorizeFeature(['INVENTORY', 'PET_SHOP'], { allowReadWithoutFeature: true }), suppliersRouter);
 // Reports has no "old data" of its own — every endpoint is a live computed
 // read over other tables, so unlike the modules above, letting GET through
 // here would just remove the plan gate entirely. Stays hard-gated.

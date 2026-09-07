@@ -1,3 +1,5 @@
+import type { FeatureKey } from './features';
+
 export const PERMISSIONS = {
   // Dashboard
   DASHBOARD_READ:       ['ADMIN', 'VETERINARIAN', 'NURSE', 'RECEPTIONIST', 'LAB_TECHNICIAN'] as const,
@@ -75,8 +77,16 @@ export const EDITABLE_PERMISSION_KEYS = (Object.keys(PERMISSIONS) as PermissionK
 );
 
 // Module grouping + human label for each editable permission, used to render
-// the Roles & Permissions screen.
-export const PERMISSION_CATALOG: Record<PermissionKey, { module: string; label: string }> = {
+// the Roles & Permissions screen. `requiredFeature`, when present, names the
+// ADR-04 feature that must be on the clinic's plan for this permission to do
+// anything — the route itself is already gated by authorizeFeature()
+// regardless of what's set here, so this is purely UI: it lets Settings show
+// the permission dimmed/locked (like ThemeColorForm does) instead of
+// presenting a live-looking control for a module the clinic doesn't have.
+export const PERMISSION_CATALOG: Record<
+  PermissionKey,
+  { module: string; label: string; requiredFeature?: FeatureKey }
+> = {
   DASHBOARD_READ:               { module: 'Dashboard',       label: 'View dashboard' },
 
   PATIENT_READ:                 { module: 'Patients',        label: 'View owners & pets' },
@@ -87,18 +97,23 @@ export const PERMISSION_CATALOG: Record<PermissionKey, { module: string; label: 
   SOAP_NOTE_WRITE:              { module: 'Medical Records',  label: 'Write SOAP notes' },
   AUDIT_LOG_READ:               { module: 'Medical Records',  label: 'View edit history (audit log)' },
 
-  APPOINTMENT_READ:             { module: 'Appointments',     label: 'View appointments' },
-  APPOINTMENT_WRITE:            { module: 'Appointments',     label: 'Create & edit appointments' },
-  APPOINTMENT_CANCEL:           { module: 'Appointments',     label: 'Cancel appointments' },
+  APPOINTMENT_READ:             { module: 'Appointments',     label: 'View appointments',            requiredFeature: 'APPOINTMENTS' },
+  APPOINTMENT_WRITE:            { module: 'Appointments',     label: 'Create & edit appointments',   requiredFeature: 'APPOINTMENTS' },
+  APPOINTMENT_CANCEL:           { module: 'Appointments',     label: 'Cancel appointments',          requiredFeature: 'APPOINTMENTS' },
 
-  INVOICE_READ:                 { module: 'Billing',          label: 'View invoices' },
+  // These three also gate Pet Shop / POS (pos.routes.ts reuses them rather
+  // than having permissions of its own) — labeled explicitly so an admin
+  // toggling one here knows it affects checkout too, not just clinical billing.
+  // Not feature-gated themselves: BILLING is on every plan, and Pet Shop's
+  // own PET_SHOP gate is a separate add-on check the route already enforces.
+  INVOICE_READ:                 { module: 'Billing',          label: 'View invoices & Pet Shop sales' },
   INVOICE_WRITE:                { module: 'Billing',          label: 'Create & edit invoices' },
-  PAYMENT_PROCESS:              { module: 'Billing',          label: 'Record payments' },
-  PAYMENT_VOID:                 { module: 'Billing',          label: 'Void payments & process refunds' },
+  PAYMENT_PROCESS:              { module: 'Billing',          label: 'Record payments & Pet Shop checkout' },
+  PAYMENT_VOID:                 { module: 'Billing',          label: 'Void payments & process refunds (incl. Pet Shop returns)' },
 
-  INVENTORY_READ:                { module: 'Inventory',        label: 'View inventory' },
-  INVENTORY_WRITE:               { module: 'Inventory',        label: 'Add & adjust inventory' },
-  CONTROLLED_SUBSTANCE_APPROVE:  { module: 'Inventory',        label: 'Approve controlled substance dispensing' },
+  INVENTORY_READ:                { module: 'Inventory',        label: 'View inventory',                        requiredFeature: 'INVENTORY' },
+  INVENTORY_WRITE:               { module: 'Inventory',        label: 'Add & adjust inventory',                requiredFeature: 'INVENTORY' },
+  CONTROLLED_SUBSTANCE_APPROVE:  { module: 'Inventory',        label: 'Approve controlled substance dispensing', requiredFeature: 'INVENTORY' },
 
   STAFF_READ:                    { module: 'Staff',            label: 'View staff' },
   STAFF_WRITE:                   { module: 'Staff',            label: 'Create & edit staff' },
@@ -108,11 +123,13 @@ export const PERMISSION_CATALOG: Record<PermissionKey, { module: string; label: 
 
   REPORT_READ:                   { module: 'Reports',          label: 'View reports' },
 
-  LAB_ORDER_WRITE:               { module: 'Laboratory',       label: 'Create lab orders' },
-  LAB_RESULT_WRITE:              { module: 'Laboratory',       label: 'Record lab results' },
+  // Laboratory is a paid add-on (not bundled by any plan tier) — locked by
+  // default everywhere except TRIAL or a clinic that's specifically bought it.
+  LAB_ORDER_WRITE:               { module: 'Laboratory',       label: 'Create lab orders',   requiredFeature: 'LABORATORY' },
+  LAB_RESULT_WRITE:              { module: 'Laboratory',       label: 'Record lab results',  requiredFeature: 'LABORATORY' },
 
-  WARD_READ:                     { module: 'Ward',             label: 'View ward & kennels' },
-  WARD_WRITE:                    { module: 'Ward',             label: 'Admit, discharge & log ward care' },
+  WARD_READ:                     { module: 'Ward',             label: 'View ward & kennels',                requiredFeature: 'WARD' },
+  WARD_WRITE:                    { module: 'Ward',             label: 'Admit, discharge & log ward care',   requiredFeature: 'WARD' },
 
   ROLE_PERMISSIONS_MANAGE:       { module: 'Clinic',           label: 'Manage role permissions' },
 };

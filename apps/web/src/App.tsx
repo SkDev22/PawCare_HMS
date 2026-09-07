@@ -83,7 +83,7 @@ function AuthLayout({
 }: {
   children: React.ReactNode;
   permission?: PermissionKey;
-  feature?: FeatureKey;
+  feature?: FeatureKey | FeatureKey[];
 }) {
   const effectivePermissions = useAuthStore((s) => s.user?.effective_permissions);
   const user = useAuthStore((s) => s.user);
@@ -207,14 +207,14 @@ export function App() {
           <Route path="/ward/:id" element={<AuthLayout permission="WARD_READ" feature="WARD"><HospitalizationDetailPage /></AuthLayout>} />
 
           {/* Inventory */}
-          <Route path="/inventory"          element={<AuthLayout permission="INVENTORY_READ" feature="INVENTORY"><InventoryPage /></AuthLayout>} />
-          <Route path="/inventory/new"      element={<AuthLayout permission="INVENTORY_WRITE" feature="INVENTORY"><InventoryNewPage /></AuthLayout>} />
-          <Route path="/inventory/alerts"   element={<AuthLayout permission="INVENTORY_READ" feature="INVENTORY"><InventoryAlertsPage /></AuthLayout>} />
-          <Route path="/inventory/grn"      element={<AuthLayout permission="INVENTORY_READ" feature="INVENTORY"><GrnListPage /></AuthLayout>} />
-          <Route path="/inventory/grn/new"  element={<AuthLayout permission="INVENTORY_WRITE" feature="INVENTORY"><GrnFormPage /></AuthLayout>} />
-          <Route path="/inventory/grn/:id"  element={<AuthLayout permission="INVENTORY_READ" feature="INVENTORY"><GrnDetailPage /></AuthLayout>} />
-          <Route path="/inventory/:id"      element={<AuthLayout permission="INVENTORY_READ" feature="INVENTORY"><InventoryDetailPage /></AuthLayout>} />
-          <Route path="/inventory/:id/edit" element={<AuthLayout permission="INVENTORY_WRITE" feature="INVENTORY"><InventoryEditPage /></AuthLayout>} />
+          <Route path="/inventory"          element={<AuthLayout permission="INVENTORY_READ" feature={["INVENTORY", "PET_SHOP"]}><InventoryPage /></AuthLayout>} />
+          <Route path="/inventory/new"      element={<AuthLayout permission="INVENTORY_WRITE" feature={["INVENTORY", "PET_SHOP"]}><InventoryNewPage /></AuthLayout>} />
+          <Route path="/inventory/alerts"   element={<AuthLayout permission="INVENTORY_READ" feature={["INVENTORY", "PET_SHOP"]}><InventoryAlertsPage /></AuthLayout>} />
+          <Route path="/inventory/grn"      element={<AuthLayout permission="INVENTORY_READ" feature={["INVENTORY", "PET_SHOP"]}><GrnListPage /></AuthLayout>} />
+          <Route path="/inventory/grn/new"  element={<AuthLayout permission="INVENTORY_WRITE" feature={["INVENTORY", "PET_SHOP"]}><GrnFormPage /></AuthLayout>} />
+          <Route path="/inventory/grn/:id"  element={<AuthLayout permission="INVENTORY_READ" feature={["INVENTORY", "PET_SHOP"]}><GrnDetailPage /></AuthLayout>} />
+          <Route path="/inventory/:id"      element={<AuthLayout permission="INVENTORY_READ" feature={["INVENTORY", "PET_SHOP"]}><InventoryDetailPage /></AuthLayout>} />
+          <Route path="/inventory/:id/edit" element={<AuthLayout permission="INVENTORY_WRITE" feature={["INVENTORY", "PET_SHOP"]}><InventoryEditPage /></AuthLayout>} />
 
           {/* Reports */}
           <Route path="/reports"      element={<AuthLayout permission="REPORT_READ" feature="REPORTS"><ReportsPage /></AuthLayout>} />

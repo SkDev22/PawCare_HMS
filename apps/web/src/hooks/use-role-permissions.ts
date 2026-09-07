@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { EditableRole, PermissionKey } from '@pawcare/shared';
+import type { EditableRole, PermissionKey, FeatureKey } from '@pawcare/shared';
 import { api } from '../lib/api';
 import { useAuthStore } from '../stores/auth.store';
 
@@ -9,6 +9,7 @@ export interface RoleMatrixEntry {
   label: string;
   granted: boolean;
   isOverridden: boolean;
+  requiredFeature?: FeatureKey;
 }
 
 export type RoleMatrix = Record<EditableRole, RoleMatrixEntry[]>;

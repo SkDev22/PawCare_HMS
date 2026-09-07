@@ -24,6 +24,8 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 import { useInventoryItem, useUpdateInventoryItem } from "../../hooks/use-inventory";
+import { useAuthStore } from "../../stores/auth.store";
+import { isInventoryRetailOnly } from "@pawcare/shared";
 import type { ItemCategory } from "../../types/inventory";
 
 const CATEGORIES: Array<{ value: ItemCategory; label: string }> = [
@@ -34,6 +36,7 @@ const CATEGORIES: Array<{ value: ItemCategory; label: string }> = [
   { value: "FOOD", label: "Food" },
   { value: "EQUIPMENT", label: "Equipment" },
   { value: "OTHER", label: "Other" },
+  { value: "RETAIL", label: "Pet Shop (Retail)" },
 ];
 
 const EditSchema = z.object({
@@ -46,6 +49,7 @@ const EditSchema = z.object({
     "FOOD",
     "EQUIPMENT",
     "OTHER",
+    "RETAIL",
   ]),
   unit: z.string().min(1, "Unit is required").max(50),
   reorder_threshold: z.coerce.number().int().min(0).default(10),
@@ -61,6 +65,8 @@ export function InventoryEditPage() {
   const navigate = useNavigate();
   const { data: item, isLoading } = useInventoryItem(id);
   const update = useUpdateInventoryItem(id ?? "");
+  const user = useAuthStore((s) => s.user);
+  const retailOnly = isInventoryRetailOnly(user?.plan ?? "TRIAL", user?.extra_features ?? []);
 
   const form = useForm<z.infer<typeof EditSchema>>({
     resolver: zodResolver(EditSchema),
@@ -178,20 +184,26 @@ export function InventoryEditPage() {
                       <FormLabel>
                         Category <span className="text-destructive">*</span>
                       </FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {CATEGORIES.map((c) => (
-                            <SelectItem key={c.value} value={c.value}>
-                              {c.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {retailOnly ? (
+                        <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">
+                          Pet Shop (Retail)
+                        </div>
+                      ) : (
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {CATEGORIES.map((c) => (
+                              <SelectItem key={c.value} value={c.value}>
+                                {c.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
@@ -284,26 +296,28 @@ export function InventoryEditPage() {
                 />
               </div>
 
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() =>
-                    form.setValue("is_controlled", !form.watch("is_controlled"))
-                  }
-                  className={`w-10 h-6 rounded-full transition-colors shrink-0 ${
-                    form.watch("is_controlled")
-                      ? "bg-destructive"
-                      : "bg-muted border border-input"
-                  }`}
-                >
-                  <span
-                    className={`block h-4 w-4 rounded-full bg-white shadow transition-transform mx-auto ${
-                      form.watch("is_controlled") ? "translate-x-2" : "-translate-x-2"
+              {!retailOnly && (
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      form.setValue("is_controlled", !form.watch("is_controlled"))
+                    }
+                    className={`w-10 h-6 rounded-full transition-colors shrink-0 ${
+                      form.watch("is_controlled")
+                        ? "bg-destructive"
+                        : "bg-muted border border-input"
                     }`}
-                  />
-                </button>
-                <span className="text-sm">Controlled substance</span>
-              </div>
+                  >
+                    <span
+                      className={`block h-4 w-4 rounded-full bg-white shadow transition-transform mx-auto ${
+                        form.watch("is_controlled") ? "translate-x-2" : "-translate-x-2"
+                      }`}
+                    />
+                  </button>
+                  <span className="text-sm">Controlled substance</span>
+                </div>
+              )}
 
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => navigate(`/inventory/${id}`)}>

@@ -7,6 +7,7 @@ import {
   UpdateInventoryItemSchema,
   LogTransactionSchema,
   InventoryQuerySchema,
+  isInventoryRetailOnly,
 } from '@pawcare/shared';
 import type { InventoryQuery } from '@pawcare/shared';
 import * as svc from './inventory.service';
@@ -17,6 +18,15 @@ function authed(req: Request): AuthenticatedRequest {
   return req as AuthenticatedRequest;
 }
 
+// True for a clinic that has Pet Shop but not the full Inventory plan
+// feature — such a caller is scoped to RETAIL-category items only, rather
+// than blocked outright (the composite feature gate in api/routes/index.ts
+// already lets them through the door).
+function retailOnly(req: Request): boolean {
+  const { plan, extra_features } = authed(req).user;
+  return isInventoryRetailOnly(plan, extra_features);
+}
+
 // ── Alerts (must come before /:id) ───────────────────────────────────────────
 
 inventoryRouter.get(
@@ -25,7 +35,7 @@ inventoryRouter.get(
   authorize('INVENTORY_READ'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const alerts = await svc.getAlerts(authed(req).user.clinic_id);
+      const alerts = await svc.getAlerts(authed(req).user.clinic_id, retailOnly(req));
       res.json(alerts);
     } catch (err) { next(err); }
   },
@@ -43,6 +53,7 @@ inventoryRouter.get(
       const result = await svc.listItems(
         authed(req).user.clinic_id,
         req.query as unknown as InventoryQuery,
+        retailOnly(req),
       );
       res.json(result);
     } catch (err) { next(err); }
@@ -56,7 +67,7 @@ inventoryRouter.post(
   validate({ body: CreateInventoryItemSchema }),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const item = await svc.createItem(authed(req).user.clinic_id, req.body);
+      const item = await svc.createItem(authed(req).user.clinic_id, req.body, retailOnly(req));
       res.status(201).json(item);
     } catch (err) { next(err); }
   },
@@ -70,7 +81,7 @@ inventoryRouter.get(
   authorize('INVENTORY_READ'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const item = await svc.getItem(req.params.id, authed(req).user.clinic_id);
+      const item = await svc.getItem(req.params.id, authed(req).user.clinic_id, retailOnly(req));
       if (!item) return res.status(404).json({ error: { message: 'Not found' } });
       res.json(item);
     } catch (err) { next(err); }
@@ -88,6 +99,7 @@ inventoryRouter.put(
         req.params.id,
         authed(req).user.clinic_id,
         req.body,
+        retailOnly(req),
       );
       res.json(item);
     } catch (err) { next(err); }
@@ -100,7 +112,7 @@ inventoryRouter.delete(
   authorize('INVENTORY_WRITE'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await svc.deleteItem(req.params.id, authed(req).user.clinic_id);
+      await svc.deleteItem(req.params.id, authed(req).user.clinic_id, retailOnly(req));
       res.status(204).end();
     } catch (err) { next(err); }
   },
@@ -114,7 +126,7 @@ inventoryRouter.get(
   authorize('INVENTORY_READ'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const batches = await svc.listBatches(req.params.id, authed(req).user.clinic_id);
+      const batches = await svc.listBatches(req.params.id, authed(req).user.clinic_id, retailOnly(req));
       res.json(batches);
     } catch (err) { next(err); }
   },
@@ -134,6 +146,7 @@ inventoryRouter.post(
         authed(req).user.clinic_id,
         authed(req).user.id,
         req.body,
+        retailOnly(req),
       );
       res.status(201).json(tx);
     } catch (err) { next(err); }
@@ -153,6 +166,7 @@ inventoryRouter.get(
         authed(req).user.clinic_id,
         cursor,
         limit,
+        retailOnly(req),
       );
       res.json(result);
     } catch (err) { next(err); }

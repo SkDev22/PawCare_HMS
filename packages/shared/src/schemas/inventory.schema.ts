@@ -8,6 +8,7 @@ export const ItemCategoryEnum = z.enum([
   'FOOD',
   'EQUIPMENT',
   'OTHER',
+  'RETAIL',
 ]);
 
 export const CreateInventoryItemSchema = z.object({

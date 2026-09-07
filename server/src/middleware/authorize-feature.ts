@@ -25,7 +25,17 @@ export interface AuthorizeFeatureOptions {
 // caller's role — authorize() answers "can this role do this", authorizeFeature()
 // answers "does this clinic's plan include this module at all". Derived from
 // the JWT's `plan` claim, so no extra DB query per request.
-export function authorizeFeature(feature: FeatureKey, options: AuthorizeFeatureOptions = {}) {
+//
+// `feature` accepts an array for an ANY-of gate — e.g. inventory/GRN/suppliers
+// are reachable with either the full INVENTORY feature or just the PET_SHOP
+// add-on (the latter then gets scoped to RETAIL-category items at the
+// service layer — see isInventoryRetailOnly()).
+export function authorizeFeature(
+  feature: FeatureKey | FeatureKey[],
+  options: AuthorizeFeatureOptions = {},
+) {
+  const features = Array.isArray(feature) ? feature : [feature];
+
   return (req: Request, res: Response, next: NextFunction): void => {
     if (options.allowReadWithoutFeature && (req.method === 'GET' || req.method === 'HEAD')) {
       next();
@@ -39,7 +49,7 @@ export function authorizeFeature(feature: FeatureKey, options: AuthorizeFeatureO
 
     const { plan, extra_features } = (req as AuthenticatedRequest).user;
 
-    if (!clinicHasFeature(plan, feature, extra_features)) {
+    if (!features.some((f) => clinicHasFeature(plan, f, extra_features))) {
       res.status(403).json({
         error: { code: 'FEATURE_NOT_ENABLED', message: 'This feature is not included in your plan' },
       });

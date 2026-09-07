@@ -36,12 +36,11 @@ export const FEATURES = [
 // product during a trial. Laboratory moved here because it's about to grow
 // well beyond what any plan tier bundles for free; Pet Shop was designed
 // as an add-on from the start.
-export const ADDON_FEATURES = [
-  "LABORATORY",
-  "PET_SHOP",
-] as const;
+export const ADDON_FEATURES = ["LABORATORY", "PET_SHOP"] as const;
 
-export type FeatureKey = (typeof FEATURES)[number] | (typeof ADDON_FEATURES)[number];
+export type FeatureKey =
+  | (typeof FEATURES)[number]
+  | (typeof ADDON_FEATURES)[number];
 
 // TRIAL gets every core feature plus every add-on, to showcase full value.
 // ENTERPRISE gets every core feature but NOT add-ons — those are sold
@@ -54,9 +53,9 @@ export const PLAN_FEATURES: Record<ClinicPlanType, readonly FeatureKey[]> = {
     "EMR",
     "BILLING",
     "STAFF",
-    "NOTIFICATIONS",
+    "NOTIFICATIONS", // In app notifications only
     "REPORTS", // Customize
-  ], // In app notifications only
+  ],
   PRO: [
     "PATIENTS",
     "APPOINTMENTS",
@@ -96,6 +95,20 @@ export function clinicHasFeature(
   extraFeatures: readonly string[] = [],
 ): boolean {
   return getEffectiveFeatures(plan, extraFeatures).includes(feature);
+}
+
+// True when a clinic can use Pet Shop but doesn't have the full Inventory
+// module — used to scope inventory/GRN access to RETAIL-category items only,
+// instead of blocking the module outright the way a missing feature normally
+// would (see authorize-feature.ts and inventory.service.ts).
+export function isInventoryRetailOnly(
+  plan: ClinicPlanType,
+  extraFeatures: readonly string[] = [],
+): boolean {
+  return (
+    !clinicHasFeature(plan, "INVENTORY", extraFeatures) &&
+    clinicHasFeature(plan, "PET_SHOP", extraFeatures)
+  );
 }
 
 // A TRIAL clinic past its trial_ends_at date loses access entirely until

@@ -6,6 +6,7 @@ import {
   type EditableRole,
   type PermissionKey,
   type StaffRole,
+  type FeatureKey,
 } from '@pawcare/shared';
 import { prisma } from '../../lib/prisma';
 import { getEffectivePermissions } from '../../lib/role-permissions';
@@ -17,6 +18,7 @@ export interface RoleMatrixEntry {
   label: string;
   granted: boolean;
   isOverridden: boolean;
+  requiredFeature?: FeatureKey;
 }
 
 // Powers the Roles & Permissions Settings card: for each editable role, the
@@ -43,6 +45,7 @@ export async function getMatrix(
         label: catalogEntry.label,
         granted: override ?? (PERMISSIONS[key] as readonly string[]).includes(role),
         isOverridden: override !== undefined,
+        ...(catalogEntry.requiredFeature ? { requiredFeature: catalogEntry.requiredFeature } : {}),
       };
     });
   }

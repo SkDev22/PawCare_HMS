@@ -18,8 +18,14 @@ function clinicScope(clinicId: string) {
   return { clinic_id: clinicId };
 }
 
-async function assertItem(id: string, clinicId: string) {
-  const item = await prisma.inventoryItem.findFirst({ where: { id, ...clinicScope(clinicId) } });
+// `retailOnly` narrows every lookup to RETAIL-category items — a
+// Pet-Shop-only clinic (PET_SHOP without the INVENTORY plan feature) gets a
+// 404 rather than a 403 for anything outside that scope, so it can't even
+// confirm a medical item exists.
+async function assertItem(id: string, clinicId: string, retailOnly = false) {
+  const item = await prisma.inventoryItem.findFirst({
+    where: { id, ...clinicScope(clinicId), ...(retailOnly ? { category: 'RETAIL' } : {}) },
+  });
   if (!item) throw new AppError('NOT_FOUND', 'Item not found', 404);
   return item;
 }
@@ -74,10 +80,15 @@ function searchFilter(search: string): Prisma.InventoryItemWhereInput {
   return { OR: [{ name: contains }, { sku: contains }, { barcode: contains }] };
 }
 
-export async function listItems(clinicId: string, params: InventoryQuery) {
+export async function listItems(clinicId: string, params: InventoryQuery, retailOnly = false) {
+  // A Pet-Shop-only clinic can only ever see RETAIL items — overrides
+  // whatever category the caller asked for, rather than erroring, since the
+  // list/alerts screens don't offer a category picker in that mode anyway.
+  const categoryFilter = retailOnly ? 'RETAIL' : params.category;
+
   const where: Prisma.InventoryItemWhereInput = {
     ...clinicScope(clinicId),
-    ...(params.category ? { category: params.category } : {}),
+    ...(categoryFilter ? { category: categoryFilter } : {}),
     ...(params.is_active !== undefined ? { is_active: params.is_active } : { is_active: true }),
     ...(params.search ? searchFilter(params.search) : {}),
     ...(params.cursor ? { id: { lt: params.cursor } } : {}),
@@ -96,7 +107,7 @@ export async function listItems(clinicId: string, params: InventoryQuery) {
     const all = await prisma.inventoryItem.findMany({
       where: {
         ...clinicScope(clinicId),
-        ...(params.category ? { category: params.category } : {}),
+        ...(categoryFilter ? { category: categoryFilter } : {}),
         is_active: true,
         ...(params.search ? searchFilter(params.search) : {}),
       },
@@ -117,9 +128,9 @@ export async function listItems(clinicId: string, params: InventoryQuery) {
   return { items: await withAggregates(items), hasMore, nextCursor: hasMore ? items[items.length - 1].id : null };
 }
 
-export async function getItem(id: string, clinicId: string) {
+export async function getItem(id: string, clinicId: string, retailOnly = false) {
   const item = await prisma.inventoryItem.findFirst({
-    where:   { id, ...clinicScope(clinicId) },
+    where:   { id, ...clinicScope(clinicId), ...(retailOnly ? { category: 'RETAIL' } : {}) },
     include: {
       transactions: {
         orderBy: { created_at: 'desc' },
@@ -155,7 +166,15 @@ export async function getItem(id: string, clinicId: string) {
   };
 }
 
-export async function createItem(clinicId: string, data: CreateInventoryItemInput) {
+export async function createItem(clinicId: string, data: CreateInventoryItemInput, retailOnly = false) {
+  if (retailOnly && (data.category !== 'RETAIL' || data.is_controlled)) {
+    throw new AppError(
+      'FORBIDDEN',
+      'Your plan only includes Pet Shop (retail) inventory — upgrade to the full Inventory module for other item types.',
+      403,
+    );
+  }
+
   if (data.sku) {
     const existing = await prisma.inventoryItem.findUnique({ where: { sku: data.sku } });
     if (existing) throw new AppError('CONFLICT', 'SKU already in use', 409);
@@ -182,9 +201,27 @@ export async function createItem(clinicId: string, data: CreateInventoryItemInpu
   });
 }
 
-export async function updateItem(id: string, clinicId: string, data: UpdateInventoryItemInput) {
-  await assertItem(id, clinicId);
+export async function updateItem(id: string, clinicId: string, data: UpdateInventoryItemInput, retailOnly = false) {
+  await assertItem(id, clinicId, retailOnly);
 
+  if (retailOnly && ((data.category !== undefined && data.category !== 'RETAIL') || data.is_controlled)) {
+    throw new AppError(
+      'FORBIDDEN',
+      'Your plan only includes Pet Shop (retail) inventory — upgrade to the full Inventory module for other item types.',
+      403,
+    );
+  }
+
+  // sku/barcode are @unique nullable columns — an empty string is not the
+  // same as "no value" to Postgres (unlike NULL, two rows can't both hold
+  // ""), so a cleared field must be written as null, and only a genuinely
+  // non-empty value needs a conflict check against other items.
+  if (data.sku) {
+    const existing = await prisma.inventoryItem.findFirst({
+      where: { sku: data.sku, id: { not: id } },
+    });
+    if (existing) throw new AppError('CONFLICT', 'SKU already in use', 409);
+  }
   if (data.barcode) {
     const existing = await prisma.inventoryItem.findFirst({
       where: { barcode: data.barcode, id: { not: id } },
@@ -204,8 +241,8 @@ export async function updateItem(id: string, clinicId: string, data: UpdateInven
       ...(data.location !== undefined ? { location: data.location } : {}),
       ...(data.is_controlled !== undefined ? { is_controlled: data.is_controlled } : {}),
       ...(data.is_active !== undefined ? { is_active: data.is_active } : {}),
-      ...(data.sku !== undefined ? { sku: data.sku } : {}),
-      ...(data.barcode !== undefined ? { barcode: data.barcode } : {}),
+      ...(data.sku !== undefined ? { sku: data.sku || null } : {}),
+      ...(data.barcode !== undefined ? { barcode: data.barcode || null } : {}),
     },
   });
 }
@@ -218,8 +255,8 @@ export async function updateItem(id: string, clinicId: string, data: UpdateInven
  * audit history; deactivating (see updateItem/is_active) is the only option
  * at that point, same as how staff are deactivated rather than deleted.
  */
-export async function deleteItem(id: string, clinicId: string) {
-  await assertItem(id, clinicId);
+export async function deleteItem(id: string, clinicId: string, retailOnly = false) {
+  await assertItem(id, clinicId, retailOnly);
 
   const [batchCount, transactionCount] = await Promise.all([
     prisma.stockBatch.count({ where: { item_id: id } }),
@@ -238,8 +275,8 @@ export async function deleteItem(id: string, clinicId: string) {
 
 // ── Batches ───────────────────────────────────────────────────────────────
 
-export async function listBatches(itemId: string, clinicId: string) {
-  await assertItem(itemId, clinicId);
+export async function listBatches(itemId: string, clinicId: string, retailOnly = false) {
+  await assertItem(itemId, clinicId, retailOnly);
 
   return prisma.stockBatch.findMany({
     where:   { item_id: itemId },
@@ -456,12 +493,20 @@ export async function logTransaction(
   clinicId: string,
   staffId:  string,
   data:     LogTransactionInput & { batch_id?: string },
+  retailOnly = false,
 ) {
+  await assertItem(itemId, clinicId, retailOnly);
   return prisma.$transaction((tx) => applyStockChangeTx(tx, itemId, clinicId, staffId, data));
 }
 
-export async function listTransactions(itemId: string, clinicId: string, cursor?: string, limit = 20) {
-  await assertItem(itemId, clinicId);
+export async function listTransactions(
+  itemId: string,
+  clinicId: string,
+  cursor?: string,
+  limit = 20,
+  retailOnly = false,
+) {
+  await assertItem(itemId, clinicId, retailOnly);
 
   const rows = await prisma.inventoryTransaction.findMany({
     where:   { item_id: itemId, ...(cursor ? { id: { lt: cursor } } : {}) },
@@ -491,9 +536,9 @@ export async function listTransactions(itemId: string, clinicId: string, cursor?
 
 // ── Alerts ────────────────────────────────────────────────────────────────────
 
-export async function getAlerts(clinicId: string) {
+export async function getAlerts(clinicId: string, retailOnly = false) {
   const all = await prisma.inventoryItem.findMany({
-    where:   { clinic_id: clinicId, is_active: true },
+    where:   { clinic_id: clinicId, is_active: true, ...(retailOnly ? { category: 'RETAIL' } : {}) },
     orderBy: { name: 'asc' },
   });
 
@@ -508,7 +553,7 @@ export async function getAlerts(clinicId: string) {
   const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   const expiringBatches = await prisma.stockBatch.findMany({
     where: {
-      item: { clinic_id: clinicId },
+      item: { clinic_id: clinicId, ...(retailOnly ? { category: 'RETAIL' } : {}) },
       is_closed: false,
       quantity_remaining: { gt: 0 },
       expiry_date: { lte: in30Days },

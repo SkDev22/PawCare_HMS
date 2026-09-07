@@ -710,6 +710,10 @@ enum ItemCategory {
   FOOD
   EQUIPMENT
   OTHER
+  // Pet Shop / POS stock — the only category a Pet-Shop-only clinic (has
+  // PET_SHOP but not the INVENTORY plan feature) may create or sell items
+  // under. See isInventoryRetailOnly() in packages/shared/src/constants/features.ts.
+  RETAIL
 }
 
 model InventoryItem {

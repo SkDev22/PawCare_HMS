@@ -50,14 +50,29 @@ export async function getGrn(id: string, clinicId: string) {
   return grn;
 }
 
-export async function createGrn(clinicId: string, staffId: string, data: CreateGrnInput) {
+export async function createGrn(
+  clinicId: string,
+  staffId: string,
+  data: CreateGrnInput,
+  retailOnly = false,
+) {
   const itemIds = [...new Set(data.items.map((i) => i.item_id))];
   const foundItems = await prisma.inventoryItem.findMany({
     where: { id: { in: itemIds }, clinic_id: clinicId },
-    select: { id: true },
+    select: { id: true, category: true },
   });
   if (foundItems.length !== itemIds.length) {
     throw new AppError('NOT_FOUND', 'One or more inventory items were not found in this clinic', 404);
+  }
+  // A Pet-Shop-only clinic (no full INVENTORY feature) can only receive
+  // stock for RETAIL-category items — mirrors the same restriction on
+  // creating the item itself in inventory.service.ts's createItem.
+  if (retailOnly && foundItems.some((i) => i.category !== 'RETAIL')) {
+    throw new AppError(
+      'FORBIDDEN',
+      'Your plan only includes Pet Shop (retail) inventory — upgrade to the full Inventory module for other item types.',
+      403,
+    );
   }
 
   const grnNumber = await nextGrnNumber(clinicId);

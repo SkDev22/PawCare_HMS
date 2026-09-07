@@ -59,8 +59,11 @@ function ItemSearch({ onAdd }: { onAdd: (item: { id: string; name: string; price
   const [open, setOpen] = useState(false);
   const debounced = useDebounce(query, 200);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Pet Shop only ever sells RETAIL-category stock — medications and other
+  // clinical inventory are dispensed through EMR, never rung up here,
+  // regardless of the clinic's plan (see pos.service.ts's createSale).
   const { data } = useInventoryItems(
-    { search: debounced, is_active: true, limit: 8 },
+    { search: debounced, category: "RETAIL", is_active: true, limit: 8 },
     { enabled: !!debounced.trim() },
   );
   const results = debounced.trim() ? (data?.items ?? []) : [];

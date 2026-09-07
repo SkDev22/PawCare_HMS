@@ -5,7 +5,8 @@ export type ItemCategory =
   | 'DIAGNOSTIC_SUPPLY'
   | 'FOOD'
   | 'EQUIPMENT'
-  | 'OTHER';
+  | 'OTHER'
+  | 'RETAIL';
 
 export type TransactionType = 'purchase' | 'dispensed' | 'adjustment' | 'expired';
 

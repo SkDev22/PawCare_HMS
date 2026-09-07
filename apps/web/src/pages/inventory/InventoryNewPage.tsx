@@ -27,6 +27,8 @@ import {
 import { useCreateInventoryItem } from "../../hooks/use-inventory";
 import { useCreateGrn } from "../../hooks/use-grn";
 import { SupplierPicker } from "../../components/inventory/SupplierPicker";
+import { useAuthStore } from "../../stores/auth.store";
+import { isInventoryRetailOnly } from "@pawcare/shared";
 import type { ItemCategory } from "../../types/inventory";
 
 const CATEGORIES: Array<{ value: ItemCategory; label: string }> = [
@@ -37,6 +39,7 @@ const CATEGORIES: Array<{ value: ItemCategory; label: string }> = [
   { value: "FOOD", label: "Food" },
   { value: "EQUIPMENT", label: "Equipment" },
   { value: "OTHER", label: "Other" },
+  { value: "RETAIL", label: "Pet Shop (Retail)" },
 ];
 
 const CreateSchema = z.object({
@@ -49,6 +52,7 @@ const CreateSchema = z.object({
     "FOOD",
     "EQUIPMENT",
     "OTHER",
+    "RETAIL",
   ]),
   unit: z.string().min(1, "Unit is required").max(50),
   reorder_threshold: z.coerce.number().int().min(0).default(10),
@@ -94,6 +98,12 @@ export function InventoryNewPage() {
   const createItem = useCreateInventoryItem();
   const createGrn = useCreateGrn();
   const [addedCount, setAddedCount] = useState(0);
+  const user = useAuthStore((s) => s.user);
+  // A Pet-Shop-only clinic (has PET_SHOP but not the full INVENTORY plan
+  // feature) can only ever catalog RETAIL items — the backend rejects
+  // anything else, so the form locks the choice instead of letting the
+  // user pick a value that will be refused on submit.
+  const retailOnly = isInventoryRetailOnly(user?.plan ?? "TRIAL", user?.extra_features ?? []);
 
   const [receiveStockNow, setReceiveStockNow] = useState(true);
   const [supplierName, setSupplierName] = useState("");
@@ -108,7 +118,7 @@ export function InventoryNewPage() {
 
   const form = useForm<z.infer<typeof CreateSchema>>({
     resolver: zodResolver(CreateSchema),
-    defaultValues: DEFAULT_VALUES,
+    defaultValues: retailOnly ? { ...DEFAULT_VALUES, category: "RETAIL" } : DEFAULT_VALUES,
   });
 
   const stockForm = useForm<z.infer<typeof StockSchema>>({
@@ -268,20 +278,26 @@ export function InventoryNewPage() {
                         <FormLabel>
                           Category <span className="text-destructive">*</span>
                         </FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {CATEGORIES.map((c) => (
-                              <SelectItem key={c.value} value={c.value}>
-                                {c.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {retailOnly ? (
+                          <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">
+                            Pet Shop (Retail)
+                          </div>
+                        ) : (
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {CATEGORIES.map((c) => (
+                                <SelectItem key={c.value} value={c.value}>
+                                  {c.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -374,27 +390,29 @@ export function InventoryNewPage() {
                   />
                 </fieldset>
 
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    disabled={!!pendingItemId}
-                    onClick={() =>
-                      form.setValue("is_controlled", !form.watch("is_controlled"))
-                    }
-                    className={`w-10 h-6 rounded-full transition-colors shrink-0 disabled:opacity-50 ${
-                      form.watch("is_controlled")
-                        ? "bg-destructive"
-                        : "bg-muted border border-input"
-                    }`}
-                  >
-                    <span
-                      className={`block h-4 w-4 rounded-full bg-white shadow transition-transform mx-auto ${
-                        form.watch("is_controlled") ? "translate-x-2" : "-translate-x-2"
+                {!retailOnly && (
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      disabled={!!pendingItemId}
+                      onClick={() =>
+                        form.setValue("is_controlled", !form.watch("is_controlled"))
+                      }
+                      className={`w-10 h-6 rounded-full transition-colors shrink-0 disabled:opacity-50 ${
+                        form.watch("is_controlled")
+                          ? "bg-destructive"
+                          : "bg-muted border border-input"
                       }`}
-                    />
-                  </button>
-                  <span className="text-sm">Controlled substance</span>
-                </div>
+                    >
+                      <span
+                        className={`block h-4 w-4 rounded-full bg-white shadow transition-transform mx-auto ${
+                          form.watch("is_controlled") ? "translate-x-2" : "-translate-x-2"
+                        }`}
+                      />
+                    </button>
+                    <span className="text-sm">Controlled substance</span>
+                  </div>
+                )}
               </form>
             </Form>
           </CardContent>

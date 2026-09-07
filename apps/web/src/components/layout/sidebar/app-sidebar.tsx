@@ -41,7 +41,7 @@ const NAV_GROUPS: {
     href: string;
     icon: LucideIcon;
     permission?: PermissionKey;
-    feature?: FeatureKey;
+    feature?: FeatureKey | FeatureKey[];
     items?: { title: string; href: string }[];
   }[];
 }[] = [
@@ -122,7 +122,7 @@ const NAV_GROUPS: {
         href: "/inventory",
         icon: Package,
         permission: "INVENTORY_READ",
-        feature: "INVENTORY",
+        feature: ["INVENTORY", "PET_SHOP"],
         items: [
           { title: "Items", href: "/inventory" },
           { title: "Add Item", href: "/inventory/new" },

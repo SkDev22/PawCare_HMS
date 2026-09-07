@@ -24,6 +24,8 @@ import {
 import { useInventoryItems, useInventoryAlerts } from "../../hooks/use-inventory";
 import { useDebounce } from "../../hooks/use-debounce";
 import { formatCurrency } from "../../lib/currency";
+import { useAuthStore } from "../../stores/auth.store";
+import { isInventoryRetailOnly } from "@pawcare/shared";
 import type { ItemCategory } from "../../types/inventory";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -37,6 +39,7 @@ const CATEGORIES: Array<{ value: ItemCategory | "ALL"; label: string }> = [
   { value: "FOOD", label: "Food" },
   { value: "EQUIPMENT", label: "Equipment" },
   { value: "OTHER", label: "Other" },
+  { value: "RETAIL", label: "Pet Shop (Retail)" },
 ];
 
 const CATEGORY_LABEL: Record<ItemCategory, string> = {
@@ -47,6 +50,7 @@ const CATEGORY_LABEL: Record<ItemCategory, string> = {
   FOOD: "Food",
   EQUIPMENT: "Equipment",
   OTHER: "Other",
+  RETAIL: "Pet Shop (Retail)",
 };
 
 // ── Stock level badge ─────────────────────────────────────────────────────────
@@ -77,6 +81,11 @@ const PAGE_SIZE = 10;
 
 export function InventoryPage() {
   const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+  // A Pet-Shop-only clinic can only ever have RETAIL items — the category
+  // filter has nothing else to offer, so it's hidden rather than shown with
+  // every other tab returning empty.
+  const retailOnly = isInventoryRetailOnly(user?.plan ?? "TRIAL", user?.extra_features ?? []);
   const [tab, setTab] = useState<ItemCategory | "ALL">("ALL");
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
@@ -164,18 +173,20 @@ export function InventoryPage() {
       </div>
 
       {/* Category tabs */}
-      <Tabs
-        value={tab}
-        onValueChange={(v) => setTab(v as ItemCategory | "ALL")}
-      >
-        <TabsList className="flex-wrap h-auto gap-1">
-          {CATEGORIES.map((c) => (
-            <TabsTrigger key={c.value} value={c.value} className="text-xs">
-              {c.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      {!retailOnly && (
+        <Tabs
+          value={tab}
+          onValueChange={(v) => setTab(v as ItemCategory | "ALL")}
+        >
+          <TabsList className="flex-wrap h-auto gap-1">
+            {CATEGORIES.map((c) => (
+              <TabsTrigger key={c.value} value={c.value} className="text-xs">
+                {c.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      )}
 
       {/* Table */}
       <Card>

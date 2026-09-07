@@ -65,8 +65,14 @@ export async function createSale(clinicId: string, staffId: string, data: Create
       );
       const item = await tx.inventoryItem.findFirstOrThrow({
         where: { id: line.item_id },
-        select: { name: true },
+        select: { name: true, category: true },
       });
+      // Pet Shop only ever sells retail stock — medications and other
+      // clinical inventory are dispensed through EMR, never rung up at the
+      // register, regardless of the clinic's plan.
+      if (item.category !== 'RETAIL') {
+        throw new AppError('BAD_REQUEST', `"${item.name}" is not a Pet Shop item`, 400);
+      }
       const lineTotal = unitPrice.times(line.quantity);
       subtotal = subtotal.plus(lineTotal);
       resolvedLines.push({
