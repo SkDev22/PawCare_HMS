@@ -1,12 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  ArrowLeft,
-  Package,
-  Plus,
-  Search,
-  Trash2,
-} from "lucide-react";
+import { ArrowLeft, Package, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { Textarea } from "../../../components/ui/textarea";
@@ -223,6 +217,7 @@ export function GrnFormPage() {
               Supplier Name <span className="text-destructive">*</span>
             </Label>
             <SupplierPicker
+              autoFocus
               name={supplierName}
               onChange={({ id, name }) => {
                 setSupplierId(id);
@@ -231,7 +226,7 @@ export function GrnFormPage() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Supplier Invoice #</Label>
+            <Label>Supplier Invoice No.</Label>
             <Input
               value={supplierInvoiceNo}
               onChange={(e) => setSupplierInvoiceNo(e.target.value)}
@@ -269,21 +264,21 @@ export function GrnFormPage() {
                     Item
                   </th>
                   <th className="text-left font-medium text-muted-foreground px-3 py-2">
-                    Batch #
+                    Batch No.
                   </th>
-                  <th className="text-right font-medium text-muted-foreground px-3 py-2 w-24">
+                  <th className="text-center font-medium text-muted-foreground px-3 py-2 w-24">
                     Qty
                   </th>
-                  <th className="text-right font-medium text-muted-foreground px-3 py-2 w-28">
+                  <th className="text-center font-medium text-muted-foreground px-3 py-2 w-28">
                     Unit Cost
                   </th>
-                  <th className="text-right font-medium text-muted-foreground px-3 py-2 w-28">
+                  <th className="text-center font-medium text-muted-foreground px-3 py-2 w-28">
                     Sell Price
                   </th>
-                  <th className="text-right font-medium text-muted-foreground px-3 py-2 w-24">
-                    Discount %
+                  <th className="text-center font-medium text-muted-foreground px-3 py-2 w-24">
+                    Discount (%)
                   </th>
-                  <th className="text-left font-medium text-muted-foreground px-3 py-2 w-40">
+                  <th className="text-center font-medium text-muted-foreground px-3 py-2 w-40">
                     Expiry
                   </th>
                   <th className="px-3 py-2" />

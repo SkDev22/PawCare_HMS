@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -84,6 +84,7 @@ import type { StockBatch } from "../../types/inventory";
 import { useServices } from "../../hooks/use-billing";
 import type { Service } from "../../types/billing";
 import { useDebounce } from "../../hooks/use-debounce";
+import { useComboboxKeyboardNav } from "../../hooks/use-combobox-keyboard-nav";
 import { formatCurrency } from "../../lib/currency";
 import { hasFeature } from "../../lib/features";
 import { useAuthStore } from "../../stores/auth.store";
@@ -1251,6 +1252,24 @@ function ItemSearch({
     debouncedQuery ? { search: debouncedQuery, limit: 8 } : undefined,
   );
   const results = (data?.items ?? []).filter((i) => i.current_price !== null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  function selectItem(item: (typeof results)[number]) {
+    onSelect({
+      id: item.id,
+      name: item.name,
+      selling_price: item.current_price!,
+    });
+    setQuery("");
+    setOpen(false);
+  }
+
+  const { highlightedIndex, handleKeyDown } = useComboboxKeyboardNav({
+    results,
+    isOpen: open,
+    onSelect: selectItem,
+    containerRef: resultsRef,
+  });
 
   return (
     <div className="relative">
@@ -1265,9 +1284,10 @@ function ItemSearch({
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={handleKeyDown}
       />
       {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md max-h-52 overflow-y-auto">
+        <div ref={resultsRef} className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md max-h-52 overflow-y-auto">
           {!results.length ? (
             <p className="px-3 py-4 text-center text-sm text-muted-foreground">
               {debouncedQuery
@@ -1275,20 +1295,14 @@ function ItemSearch({
                 : "Type to search the inventory catalog."}
             </p>
           ) : (
-            results.map((item) => (
+            results.map((item, i) => (
               <button
                 key={item.id}
                 type="button"
-                onMouseDown={() => {
-                  onSelect({
-                    id: item.id,
-                    name: item.name,
-                    selling_price: item.current_price!,
-                  });
-                  setQuery("");
-                  setOpen(false);
-                }}
-                className="w-full flex items-center justify-between gap-2.5 px-3 py-2.5 text-left hover:bg-accent transition-colors"
+                onMouseDown={() => selectItem(item)}
+                className={`w-full flex items-center justify-between gap-2.5 px-3 py-2.5 text-left transition-colors ${
+                  i === highlightedIndex ? "bg-accent" : "hover:bg-accent"
+                }`}
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <Package className="size-3.5 text-primary shrink-0" />
@@ -1320,6 +1334,20 @@ function ServiceSearch({
   const [open, setOpen] = useState(false);
   const q = query.trim().toLowerCase();
   const results = q ? services.filter((s) => s.name.toLowerCase().includes(q)) : services;
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  function selectService(s: (typeof results)[number]) {
+    onSelect({ id: s.id, name: s.name, price: s.price });
+    setQuery("");
+    setOpen(false);
+  }
+
+  const { highlightedIndex, handleKeyDown } = useComboboxKeyboardNav({
+    results,
+    isOpen: open,
+    onSelect: selectService,
+    containerRef: resultsRef,
+  });
 
   return (
     <div className="relative">
@@ -1334,9 +1362,10 @@ function ServiceSearch({
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={handleKeyDown}
       />
       {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md max-h-52 overflow-y-auto">
+        <div ref={resultsRef} className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md max-h-52 overflow-y-auto">
           {!results.length ? (
             <p className="px-3 py-4 text-center text-sm text-muted-foreground">
               {services.length === 0
@@ -1344,16 +1373,14 @@ function ServiceSearch({
                 : "No matching services."}
             </p>
           ) : (
-            results.map((s) => (
+            results.map((s, i) => (
               <button
                 key={s.id}
                 type="button"
-                onMouseDown={() => {
-                  onSelect({ id: s.id, name: s.name, price: s.price });
-                  setQuery("");
-                  setOpen(false);
-                }}
-                className="w-full flex items-center justify-between gap-2.5 px-3 py-2.5 text-left hover:bg-accent transition-colors"
+                onMouseDown={() => selectService(s)}
+                className={`w-full flex items-center justify-between gap-2.5 px-3 py-2.5 text-left transition-colors ${
+                  i === highlightedIndex ? "bg-accent" : "hover:bg-accent"
+                }`}
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <Receipt className="size-3.5 text-primary shrink-0" />

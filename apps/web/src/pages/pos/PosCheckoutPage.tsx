@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useComboboxKeyboardNav } from "@/hooks/use-combobox-keyboard-nav";
 import { useInventoryItems } from "@/hooks/use-inventory";
 import { useOwners } from "@/hooks/use-owners";
 import { useClinic } from "@/hooks/use-clinic";
@@ -59,6 +60,7 @@ function ItemSearch({ onAdd }: { onAdd: (item: { id: string; name: string; price
   const [open, setOpen] = useState(false);
   const debounced = useDebounce(query, 200);
   const inputRef = useRef<HTMLInputElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
   // Pet Shop only ever sells RETAIL-category stock — medications and other
   // clinical inventory are dispensed through EMR, never rung up here,
   // regardless of the clinic's plan (see pos.service.ts's createSale).
@@ -75,6 +77,25 @@ function ItemSearch({ onAdd }: { onAdd: (item: { id: string; name: string; price
     inputRef.current?.focus();
   };
 
+  function selectResult(r: (typeof results)[number]) {
+    if (r.current_price !== null) {
+      addAndReset({ id: r.id, name: r.name, price: r.current_price });
+    }
+  }
+
+  // Stays focused on itself after a pick (focusNextOnSelect: false) — a
+  // checkout is scan-scan-scan, so jumping away after every item would
+  // break the workflow. With one result, highlightedIndex defaults to 0,
+  // so this also covers the old "single barcode match → Enter adds it"
+  // case with no special-casing needed.
+  const { highlightedIndex, handleKeyDown } = useComboboxKeyboardNav({
+    results,
+    isOpen: open,
+    onSelect: selectResult,
+    focusNextOnSelect: false,
+    containerRef: resultsRef,
+  });
+
   return (
     <div className="relative">
       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -90,32 +111,22 @@ function ItemSearch({ onAdd }: { onAdd: (item: { id: string; name: string; price
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
-        onKeyDown={(e) => {
-          // A barcode scanner types the full code and hits Enter — if that
-          // uniquely matched exactly one item, add it immediately instead
-          // of requiring a click.
-          if (e.key === "Enter" && results.length === 1) {
-            e.preventDefault();
-            const r = results[0];
-            if (r.current_price !== null) {
-              addAndReset({ id: r.id, name: r.name, price: r.current_price });
-            }
-          }
-        }}
+        onKeyDown={handleKeyDown}
       />
       {open && results.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground border border-border rounded-md shadow-lg max-h-64 overflow-y-auto">
-          {results.map((r) => (
+        <div
+          ref={resultsRef}
+          className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground border border-border rounded-md shadow-lg max-h-64 overflow-y-auto"
+        >
+          {results.map((r, i) => (
             <button
               key={r.id}
               type="button"
               disabled={r.current_price === null}
-              className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center justify-between gap-3 disabled:opacity-40 disabled:cursor-not-allowed"
-              onMouseDown={() => {
-                if (r.current_price !== null) {
-                  addAndReset({ id: r.id, name: r.name, price: r.current_price });
-                }
-              }}
+              className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between gap-3 disabled:opacity-40 disabled:cursor-not-allowed ${
+                i === highlightedIndex ? "bg-muted" : "hover:bg-muted"
+              }`}
+              onMouseDown={() => selectResult(r)}
             >
               <div>
                 <div className="font-medium">{r.name}</div>
@@ -161,6 +172,19 @@ function CustomerInput({
     { enabled: !linkedOwnerId && !!debounced.trim() },
   );
   const results = !linkedOwnerId && debounced.trim() ? (data?.items ?? []) : [];
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  function selectOwner(o: (typeof results)[number]) {
+    onSelectOwner(o);
+    setOpen(false);
+  }
+
+  const { highlightedIndex, handleKeyDown } = useComboboxKeyboardNav({
+    results,
+    isOpen: open,
+    onSelect: selectOwner,
+    containerRef: resultsRef,
+  });
 
   return (
     <div className="relative">
@@ -173,6 +197,7 @@ function CustomerInput({
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={handleKeyDown}
       />
       {linkedOwnerId && (
         <div className="flex items-center justify-between mt-1.5">
@@ -184,16 +209,16 @@ function CustomerInput({
         </div>
       )}
       {open && results.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
-          {results.map((o) => (
+        <div
+          ref={resultsRef}
+          className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground border border-border rounded-md shadow-lg max-h-48 overflow-y-auto"
+        >
+          {results.map((o, i) => (
             <button
               key={o.id}
               type="button"
-              className="w-full px-3 py-2 text-left text-sm hover:bg-muted"
-              onMouseDown={() => {
-                onSelectOwner(o);
-                setOpen(false);
-              }}
+              className={`w-full px-3 py-2 text-left text-sm ${i === highlightedIndex ? "bg-muted" : "hover:bg-muted"}`}
+              onMouseDown={() => selectOwner(o)}
             >
               <div className="font-medium">
                 {o.first_name} {o.last_name}

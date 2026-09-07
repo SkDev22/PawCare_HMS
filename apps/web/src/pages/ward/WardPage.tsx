@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { BedDouble, Plus, Search, Settings2 } from "lucide-react";
@@ -49,6 +49,7 @@ import {
 import { useRooms, useCreateRoom } from "../../hooks/use-appointments";
 import { usePets } from "../../hooks/use-pets";
 import { useDebounce } from "../../hooks/use-debounce";
+import { useComboboxKeyboardNav } from "../../hooks/use-combobox-keyboard-nav";
 import { useAuthStore } from "../../stores/auth.store";
 import { hasPermission } from "../../lib/permissions";
 import type { KennelUnit, KennelStatus } from "../../types/ward";
@@ -98,6 +99,20 @@ function AdmitForm({
   const petId = form.watch("pet_id");
   const kennelId = form.watch("kennel_id");
 
+  const petResultsRef = useRef<HTMLDivElement>(null);
+  function selectPet(p: (typeof pets)[number]) {
+    form.setValue("pet_id", p.id, { shouldValidate: true });
+    setSelectedPetName(`${p.name} (${p.owner?.last_name ?? ""})`);
+    setPetSearch("");
+  }
+  const { highlightedIndex: petHighlightedIndex, handleKeyDown: handlePetSearchKeyDown } =
+    useComboboxKeyboardNav({
+      results: pets,
+      isOpen: petSearch.length > 1,
+      onSelect: selectPet,
+      containerRef: petResultsRef,
+    });
+
   function onSubmit(values: z.infer<typeof AdmitSchema>) {
     admitPet.mutate(
       {
@@ -145,6 +160,7 @@ function AdmitForm({
                 className="pl-9"
                 value={petSearch}
                 onChange={(e) => setPetSearch(e.target.value)}
+                onKeyDown={handlePetSearchKeyDown}
               />
               {form.formState.errors.pet_id && (
                 <p className="text-xs text-destructive mt-1">
@@ -152,19 +168,15 @@ function AdmitForm({
                 </p>
               )}
               {petSearch.length > 1 && pets.length > 0 && (
-                <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
-                  {pets.map((p) => (
+                <div ref={petResultsRef} className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
+                  {pets.map((p, i) => (
                     <button
                       key={p.id}
                       type="button"
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-muted/50 first:rounded-t-md last:rounded-b-md"
-                      onClick={() => {
-                        form.setValue("pet_id", p.id, { shouldValidate: true });
-                        setSelectedPetName(
-                          `${p.name} (${p.owner?.last_name ?? ""})`,
-                        );
-                        setPetSearch("");
-                      }}
+                      className={`w-full px-3 py-2 text-left text-sm first:rounded-t-md last:rounded-b-md ${
+                        i === petHighlightedIndex ? "bg-muted/50" : "hover:bg-muted/50"
+                      }`}
+                      onClick={() => selectPet(p)}
                     >
                       <span className="font-medium">{p.name}</span>
                       <span className="text-muted-foreground ml-2 text-xs capitalize">

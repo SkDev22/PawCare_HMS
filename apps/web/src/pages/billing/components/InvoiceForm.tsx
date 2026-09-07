@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useDebounce } from '../../../hooks/use-debounce';
+import { useComboboxKeyboardNav } from '../../../hooks/use-combobox-keyboard-nav';
 import { useOwners } from '../../../hooks/use-owners';
 import { useCreateInvoice } from '../../../hooks/use-billing';
 import { Button } from '../../../components/ui/button';
@@ -71,6 +72,15 @@ export function InvoiceForm({ onSuccess, onCancel }: Props) {
 
   const ownerId = form.watch('owner_id');
 
+  const ownerResultsRef = useRef<HTMLDivElement>(null);
+  const { highlightedIndex: ownerHighlightedIndex, handleKeyDown: handleOwnerSearchKeyDown } =
+    useComboboxKeyboardNav({
+      results: owners,
+      isOpen: ownerSearch.length > 1,
+      onSelect: (o) => handleOwnerSelect(o.id, `${o.first_name} ${o.last_name}`),
+      containerRef: ownerResultsRef,
+    });
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -98,6 +108,7 @@ export function InvoiceForm({ onSuccess, onCancel }: Props) {
                 placeholder="Search by name, email, or phone..."
                 value={ownerSearch}
                 onChange={(e) => setOwnerSearch(e.target.value)}
+                onKeyDown={handleOwnerSearchKeyDown}
               />
               {form.formState.errors.owner_id && (
                 <p className="text-xs text-destructive mt-1">
@@ -105,12 +116,14 @@ export function InvoiceForm({ onSuccess, onCancel }: Props) {
                 </p>
               )}
               {ownerSearch.length > 1 && owners.length > 0 && (
-                <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
-                  {owners.map((o) => (
+                <div ref={ownerResultsRef} className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
+                  {owners.map((o, i) => (
                     <button
                       key={o.id}
                       type="button"
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-muted/50 first:rounded-t-md last:rounded-b-md"
+                      className={`w-full px-3 py-2 text-left text-sm first:rounded-t-md last:rounded-b-md ${
+                        i === ownerHighlightedIndex ? "bg-muted/50" : "hover:bg-muted/50"
+                      }`}
                       onClick={() => handleOwnerSelect(o.id, `${o.first_name} ${o.last_name}`)}
                     >
                       <span className="font-medium">{o.first_name} {o.last_name}</span>

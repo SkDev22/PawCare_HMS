@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -38,6 +38,7 @@ import {
 } from "@/hooks/use-appointments";
 import { usePets } from "@/hooks/use-pets";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useComboboxKeyboardNav } from "@/hooks/use-combobox-keyboard-nav";
 import type { Appointment } from "@/types/appointments";
 import type { Pet } from "@/types/patients"; // used in PetSearch dropdown results
 
@@ -144,6 +145,15 @@ function PetSearch({ value, onChange, defaultPet }: PetSearchProps) {
     setQuery("");
   }
 
+  const results = data?.items ?? [];
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const { highlightedIndex, handleKeyDown } = useComboboxKeyboardNav({
+    results,
+    isOpen: open && !value,
+    onSelect: select,
+    containerRef: resultsRef,
+  });
+
   return (
     <div className="relative">
       {value && selected ? (
@@ -171,23 +181,26 @@ function PetSearch({ value, onChange, defaultPet }: PetSearchProps) {
             }}
             onClick={() => setOpen(true)}
             onBlur={() => setTimeout(() => setOpen(false), 150)}
+            onKeyDown={handleKeyDown}
           />
         </div>
       )}
 
       {open && !value && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md max-h-52 overflow-y-auto">
-          {!data?.items.length ? (
+        <div ref={resultsRef} className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md max-h-52 overflow-y-auto">
+          {!results.length ? (
             <p className="px-3 py-4 text-center text-sm text-muted-foreground">
               {debouncedQuery ? "No patients found." : "Type a name to search."}
             </p>
           ) : (
-            data.items.map((pet) => (
+            results.map((pet, i) => (
               <button
                 key={pet.id}
                 type="button"
                 onMouseDown={() => select(pet)}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-accent transition-colors"
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${
+                  i === highlightedIndex ? "bg-accent" : "hover:bg-accent"
+                }`}
               >
                 <div className="flex size-7 items-center justify-center rounded-full bg-primary/10 shrink-0">
                   <PawPrint className="size-3.5 text-primary" />

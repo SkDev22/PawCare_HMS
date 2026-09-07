@@ -11,6 +11,7 @@ import {
 import { useCreateOwner, useOwners } from "@/hooks/use-owners";
 import { useCreatePet } from "@/hooks/use-pets";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useComboboxKeyboardNav } from "@/hooks/use-combobox-keyboard-nav";
 import { useAuthStore } from "@/stores/auth.store";
 import { hasFeature } from "@/lib/features";
 import { Button } from "@/components/ui/button";
@@ -173,6 +174,15 @@ export function RegisterPage() {
     setSelectedOwner(owner);
     setOwnerSearch("");
   }
+
+  const ownerResultsRef = useRef<HTMLDivElement>(null);
+  const { highlightedIndex: ownerHighlightedIndex, handleKeyDown: handleOwnerSearchKeyDown } =
+    useComboboxKeyboardNav({
+      results: ownerResults,
+      isOpen: ownerSearch.length > 1,
+      onSelect: handleOwnerSelect,
+      containerRef: ownerResultsRef,
+    });
 
   return (
     <div className="space-y-4">
@@ -377,14 +387,17 @@ export function RegisterPage() {
                       placeholder="Search by name, email, or phone…"
                       value={ownerSearch}
                       onChange={(e) => setOwnerSearch(e.target.value)}
+                      onKeyDown={handleOwnerSearchKeyDown}
                     />
                     {ownerSearch.length > 1 && ownerResults.length > 0 && (
-                      <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
-                        {ownerResults.map((o) => (
+                      <div ref={ownerResultsRef} className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
+                        {ownerResults.map((o, i) => (
                           <button
                             key={o.id}
                             type="button"
-                            className="w-full px-3 py-2 text-left text-sm hover:bg-muted/50 first:rounded-t-md last:rounded-b-md"
+                            className={`w-full px-3 py-2 text-left text-sm first:rounded-t-md last:rounded-b-md ${
+                              i === ownerHighlightedIndex ? "bg-muted/50" : "hover:bg-muted/50"
+                            }`}
                             onClick={() => handleOwnerSelect(o)}
                           >
                             <span className="font-medium">

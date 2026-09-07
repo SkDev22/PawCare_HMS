@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "../../../components/ui/select";
 import { usePets } from "../../../hooks/use-pets";
+import { useComboboxKeyboardNav } from "../../../hooks/use-combobox-keyboard-nav";
 import { useVets } from "../../../hooks/use-appointments";
 import { useCreateMedicalRecord } from "../../../hooks/use-emr";
 import type { MedicalRecord } from "../../../types/emr";
@@ -54,11 +55,26 @@ function PetSearch({
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const { data } = usePets({ search, limit: 8 });
+  const results = data?.items ?? [];
+  const resultsRef = useRef<HTMLDivElement>(null);
 
-  const selected = data?.items.find((p) => p.id === value);
+  const selected = results.find((p) => p.id === value);
   const defaultLabel = defaultPet
     ? `${defaultPet.name}${defaultPet.owner ? ` (${defaultPet.owner.first_name} ${defaultPet.owner.last_name})` : ""}`
     : "";
+
+  function selectPet(pet: (typeof results)[number]) {
+    onChange(pet.id);
+    setSearch("");
+    setOpen(false);
+  }
+
+  const { highlightedIndex, handleKeyDown } = useComboboxKeyboardNav({
+    results,
+    isOpen: open && results.length > 0,
+    onSelect: selectPet,
+    containerRef: resultsRef,
+  });
 
   return (
     <div className="relative">
@@ -79,19 +95,19 @@ function PetSearch({
         }}
         onClick={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={handleKeyDown}
       />
-      {open && data && data.items.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
-          {data.items.map((pet) => (
+      {open && results.length > 0 && (
+        <div
+          ref={resultsRef}
+          className="absolute z-50 w-full mt-1 bg-white border border-border rounded-md shadow-lg max-h-48 overflow-y-auto"
+        >
+          {results.map((pet, i) => (
             <button
               key={pet.id}
               type="button"
-              className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex flex-col"
-              onMouseDown={() => {
-                onChange(pet.id);
-                setSearch("");
-                setOpen(false);
-              }}
+              className={`w-full px-3 py-2 text-left text-sm flex flex-col ${i === highlightedIndex ? "bg-muted" : "hover:bg-muted"}`}
+              onMouseDown={() => selectPet(pet)}
             >
               <span className="font-medium">{pet.name}</span>
               <span className="text-muted-foreground text-xs">
