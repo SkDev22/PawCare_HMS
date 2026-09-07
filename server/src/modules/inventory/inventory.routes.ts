@@ -7,6 +7,7 @@ import {
   UpdateInventoryItemSchema,
   LogTransactionSchema,
   InventoryQuerySchema,
+  SetPreferredBatchSchema,
   isInventoryRetailOnly,
 } from '@pawcare/shared';
 import type { InventoryQuery } from '@pawcare/shared';
@@ -128,6 +129,24 @@ inventoryRouter.get(
     try {
       const batches = await svc.listBatches(req.params.id, authed(req).user.clinic_id, retailOnly(req));
       res.json(batches);
+    } catch (err) { next(err); }
+  },
+);
+
+inventoryRouter.patch(
+  '/:id/preferred-batch',
+  authenticate,
+  authorize('INVENTORY_WRITE'),
+  validate({ body: SetPreferredBatchSchema }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const item = await svc.setPreferredBatch(
+        req.params.id,
+        authed(req).user.clinic_id,
+        req.body.batch_id,
+        retailOnly(req),
+      );
+      res.json(item);
     } catch (err) { next(err); }
   },
 );

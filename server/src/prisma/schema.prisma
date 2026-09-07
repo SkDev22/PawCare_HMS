@@ -748,15 +748,23 @@ model InventoryItem {
   location           String?
   is_controlled      Boolean      @default(false)
   is_active          Boolean      @default(true)
+  // The batch clinical dispensing (Prescriptions, Vaccinations, EMR
+  // Charges, Pet Shop checkout) draws from when no explicit batch is
+  // requested — set via "Use this batch" on the item detail page, so
+  // clinicians never have to choose a batch themselves. Falls back to
+  // oldest-first (FIFO) automatically once this batch is exhausted/closed
+  // — see resolveBatchForSaleTx in inventory.service.ts.
+  preferred_batch_id String?      @unique @db.Uuid
   created_at         DateTime     @default(now())
   updated_at         DateTime     @updatedAt
 
+  preferred_batch    StockBatch?  @relation("PreferredBatch", fields: [preferred_batch_id], references: [id])
   transactions       InventoryTransaction[]
   invoice_line_items InvoiceLineItem[]
   charges            MedicalRecordCharge[]
   prescriptions      Prescription[]
   vaccinations       Vaccination[]
-  batches            StockBatch[]
+  batches            StockBatch[] @relation("ItemBatches")
   grn_items          GoodsReceivedNoteItem[]
   controlled_approvals ControlledSubstanceApproval[]
 
@@ -784,11 +792,12 @@ model StockBatch {
   created_at         DateTime  @default(now())
   updated_at         DateTime  @updatedAt
 
-  item         InventoryItem          @relation(fields: [item_id], references: [id])
-  grn_item     GoodsReceivedNoteItem? @relation(fields: [grn_item_id], references: [id])
-  transactions InventoryTransaction[]
-  charges      MedicalRecordCharge[]
-  line_items   InvoiceLineItem[]
+  item              InventoryItem          @relation("ItemBatches", fields: [item_id], references: [id])
+  preferred_by_item InventoryItem?         @relation("PreferredBatch")
+  grn_item          GoodsReceivedNoteItem? @relation(fields: [grn_item_id], references: [id])
+  transactions      InventoryTransaction[]
+  charges           MedicalRecordCharge[]
+  line_items        InvoiceLineItem[]
 
   @@map("stock_batches")
 }

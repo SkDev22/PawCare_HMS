@@ -149,3 +149,21 @@ export function useLogTransaction(itemId: string) {
     },
   });
 }
+
+// Pins (batchId) or clears (null) the batch clinical dispensing draws from
+// by default — see resolveBatchForSaleTx in inventory.service.ts.
+export function useSetPreferredBatch(itemId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (batchId: string | null) =>
+      api.patch(`/inventory/${itemId}/preferred-batch`, { batch_id: batchId }).then((r) => r.data as InventoryItem),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['inventory'] });
+      qc.invalidateQueries({ queryKey: ['inventory-batches', itemId] });
+      toast.success('Preferred batch updated');
+    },
+    onError: (err: { response?: { data?: { error?: { message?: string } } } }) => {
+      toast.error(err?.response?.data?.error?.message ?? 'Failed to update preferred batch');
+    },
+  });
+}

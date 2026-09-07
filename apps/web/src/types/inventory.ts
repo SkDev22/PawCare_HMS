@@ -59,6 +59,10 @@ export type InventoryItem = {
   location:          string | null;
   is_controlled:     boolean;
   is_active:         boolean;
+  // The batch clinical dispensing draws from by default when no explicit
+  // batch is requested — set via "Use this batch" on this item's detail
+  // page. Null means fall back to oldest-first (FIFO).
+  preferred_batch_id: string | null;
   created_at:        string;
   updated_at:        string;
   // Computed from the oldest active stock batch (FIFO) — null when out of stock.

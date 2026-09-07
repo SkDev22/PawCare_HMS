@@ -82,7 +82,7 @@ import {
   useAddCharge,
   useRemoveCharge,
 } from "../../hooks/use-emr";
-import { useInventoryItems, useItemBatches } from "../../hooks/use-inventory";
+import { useInventoryItems } from "../../hooks/use-inventory";
 import type { StockBatch, ItemCategory } from "../../types/inventory";
 import { useServices } from "../../hooks/use-billing";
 import type { Service } from "../../types/billing";
@@ -702,8 +702,6 @@ function AddVaccinationDialog({
     name: string;
     selling_price: string;
   } | null>(null);
-  const [selectedBatchId, setSelectedBatchId] = useState<string | undefined>(undefined);
-  const { data: itemBatches, isLoading: batchesLoading } = useItemBatches(selectedItem?.id);
   // Clinics without INVENTORY (e.g. BASIC) bill against the plain Service
   // catalog instead — same "Administered here" slot, different catalog,
   // exactly like AddPrescriptionDialog.
@@ -728,20 +726,18 @@ function AddVaccinationDialog({
   const resetSelection = () => {
     setAdministeredHere(true);
     setSelectedItem(null);
-    setSelectedBatchId(undefined);
     setSelectedService(null);
   };
 
   const manualName = form.watch("vaccine_name");
   const clinicSelectionMade = hasInventory ? !!selectedItem : !!selectedService;
   const canSubmit = administeredHere ? clinicSelectionMade : !!manualName?.trim();
-  const selectedBatch = itemBatches?.find((b) => b.id === selectedBatchId);
+  // Which batch this draws from (the item's pinned "preferred" batch, or
+  // oldest-first) is resolved server-side — this is just a price preview.
   const unitPrice = hasInventory
-    ? selectedBatch
-      ? batchEffectivePrice(selectedBatch)
-      : selectedItem
-        ? Number(selectedItem.selling_price)
-        : 0
+    ? selectedItem
+      ? Number(selectedItem.selling_price)
+      : 0
     : selectedService
       ? Number(selectedService.price)
       : 0;
@@ -760,9 +756,6 @@ function AddVaccinationDialog({
         ...(values.notes ? { notes: values.notes } : {}),
         ...(administeredHere && hasInventory && selectedItem
           ? { item_id: selectedItem.id }
-          : {}),
-        ...(administeredHere && hasInventory && selectedBatchId
-          ? { batch_id: selectedBatchId }
           : {}),
         ...(administeredHere && !hasInventory && selectedService
           ? { service_id: selectedService.id }
@@ -814,7 +807,6 @@ function AddVaccinationDialog({
                   onClick={() => {
                     setAdministeredHere(false);
                     setSelectedItem(null);
-                    setSelectedBatchId(undefined);
                     setSelectedService(null);
                   }}
                 >
@@ -833,10 +825,7 @@ function AddVaccinationDialog({
                       <span className="flex-1 truncate">{selectedItem.name}</span>
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedItem(null);
-                          setSelectedBatchId(undefined);
-                        }}
+                        onClick={() => setSelectedItem(null)}
                         className="text-muted-foreground hover:text-foreground"
                       >
                         <X className="size-3.5" />
@@ -844,14 +833,6 @@ function AddVaccinationDialog({
                     </div>
                   ) : (
                     <ItemSearch category="VACCINE" onSelect={setSelectedItem} />
-                  )}
-                  {selectedItem && (
-                    <BatchSelect
-                      batches={itemBatches ?? []}
-                      isLoading={batchesLoading}
-                      value={selectedBatchId}
-                      onChange={setSelectedBatchId}
-                    />
                   )}
                   {selectedItem && (
                     <p className="text-xs text-muted-foreground">
@@ -1142,12 +1123,6 @@ function AddPrescriptionDialog({
     name: string;
     selling_price: string;
   } | null>(null);
-  const [selectedBatchId, setSelectedBatchId] = useState<string | undefined>(
-    undefined,
-  );
-  const { data: itemBatches, isLoading: batchesLoading } = useItemBatches(
-    selectedItem?.id,
-  );
   // Clinics without INVENTORY (e.g. BASIC) bill prescriptions against the
   // plain Service catalog instead — same "Clinic" fulfillment slot, just a
   // different catalog underneath.
@@ -1173,7 +1148,6 @@ function AddPrescriptionDialog({
   const resetFulfillment = () => {
     setFulfillment("pharmacy");
     setSelectedItem(null);
-    setSelectedBatchId(undefined);
     setSelectedService(null);
   };
   const quantity = form.watch("quantity");
@@ -1181,13 +1155,12 @@ function AddPrescriptionDialog({
   const canSubmit =
     fulfillment === "pharmacy" ||
     (clinicSelectionMade && !!quantity && quantity > 0);
-  const selectedBatch = itemBatches?.find((b) => b.id === selectedBatchId);
+  // Which batch this draws from (the item's pinned "preferred" batch, or
+  // oldest-first) is resolved server-side — this is just a price preview.
   const unitPrice = hasInventory
-    ? selectedBatch
-      ? batchEffectivePrice(selectedBatch)
-      : selectedItem
-        ? Number(selectedItem.selling_price)
-        : 0
+    ? selectedItem
+      ? Number(selectedItem.selling_price)
+      : 0
     : selectedService
       ? Number(selectedService.price)
       : 0;
@@ -1207,9 +1180,6 @@ function AddPrescriptionDialog({
         ...(values.expires_at ? { expires_at: values.expires_at } : {}),
         ...(fulfillment === "clinic" && hasInventory && selectedItem
           ? { item_id: selectedItem.id }
-          : {}),
-        ...(fulfillment === "clinic" && hasInventory && selectedBatchId
-          ? { batch_id: selectedBatchId }
           : {}),
         ...(fulfillment === "clinic" && !hasInventory && selectedService
           ? { service_id: selectedService.id }
@@ -1386,7 +1356,6 @@ function AddPrescriptionDialog({
                   onClick={() => {
                     setFulfillment("pharmacy");
                     setSelectedItem(null);
-                    setSelectedBatchId(undefined);
                     setSelectedService(null);
                   }}
                 >
@@ -1406,10 +1375,7 @@ function AddPrescriptionDialog({
                     <span className="flex-1 truncate">{selectedItem.name}</span>
                     <button
                       type="button"
-                      onClick={() => {
-                        setSelectedItem(null);
-                        setSelectedBatchId(undefined);
-                      }}
+                      onClick={() => setSelectedItem(null)}
                       className="text-muted-foreground hover:text-foreground"
                     >
                       <X className="size-3.5" />
@@ -1417,14 +1383,6 @@ function AddPrescriptionDialog({
                   </div>
                 ) : (
                   <ItemSearch onSelect={setSelectedItem} />
-                )}
-                {selectedItem && (
-                  <BatchSelect
-                    batches={itemBatches ?? []}
-                    isLoading={batchesLoading}
-                    value={selectedBatchId}
-                    onChange={setSelectedBatchId}
-                  />
                 )}
                 {selectedItem && (
                   <p className="text-xs text-muted-foreground">
@@ -1789,19 +1747,12 @@ function AddChargeDialog({
     name: string;
     selling_price: string;
   } | null>(null);
-  const [selectedBatchId, setSelectedBatchId] = useState<string | undefined>(
-    undefined,
-  );
-  const { data: itemBatches, isLoading: batchesLoading } = useItemBatches(
-    selectedItem?.id,
-  );
   const [serviceId, setServiceId] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [addedCount, setAddedCount] = useState(0);
 
   const resetSelection = () => {
     setSelectedItem(null);
-    setSelectedBatchId(undefined);
     setServiceId("");
     setQuantity(1);
   };
@@ -1813,13 +1764,10 @@ function AddChargeDialog({
 
   const canSubmit = mode === "item" ? !!selectedItem : !!serviceId;
   const selectedService = services.find((s) => s.id === serviceId);
-  const selectedBatch = itemBatches?.find((b) => b.id === selectedBatchId);
+  // Which batch this draws from (the item's pinned "preferred" batch, or
+  // oldest-first) is resolved server-side — this is just a price preview.
   const unitPrice =
-    mode === "item"
-      ? selectedBatch
-        ? batchEffectivePrice(selectedBatch)
-        : selectedItem?.selling_price
-      : selectedService?.price;
+    mode === "item" ? selectedItem?.selling_price : selectedService?.price;
 
   const onSubmit = () => {
     addCharge.mutate(
@@ -1828,9 +1776,6 @@ function AddChargeDialog({
         ...(mode === "item"
           ? { item_id: selectedItem!.id }
           : { service_id: serviceId }),
-        ...(mode === "item" && selectedBatchId
-          ? { batch_id: selectedBatchId }
-          : {}),
       },
       {
         onSuccess: () => {
@@ -1875,7 +1820,6 @@ function AddChargeDialog({
                 onClick={() => {
                   setMode("service");
                   setSelectedItem(null);
-                  setSelectedBatchId(undefined);
                 }}
               >
                 Service
@@ -1891,10 +1835,7 @@ function AddChargeDialog({
                   <span className="flex-1 truncate">{selectedItem.name}</span>
                   <button
                     type="button"
-                    onClick={() => {
-                      setSelectedItem(null);
-                      setSelectedBatchId(undefined);
-                    }}
+                    onClick={() => setSelectedItem(null)}
                     className="text-muted-foreground hover:text-foreground"
                   >
                     <X className="size-3.5" />
@@ -1902,14 +1843,6 @@ function AddChargeDialog({
                 </div>
               ) : (
                 <ItemSearch onSelect={setSelectedItem} />
-              )}
-              {selectedItem && (
-                <BatchSelect
-                  batches={itemBatches ?? []}
-                  isLoading={batchesLoading}
-                  value={selectedBatchId}
-                  onChange={setSelectedBatchId}
-                />
               )}
             </div>
           ) : (

@@ -51,6 +51,11 @@ export const LogTransactionSchema = z
     path:    ['batch_id'],
   });
 
+// null clears the pin, reverting to oldest-first (FIFO) dispensing.
+export const SetPreferredBatchSchema = z.object({
+  batch_id: z.string().uuid().nullable(),
+});
+
 export const InventoryQuerySchema = z.object({
   category:   ItemCategoryEnum.optional(),
   low_stock:  z
@@ -71,3 +76,4 @@ export type CreateInventoryItemInput  = z.infer<typeof CreateInventoryItemSchema
 export type UpdateInventoryItemInput  = z.infer<typeof UpdateInventoryItemSchema>;
 export type LogTransactionInput       = z.infer<typeof LogTransactionSchema>;
 export type InventoryQuery            = z.infer<typeof InventoryQuerySchema>;
+export type SetPreferredBatchInput    = z.infer<typeof SetPreferredBatchSchema>;

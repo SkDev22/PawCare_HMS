@@ -52,6 +52,7 @@ import {
   useLogTransaction,
   useUpdateInventoryItem,
   useDeleteInventoryItem,
+  useSetPreferredBatch,
 } from "../../hooks/use-inventory";
 import { formatCurrency } from "../../lib/currency";
 import type { LogTransactionType, StockBatch } from "../../types/inventory";
@@ -331,12 +332,21 @@ export function InventoryDetailPage() {
   const { data: batches } = useItemBatches(id);
   const updateItem = useUpdateInventoryItem(id ?? "");
   const deleteItem = useDeleteInventoryItem();
+  const setPreferredBatch = useSetPreferredBatch(id ?? "");
 
   const batchLabelById = new Map(
     (batches ?? []).map((b) => [
       b.id,
       b.batch_no ?? b.id.slice(0, 8).toUpperCase(),
     ]),
+  );
+
+  // Mirrors resolveBatchForSaleTx's own fallback: the pin only actually
+  // applies while that batch is still open and has stock — otherwise the
+  // price shown really is coming from the oldest batch, so the caption
+  // shouldn't claim otherwise.
+  const preferredBatchInUse = (batches ?? []).find(
+    (b) => b.id === item?.preferred_batch_id && !b.is_closed && b.quantity_remaining > 0,
   );
 
   if (isLoading) {
@@ -487,7 +497,9 @@ export function InventoryDetailPage() {
               {item.current_price ? formatCurrency(item.current_price) : "—"}
             </p>
             <p className="text-xs text-muted-foreground">
-              From oldest active batch
+              {preferredBatchInUse
+                ? `From preferred batch (${batchLabelById.get(preferredBatchInUse.id)})`
+                : "From oldest active batch"}
             </p>
           </CardContent>
         </Card>
@@ -588,23 +600,44 @@ export function InventoryDetailPage() {
                           : "—"}
                       </td>
                       <td className="px-4 py-3">
-                        <Badge
-                          variant={b.is_closed ? "secondary" : "success"}
-                          className="text-xs"
-                        >
-                          {b.is_closed ? "Closed" : "Active"}
-                        </Badge>
+                        <div className="flex items-center gap-1.5">
+                          <Badge
+                            variant={b.is_closed ? "secondary" : "success"}
+                            className="text-xs"
+                          >
+                            {b.is_closed ? "Closed" : "Active"}
+                          </Badge>
+                          {item.preferred_batch_id === b.id && (
+                            <Badge variant="default" className="text-xs">
+                              Preferred
+                            </Badge>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {!b.is_closed && item.is_active && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openBatchAction(b.id)}
-                          >
-                            Adjust
-                          </Button>
-                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          {!b.is_closed &&
+                            item.is_active &&
+                            item.preferred_batch_id !== b.id && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={setPreferredBatch.isPending}
+                                onClick={() => setPreferredBatch.mutate(b.id)}
+                              >
+                                Use this batch
+                              </Button>
+                            )}
+                          {!b.is_closed && item.is_active && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openBatchAction(b.id)}
+                            >
+                              Adjust
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

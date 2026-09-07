@@ -46,26 +46,48 @@ function effectivePrice(batch: { selling_price: Prisma.Decimal; discount_percent
   return new Decimal(batch.selling_price).times(new Decimal(1).minus(new Decimal(batch.discount_percent).dividedBy(100)));
 }
 
-async function batchAggregatesByItem(itemIds: string[]) {
+// `current_price` must reflect whatever resolveBatchForSaleTx would actually
+// charge — i.e. the item's pinned "preferred" batch when one is set and
+// still valid, else oldest-first — otherwise the price shown in lists, the
+// item detail card, and the EMR item pickers drifts from what a real
+// dispense bills (see the same "preferred, else FIFO" logic there).
+async function batchAggregatesByItem(
+  items: Array<{ id: string; preferred_batch_id: string | null }>,
+) {
   const map = new Map<string, { current_price: string | null; nearest_expiry: Date | null }>();
-  if (itemIds.length === 0) return map;
+  if (items.length === 0) return map;
 
   const batches = await prisma.stockBatch.findMany({
-    where: { item_id: { in: itemIds }, is_closed: false, quantity_remaining: { gt: 0 } },
+    where: { item_id: { in: items.map((i) => i.id) }, is_closed: false, quantity_remaining: { gt: 0 } },
     orderBy: FIFO_ORDER,
   });
 
-  for (const itemId of itemIds) map.set(itemId, { current_price: null, nearest_expiry: null });
-
+  const batchesByItem = new Map<string, typeof batches>();
   for (const batch of batches) {
-    const entry = map.get(batch.item_id);
-    if (!entry) continue;
-    if (entry.current_price === null) {
-      entry.current_price = effectivePrice(batch).toFixed(2);
+    const list = batchesByItem.get(batch.item_id);
+    if (list) list.push(batch);
+    else batchesByItem.set(batch.item_id, [batch]);
+  }
+
+  for (const item of items) {
+    const itemBatches = batchesByItem.get(item.id) ?? [];
+    const preferred = item.preferred_batch_id
+      ? itemBatches.find((b) => b.id === item.preferred_batch_id)
+      : undefined;
+    // itemBatches is already FIFO-ordered, so [0] is the oldest-first pick.
+    const priced = preferred ?? itemBatches[0];
+
+    let nearestExpiry: Date | null = null;
+    for (const b of itemBatches) {
+      if (b.expiry_date && (nearestExpiry === null || b.expiry_date < nearestExpiry)) {
+        nearestExpiry = b.expiry_date;
+      }
     }
-    if (batch.expiry_date && (entry.nearest_expiry === null || batch.expiry_date < entry.nearest_expiry)) {
-      entry.nearest_expiry = batch.expiry_date;
-    }
+
+    map.set(item.id, {
+      current_price: priced ? effectivePrice(priced).toFixed(2) : null,
+      nearest_expiry: nearestExpiry,
+    });
   }
 
   return map;
@@ -96,8 +118,8 @@ export async function listItems(clinicId: string, params: InventoryQuery, retail
 
   const limit = params.limit;
 
-  async function withAggregates<T extends { id: string }>(items: T[]) {
-    const aggregates = await batchAggregatesByItem(items.map((i) => i.id));
+  async function withAggregates<T extends { id: string; preferred_batch_id: string | null }>(items: T[]) {
+    const aggregates = await batchAggregatesByItem(items);
     return items.map((i) => ({ ...i, ...(aggregates.get(i.id) ?? { current_price: null, nearest_expiry: null }) }));
   }
 
@@ -151,7 +173,7 @@ export async function getItem(id: string, clinicId: string, retailOnly = false) 
       : [];
   const perfMap = new Map(performers.map((p) => [p.id, p]));
 
-  const aggregates = (await batchAggregatesByItem([item.id])).get(item.id) ?? {
+  const aggregates = (await batchAggregatesByItem([item])).get(item.id) ?? {
     current_price: null,
     nearest_expiry: null,
   };
@@ -284,14 +306,45 @@ export async function listBatches(itemId: string, clinicId: string, retailOnly =
   });
 }
 
+// Pins (or clears, when batchId is null) the batch that clinical dispensing
+// draws from by default — see resolveBatchForSaleTx. Staff-driven, not a
+// clinical decision, so this lives entirely on the Inventory side.
+export async function setPreferredBatch(
+  itemId: string,
+  clinicId: string,
+  batchId: string | null,
+  retailOnly = false,
+) {
+  await assertItem(itemId, clinicId, retailOnly);
+
+  if (batchId) {
+    const batch = await prisma.stockBatch.findFirst({
+      where: { id: batchId, item_id: itemId, is_closed: false },
+    });
+    if (!batch) throw new AppError('NOT_FOUND', 'Batch not found or already closed', 404);
+  }
+
+  return prisma.inventoryItem.update({
+    where: { id: itemId },
+    data: { preferred_batch_id: batchId },
+  });
+}
+
 /**
- * Picks the batch a sale/dispense should draw its price from — oldest active
- * batch (FIFO order) by default, or a caller-chosen batch when `batchId` is
- * given (e.g. one that's already open, or a deliberate pricing choice) —
- * and asserts it can cover the whole requested quantity. Selling across a
- * batch boundary would mean one invoice line billed at two different
- * prices, so instead of blending prices we ask the caller to split the sale
- * into two line items once a batch runs out.
+ * Picks the batch a sale/dispense should draw its price from, and asserts
+ * it can cover the whole requested quantity. Selling across a batch
+ * boundary would mean one invoice line billed at two different prices, so
+ * instead of blending prices we ask the caller to split the sale into two
+ * line items once a batch runs out.
+ *
+ * Resolution order when no explicit `batchId` is given (the case for every
+ * clinical caller — Prescriptions, Vaccinations, EMR Charges, POS — none of
+ * which expose batch choice in their UI):
+ *   1. The item's pinned "preferred" batch (see `InventoryItem.preferred_batch_id`,
+ *      set via "Use this batch" on the item detail page), if it's still open
+ *      and has enough quantity.
+ *   2. Otherwise, oldest-first (FIFO) — unchanged from before this existed.
+ * An explicit `batchId` always wins outright (a deliberate caller choice).
  */
 export async function resolveBatchForSaleTx(
   tx: TxClient,
@@ -303,12 +356,28 @@ export async function resolveBatchForSaleTx(
   const item = await tx.inventoryItem.findFirst({ where: { id: itemId, clinic_id: clinicId } });
   if (!item) throw new AppError('NOT_FOUND', 'Item not found', 404);
 
-  const batch = batchId
+  let batch = batchId
     ? await tx.stockBatch.findFirst({ where: { id: batchId, item_id: itemId, is_closed: false } })
-    : await tx.stockBatch.findFirst({
-        where:   activeBatchWhere(itemId),
-        orderBy: FIFO_ORDER,
-      });
+    : null;
+
+  if (!batchId && item.preferred_batch_id) {
+    batch = await tx.stockBatch.findFirst({
+      where: {
+        id: item.preferred_batch_id,
+        item_id: itemId,
+        is_closed: false,
+        quantity_remaining: { gte: quantity },
+      },
+    });
+  }
+
+  if (!batchId && !batch) {
+    batch = await tx.stockBatch.findFirst({
+      where:   activeBatchWhere(itemId),
+      orderBy: FIFO_ORDER,
+    });
+  }
+
   if (!batch) {
     throw new AppError(
       'BAD_REQUEST',
@@ -543,7 +612,7 @@ export async function getAlerts(clinicId: string, retailOnly = false) {
   });
 
   const lowStock = all.filter((i) => i.quantity_on_hand <= i.reorder_threshold);
-  const lowStockAggregates = await batchAggregatesByItem(lowStock.map((i) => i.id));
+  const lowStockAggregates = await batchAggregatesByItem(lowStock);
   const lowStockWithPrice = lowStock.map((i) => ({
     ...i,
     ...(lowStockAggregates.get(i.id) ?? { current_price: null, nearest_expiry: null }),
