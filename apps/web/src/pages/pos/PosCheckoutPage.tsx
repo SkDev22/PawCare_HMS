@@ -38,6 +38,7 @@ import { useAuthStore } from "@/stores/auth.store";
 import { hasPermission } from "@/lib/permissions";
 import { formatCurrency } from "@/lib/currency";
 import type { PosCartItem, PosSale } from "@/types/pos";
+import { PosReceiptPrint } from "./components/PosReceiptPrint";
 
 interface HeldSale {
   id: string;
@@ -207,6 +208,30 @@ function CustomerInput({
   );
 }
 
+// Named-page CSS (page: <ident>) proved unreliable for actually changing
+// the physical page size at print time, so instead we inject a plain
+// @page override right before printing and remove it once the print
+// dialog closes — this is the same @page mechanism that already works
+// for the A4 documents elsewhere in the app, just swapped in temporarily.
+// "auto" height is deliberate: thermal receipt paper is a continuous roll
+// with no fixed length — a real thermal printer's driver cuts right after
+// the content ends, so "auto" is what avoids wasting blank paper. Virtual
+// destinations with no printer behind them (e.g. "Save as PDF") can't
+// represent a variable-length page and will fall back to a default page
+// size in preview — that's a limitation of previewing without the actual
+// roll-paper hardware, not a bug; a real thermal printer prints this correctly.
+function printThermalReceipt() {
+  const style = document.createElement("style");
+  style.textContent = "@page { size: 80mm auto; margin: 2mm; }";
+  document.head.appendChild(style);
+  const cleanup = () => {
+    style.remove();
+    window.removeEventListener("afterprint", cleanup);
+  };
+  window.addEventListener("afterprint", cleanup);
+  window.print();
+}
+
 function Receipt({
   sale,
   clinic,
@@ -219,9 +244,11 @@ function Receipt({
   onClose?: () => void;
 }) {
   return (
-    <div className="mx-auto max-w-md space-y-6">
-      <div className="print:hidden flex justify-end gap-2">
-        <Button variant="outline" onClick={() => window.print()}>
+    <>
+      <PosReceiptPrint sale={sale} clinic={clinic} />
+      <div className="mx-auto max-w-md space-y-6 print:hidden">
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" onClick={printThermalReceipt}>
           <Printer className="h-4 w-4 mr-2" />
           Print Receipt
         </Button>
@@ -329,7 +356,8 @@ function Receipt({
           </p>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </>
   );
 }
 
