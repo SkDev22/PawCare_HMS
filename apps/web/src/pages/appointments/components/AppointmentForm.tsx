@@ -5,6 +5,7 @@ import { z } from "zod";
 import { Search, PawPrint, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -456,7 +457,7 @@ export function AppointmentForm({
                       Date <span className="text-destructive">*</span>
                     </FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <DatePicker {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

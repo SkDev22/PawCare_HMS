@@ -38,6 +38,7 @@ import {
 } from "../../components/ui/tabs";
 import { Textarea } from "../../components/ui/textarea";
 import { Input } from "../../components/ui/input";
+import { DatePicker } from "../../components/ui/date-picker";
 import {
   Form,
   FormControl,
@@ -193,7 +194,7 @@ function SoapNoteTab({
                     Next Visit Date
                   </FormLabel>
                   <FormControl>
-                    <Input type="date" {...f} />
+                    <DatePicker {...f} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -894,7 +895,7 @@ function AddVaccinationDialog({
                   <FormItem>
                     <FormLabel>Administered On</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <DatePicker {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -907,7 +908,7 @@ function AddVaccinationDialog({
                   <FormItem>
                     <FormLabel>Next Due (optional)</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <DatePicker {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

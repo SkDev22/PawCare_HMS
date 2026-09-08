@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
+import { DatePicker } from "../../components/ui/date-picker";
 import { Label } from "../../components/ui/label";
 import { Switch } from "../../components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
@@ -589,7 +590,7 @@ export function InventoryNewPage() {
                           <FormItem>
                             <FormLabel>Expiry Date</FormLabel>
                             <FormControl>
-                              <Input type="date" {...field} />
+                              <DatePicker {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
+import { DatePicker } from "../../../components/ui/date-picker";
 import { Textarea } from "../../../components/ui/textarea";
 import { Label } from "../../../components/ui/label";
 import {
@@ -389,12 +390,11 @@ export function GrnFormPage() {
                       />
                     </td>
                     <td className="px-3 py-2">
-                      <Input
-                        type="date"
+                      <DatePicker
                         className="h-9"
                         value={row.expiry_date}
-                        onChange={(e) =>
-                          updateRow(row.key, { expiry_date: e.target.value })
+                        onChange={(value) =>
+                          updateRow(row.key, { expiry_date: value })
                         }
                       />
                     </td>

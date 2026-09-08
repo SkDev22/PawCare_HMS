@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { Plus, Search, FileText } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
+import { DatePicker } from "../../components/ui/date-picker";
 import { Badge } from "../../components/ui/badge";
 import {
   Card,
@@ -145,18 +146,16 @@ export function EmrPage() {
               />
             </div>
             <div className="flex gap-2 items-center">
-              <Input
-                type="date"
+              <DatePicker
                 value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
+                onChange={setDateFrom}
                 className="w-40"
                 placeholder="From"
               />
               <span className="text-muted-foreground text-sm">to</span>
-              <Input
-                type="date"
+              <DatePicker
                 value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
+                onChange={setDateTo}
                 className="w-40"
                 placeholder="To"
               />

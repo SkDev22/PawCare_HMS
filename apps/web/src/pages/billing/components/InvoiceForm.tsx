@@ -7,6 +7,7 @@ import { useOwners } from '../../../hooks/use-owners';
 import { useCreateInvoice } from '../../../hooks/use-billing';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
+import { DatePicker } from '../../../components/ui/date-picker';
 import { Textarea } from '../../../components/ui/textarea';
 import { Label } from '../../../components/ui/label';
 import {
@@ -138,7 +139,7 @@ export function InvoiceForm({ onSuccess, onCancel }: Props) {
             <FormItem>
               <FormLabel>Due Date</FormLabel>
               <FormControl>
-                <Input type="date" {...field} />
+                <DatePicker {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

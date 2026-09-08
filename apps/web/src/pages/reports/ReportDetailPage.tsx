@@ -5,6 +5,7 @@ import { ArrowLeft, Printer } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
+import { DatePicker } from "../../components/ui/date-picker";
 import { Label } from "../../components/ui/label";
 import { getReportByKey } from "./report-registry";
 import { useAuthStore } from "../../stores/auth.store";
@@ -184,24 +185,22 @@ export function ReportDetailPage() {
               <div className="flex items-end gap-2">
                 <div className="space-y-1">
                   <Label className="text-xs">From</Label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     className="h-8 text-sm"
                     value={startDate}
-                    onChange={(e) => {
-                      setStartDate(e.target.value);
+                    onChange={(value) => {
+                      setStartDate(value);
                       setPreset(-1);
                     }}
                   />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">To</Label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     className="h-8 text-sm"
                     value={endDate}
-                    onChange={(e) => {
-                      setEndDate(e.target.value);
+                    onChange={(value) => {
+                      setEndDate(value);
                       setPreset(-1);
                     }}
                   />
