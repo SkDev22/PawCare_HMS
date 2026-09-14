@@ -1516,9 +1516,14 @@ function PrescriptionsTab({
                       </Badge>
                     ) : rx.controlled_substance_approval?.status ===
                       "PENDING" ? (
-                      <Badge variant="warning" className="text-xs">
-                        Pending Dual Sign-off
-                      </Badge>
+                      <Link to="/inventory/alerts">
+                        <Badge
+                          variant="warning"
+                          className="text-xs hover:opacity-80 cursor-pointer"
+                        >
+                          Pending Dual Sign-off →
+                        </Badge>
+                      </Link>
                     ) : rx.controlled_substance_approval?.status ===
                       "REJECTED" ? (
                       <Badge variant="destructive" className="text-xs">

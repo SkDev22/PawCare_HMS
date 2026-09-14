@@ -18,28 +18,8 @@ import { useNotifications, useUnreadCount, useMarkRead, useMarkAllRead } from '@
 import { useRefreshMyPermissions } from '@/hooks/use-role-permissions';
 import { useAuthStore } from '@/stores/auth.store';
 import { connectSocket, disconnectSocket } from '@/lib/socket';
+import { notifTitle, notifLink } from '@/lib/notification-display';
 import type { Notification } from '@/types/notifications';
-
-function notifTitle(type: string): string {
-  const map: Record<string, string> = {
-    lab_result_abnormal:           'Abnormal Lab Result',
-    appointment_reminder:          'Appointment Reminder',
-    appointment_created:           'New Appointment',
-    appointment_reassigned:        'Appointment Assigned to You',
-    appointment_checked_in:        'Patient Checked In',
-    vaccine_due:                   'Vaccine Due',
-    invoice_overdue:               'Invoice Overdue',
-    payment_recorded:              'Payment Recorded',
-    low_stock:                     'Low Stock Alert',
-    controlled_substance_dispensed: 'Controlled Substance Dispensed',
-    ward_admission:                'Patient Admitted',
-    ward_discharge:                'Patient Discharged',
-    schedule_changed:              'Schedule Updated',
-    daily_digest:                  'Daily Summary',
-    system:                        'System',
-  };
-  return map[type] ?? type.replace(/_/g, ' ');
-}
 
 export function Notifications() {
   const navigate    = useNavigate();
@@ -112,11 +92,15 @@ export function Notifications() {
         ) : (
           notifications.map((n) => {
             const isUnread = !n.read_at;
+            const link = notifLink(n.type);
             return (
               <DropdownMenuItem
                 key={n.id}
                 className="flex flex-col items-start gap-1 py-3 cursor-pointer"
-                onClick={() => { if (isUnread) markRead.mutate(n.id); }}
+                onClick={() => {
+                  if (isUnread) markRead.mutate(n.id);
+                  if (link) navigate(link);
+                }}
               >
                 <div className="flex w-full items-center gap-2">
                   <span className="text-sm font-medium leading-none">{notifTitle(n.type)}</span>

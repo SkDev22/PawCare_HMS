@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { Bell, CheckCheck, BellOff, Trash2 } from "lucide-react";
 import { Button } from "../../components/ui/button";
@@ -30,26 +31,14 @@ import {
   useMarkAllRead,
   useDeleteReadNotifications,
 } from "../../hooks/use-notifications";
+import { notifTitle, notifLink } from "../../lib/notification-display";
 
 const PAGE_SIZE = 30;
-
-// ── Type → display label ──────────────────────────────────────────────────────
-
-function notifTitle(type: string): string {
-  const map: Record<string, string> = {
-    lab_result_abnormal: "Abnormal Lab Result",
-    appointment_reminder: "Appointment Reminder",
-    vaccine_due: "Vaccine Due",
-    invoice_overdue: "Invoice Overdue",
-    low_stock: "Low Stock Alert",
-    system: "System Notification",
-  };
-  return map[type] ?? type.replace(/_/g, " ");
-}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function NotificationsPage() {
+  const navigate = useNavigate();
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
 
@@ -163,6 +152,7 @@ export function NotificationsPage() {
             <div className="divide-y">
               {notifications.map((notif) => {
                 const isUnread = !notif.read_at;
+                const link = notifLink(notif.type);
                 return (
                   <div
                     key={notif.id}
@@ -212,17 +202,32 @@ export function NotificationsPage() {
                             addSuffix: true,
                           })}
                         </p>
-                        {isUnread && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 text-xs px-2"
-                            onClick={() => markRead.mutate(notif.id)}
-                            disabled={markRead.isPending}
-                          >
-                            Mark read
-                          </Button>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {link && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-xs px-2"
+                              onClick={() => {
+                                if (isUnread) markRead.mutate(notif.id);
+                                navigate(link);
+                              }}
+                            >
+                              View
+                            </Button>
+                          )}
+                          {isUnread && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-xs px-2"
+                              onClick={() => markRead.mutate(notif.id)}
+                              disabled={markRead.isPending}
+                            >
+                              Mark read
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
