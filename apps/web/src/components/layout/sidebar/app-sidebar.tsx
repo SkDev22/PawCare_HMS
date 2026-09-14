@@ -154,6 +154,10 @@ const NAV_GROUPS: {
         href: "/staff",
         icon: UserCog,
         permission: "STAFF_READ",
+        items: [
+          { title: "Staff Management", href: "/staff" },
+          { title: "Permissions", href: "/staff/permissions" },
+        ],
       },
       {
         title: "Audit Log",

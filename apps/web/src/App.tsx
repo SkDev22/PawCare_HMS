@@ -29,6 +29,7 @@ import { BillingPage } from './pages/billing/BillingPage';
 import { InvoiceDetailPage } from './pages/billing/InvoiceDetailPage';
 import { StaffPage } from './pages/staff/StaffPage';
 import { StaffDetailPage } from './pages/staff/StaffDetailPage';
+import { PermissionsPage } from './pages/staff/PermissionsPage';
 import { AuditLogPage } from './pages/audit-log/AuditLogPage';
 import { LabPage } from './pages/lab/LabPage';
 import { LabOrderDetailPage } from './pages/lab/LabOrderDetailPage';
@@ -194,8 +195,9 @@ export function App() {
           <Route path="/pos" element={<AuthLayout permission="PAYMENT_PROCESS" feature="PET_SHOP"><PosCheckoutPage /></AuthLayout>} />
 
           {/* Staff Management */}
-          <Route path="/staff"     element={<AuthLayout permission="STAFF_READ"><StaffPage /></AuthLayout>} />
-          <Route path="/staff/:id" element={<AuthLayout permission="STAFF_READ"><StaffDetailPage /></AuthLayout>} />
+          <Route path="/staff"             element={<AuthLayout permission="STAFF_READ"><StaffPage /></AuthLayout>} />
+          <Route path="/staff/permissions" element={<AuthLayout permission="ROLE_PERMISSIONS_MANAGE"><PermissionsPage /></AuthLayout>} />
+          <Route path="/staff/:id"         element={<AuthLayout permission="STAFF_READ"><StaffDetailPage /></AuthLayout>} />
           <Route path="/audit-log" element={<AuthLayout permission="AUDIT_LOG_READ"><AuditLogPage /></AuthLayout>} />
 
           {/* Laboratory */}

@@ -124,7 +124,13 @@ const ALL_PAGES: Array<{
     permission: "PAYMENT_PROCESS",
     feature: "PET_SHOP",
   },
-  { title: "Staff", href: "/staff", icon: UserCog, permission: "STAFF_READ" },
+  { title: "Staff Management", href: "/staff", icon: UserCog, permission: "STAFF_READ" },
+  {
+    title: "Staff Permissions",
+    href: "/staff/permissions",
+    icon: UserCog,
+    permission: "ROLE_PERMISSIONS_MANAGE",
+  },
   {
     title: "Audit Log",
     href: "/audit-log",

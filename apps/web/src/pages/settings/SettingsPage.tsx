@@ -17,7 +17,6 @@ import { SubscriptionCard } from "./components/SubscriptionCard";
 // import { BusinessHoursForm } from "./components/BusinessHoursForm";
 import { DataExportCard } from "./components/DataExportCard";
 import { ServicesManagementCard } from "./components/ServicesManagementCard";
-import { RolePermissionsCard } from "./components/RolePermissionsCard";
 
 const PLACEHOLDER_SECTIONS = [
   {
@@ -89,7 +88,6 @@ export function SettingsPage() {
   const canManageServices = hasPermission(effectivePermissions, "INVOICE_WRITE");
   const canExport =
     hasPermission(effectivePermissions, "REPORT_READ") && hasFeature(user, "REPORTS");
-  const canManageRolePermissions = hasPermission(effectivePermissions, "ROLE_PERMISSIONS_MANAGE");
 
   return (
     <div className="space-y-6 w-full">
@@ -110,8 +108,6 @@ export function SettingsPage() {
         {/* {canEditClinicInfo && <BusinessHoursForm />} */}
 
         {canManageServices && <ServicesManagementCard />}
-
-        {canManageRolePermissions && <RolePermissionsCard />}
 
         <NotificationPreferencesCard />
 
