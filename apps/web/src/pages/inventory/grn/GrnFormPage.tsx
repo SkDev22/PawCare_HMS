@@ -224,6 +224,7 @@ export function GrnFormPage() {
               Supplier Name <span className="text-destructive">*</span>
             </Label>
             <SupplierPicker
+              autoFocus
               name={supplierName}
               onChange={({ id, name }) => {
                 setSupplierId(id);

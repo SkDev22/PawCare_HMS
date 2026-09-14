@@ -9,7 +9,12 @@ import { Input } from "../../components/ui/input";
 import { DatePicker } from "../../components/ui/date-picker";
 import { Label } from "../../components/ui/label";
 import { Switch } from "../../components/ui/switch";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/card";
 import {
   Form,
   FormControl,
@@ -25,7 +30,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
-import { useCreateInventoryItem, useInventoryItems } from "../../hooks/use-inventory";
+import {
+  useCreateInventoryItem,
+  useInventoryItems,
+} from "../../hooks/use-inventory";
 import { useCreateGrn } from "../../hooks/use-grn";
 import { useDebounce } from "../../hooks/use-debounce";
 import { SupplierPicker } from "../../components/inventory/SupplierPicker";
@@ -105,7 +113,10 @@ export function InventoryNewPage() {
   // feature) can only ever catalog RETAIL items — the backend rejects
   // anything else, so the form locks the choice instead of letting the
   // user pick a value that will be refused on submit.
-  const retailOnly = isInventoryRetailOnly(user?.plan ?? "TRIAL", user?.extra_features ?? []);
+  const retailOnly = isInventoryRetailOnly(
+    user?.plan ?? "TRIAL",
+    user?.extra_features ?? [],
+  );
 
   const [receiveStockNow, setReceiveStockNow] = useState(true);
   const [supplierName, setSupplierName] = useState("");
@@ -120,7 +131,9 @@ export function InventoryNewPage() {
 
   const form = useForm<z.infer<typeof CreateSchema>>({
     resolver: zodResolver(CreateSchema),
-    defaultValues: retailOnly ? { ...DEFAULT_VALUES, category: "RETAIL" } : DEFAULT_VALUES,
+    defaultValues: retailOnly
+      ? { ...DEFAULT_VALUES, category: "RETAIL" }
+      : DEFAULT_VALUES,
   });
 
   const stockForm = useForm<z.infer<typeof StockSchema>>({
@@ -171,7 +184,9 @@ export function InventoryNewPage() {
       {
         supplier_name: supplierName,
         ...(supplierId ? { supplier_id: supplierId } : {}),
-        ...(supplierInvoiceNo ? { supplier_invoice_no: supplierInvoiceNo } : {}),
+        ...(supplierInvoiceNo
+          ? { supplier_invoice_no: supplierInvoiceNo }
+          : {}),
         items: [
           {
             item_id: itemId,
@@ -186,7 +201,9 @@ export function InventoryNewPage() {
       },
       {
         onSuccess: () => completeCycle(),
-        onError: (err: { response?: { data?: { error?: { message?: string } } } }) => {
+        onError: (err: {
+          response?: { data?: { error?: { message?: string } } };
+        }) => {
           setStockError(
             err?.response?.data?.error?.message ??
               "Failed to save initial stock — the item was created; retry below.",
@@ -224,7 +241,9 @@ export function InventoryNewPage() {
         reorder_threshold: values.reorder_threshold,
         ...(values.sku ? { sku: values.sku } : {}),
         ...(values.barcode ? { barcode: values.barcode } : {}),
-        ...(values.supplier_name ? { supplier_name: values.supplier_name } : {}),
+        ...(values.supplier_name
+          ? { supplier_name: values.supplier_name }
+          : {}),
         ...(values.location ? { location: values.location } : {}),
         is_controlled: values.is_controlled,
       },
@@ -255,7 +274,7 @@ export function InventoryNewPage() {
           <h1 className="text-xl font-semibold">Add Inventory Item</h1>
           <p className="text-sm text-muted-foreground">
             Catalog the item and, if you have stock in hand, receive it in the
-            same step — no need to visit Goods Received separately.
+            same step. No need to visit Goods Received separately.
             {addedCount > 0 && ` Added ${addedCount} so far.`}
           </p>
         </div>
@@ -269,7 +288,10 @@ export function InventoryNewPage() {
           <CardContent>
             <Form {...form}>
               <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
-                <fieldset disabled={!!pendingItemId} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <fieldset
+                  disabled={!!pendingItemId}
+                  className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+                >
                   <FormField
                     control={form.control}
                     name="barcode"
@@ -282,7 +304,11 @@ export function InventoryNewPage() {
                               first load and after each item is saved (see
                               completeCycle's form.setFocus("barcode")) — scan the
                               next item immediately with no click needed. */}
-                          <Input autoFocus placeholder="Scan barcode, or type it in" {...field} />
+                          <Input
+                            autoFocus
+                            placeholder="Scan barcode, or type it in"
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                         {duplicateItem && (
@@ -291,7 +317,9 @@ export function InventoryNewPage() {
                             <button
                               type="button"
                               className="underline underline-offset-2 hover:no-underline"
-                              onClick={() => navigate(`/inventory/${duplicateItem.id}`)}
+                              onClick={() =>
+                                navigate(`/inventory/${duplicateItem.id}`)
+                              }
                             >
                               {duplicateItem.name}
                             </button>
@@ -311,7 +339,10 @@ export function InventoryNewPage() {
                           Name <span className="text-destructive">*</span>
                         </FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g. Amoxicillin 250mg" {...field} />
+                          <Input
+                            placeholder="e.g. Amoxicillin 250mg"
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -331,7 +362,10 @@ export function InventoryNewPage() {
                             Pet Shop (Retail)
                           </div>
                         ) : (
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value}
+                          >
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue />
@@ -360,7 +394,10 @@ export function InventoryNewPage() {
                           Unit <span className="text-destructive">*</span>
                         </FormLabel>
                         <FormControl>
-                          <Input placeholder="tablet, ml, box, each" {...field} />
+                          <Input
+                            placeholder="tablet, ml, box, each"
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -416,7 +453,10 @@ export function InventoryNewPage() {
                       <FormItem>
                         <FormLabel>Location / Shelf</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g. Cabinet A, Shelf 2" {...field} />
+                          <Input
+                            placeholder="e.g. Cabinet A, Shelf 2"
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -430,7 +470,10 @@ export function InventoryNewPage() {
                       type="button"
                       disabled={!!pendingItemId}
                       onClick={() =>
-                        form.setValue("is_controlled", !form.watch("is_controlled"))
+                        form.setValue(
+                          "is_controlled",
+                          !form.watch("is_controlled"),
+                        )
                       }
                       className={`w-10 h-6 rounded-full transition-colors shrink-0 disabled:opacity-50 ${
                         form.watch("is_controlled")
@@ -440,7 +483,9 @@ export function InventoryNewPage() {
                     >
                       <span
                         className={`block h-4 w-4 rounded-full bg-white shadow transition-transform mx-auto ${
-                          form.watch("is_controlled") ? "translate-x-2" : "-translate-x-2"
+                          form.watch("is_controlled")
+                            ? "translate-x-2"
+                            : "-translate-x-2"
                         }`}
                       />
                     </button>
@@ -456,7 +501,10 @@ export function InventoryNewPage() {
           <CardHeader className="pb-3 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-medium">Initial Stock</CardTitle>
             <div className="flex items-center gap-2">
-              <Label htmlFor="receive-now" className="text-xs text-muted-foreground font-normal">
+              <Label
+                htmlFor="receive-now"
+                className="text-xs text-muted-foreground font-normal"
+              >
                 Receive stock now
               </Label>
               <Switch
@@ -482,7 +530,10 @@ export function InventoryNewPage() {
               </p>
             ) : (
               <Form {...stockForm}>
-                <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
+                <form
+                  onSubmit={(e) => e.preventDefault()}
+                  className="space-y-4"
+                >
                   <fieldset disabled={!!pendingItemId} className="space-y-4">
                     <div className="space-y-1.5">
                       <Label>
@@ -527,7 +578,8 @@ export function InventoryNewPage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>
-                              Quantity <span className="text-destructive">*</span>
+                              Quantity{" "}
+                              <span className="text-destructive">*</span>
                             </FormLabel>
                             <FormControl>
                               <Input type="number" min="1" {...field} />
@@ -543,10 +595,16 @@ export function InventoryNewPage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>
-                              Unit Cost <span className="text-destructive">*</span>
+                              Unit Cost{" "}
+                              <span className="text-destructive">*</span>
                             </FormLabel>
                             <FormControl>
-                              <Input type="number" min="0" step="0.01" {...field} />
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                {...field}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -559,10 +617,16 @@ export function InventoryNewPage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>
-                              Selling Price <span className="text-destructive">*</span>
+                              Selling Price{" "}
+                              <span className="text-destructive">*</span>
                             </FormLabel>
                             <FormControl>
-                              <Input type="number" min="0" step="0.01" {...field} />
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                {...field}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -576,7 +640,13 @@ export function InventoryNewPage() {
                           <FormItem>
                             <FormLabel>Discount %</FormLabel>
                             <FormControl>
-                              <Input type="number" min="0" max="100" step="0.01" {...field} />
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                {...field}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -610,7 +680,11 @@ export function InventoryNewPage() {
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
-        <Button type="button" variant="outline" onClick={() => navigate("/inventory")}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => navigate("/inventory")}
+        >
           {addedCount > 0 ? "Done" : "Cancel"}
         </Button>
         <Button type="button" disabled={isBusy} onClick={handleSubmit}>

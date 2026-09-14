@@ -11,9 +11,11 @@ import { useDebounce } from "../../hooks/use-debounce";
 export function SupplierPicker({
   name,
   onChange,
+  autoFocus,
 }: {
   name: string;
   onChange: (v: { id: string | null; name: string }) => void;
+  autoFocus?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const debouncedName = useDebounce(name, 250);
@@ -37,6 +39,7 @@ export function SupplierPicker({
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         placeholder="Search or type a new supplier"
+        autoFocus={autoFocus}
       />
       {open && (
         <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md max-h-48 overflow-y-auto">
