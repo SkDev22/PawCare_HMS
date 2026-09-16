@@ -220,9 +220,15 @@ function CustomerInput({
 // represent a variable-length page and will fall back to a default page
 // size in preview — that's a limitation of previewing without the actual
 // roll-paper hardware, not a bug; a real thermal printer prints this correctly.
+// margin: 0 — an 80mm roll's actual printable width is narrower than 80mm
+// (the print head can't reach the very edges; this printer reports 72.1mm
+// printable). Any margin we add here stacks on top of that hardware-imposed
+// inset rather than replacing it, so it was clipping the right edge of the
+// receipt (see PosReceiptPrint.tsx's content width, sized to fit within
+// that printable width with 0 extra margin requested).
 function printThermalReceipt() {
   const style = document.createElement("style");
-  style.textContent = "@page { size: 80mm auto; margin: 2mm; }";
+  style.textContent = "@page { size: 80mm auto; margin: 0; }";
   document.head.appendChild(style);
   const cleanup = () => {
     style.remove();
@@ -629,7 +635,7 @@ export function PosCheckoutPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print:hidden">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold">Pet Shop Checkout</h1>

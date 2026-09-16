@@ -14,11 +14,14 @@ interface Props {
 // unreliable for actually changing the physical page size in testing.
 // Kept as a separate component from the on-screen `Receipt` card because
 // the two have fundamentally different layout constraints: a screen card
-// vs. a ~72mm-wide ticket.
+// vs. a narrow ticket. Content is sized to 68mm — narrower than this
+// printer's own reported 72.1mm printable width — to leave a safety margin
+// against printable-width variance across different 80mm thermal printers,
+// after a too-tight 72mm clipped the right edge on real hardware.
 export function PosReceiptPrint({ sale, clinic }: Props) {
   return (
     <div className="hidden print:block bg-white text-black">
-      <div className="w-[72mm] mx-auto font-mono text-[11px] leading-snug">
+      <div className="w-[68mm] mx-auto font-mono text-[11px] leading-snug">
         <div className="text-center space-y-0.5">
           {clinic && <p className="text-sm font-bold">{clinic.name}</p>}
           {clinic?.address && <p>{clinic.address}</p>}
